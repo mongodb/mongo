@@ -766,18 +766,20 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
             "collectionValidateOptions");
     auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
     auto parsedOptions = !validateOptions.isEmpty()
-        ? CollectionValidation::parseValidateOptions(opCtx, nss, validateOptions, skipAtClusterTime)
-        : CollectionValidation::ValidationOptions(
-              CollectionValidation::ValidateMode::kForegroundFull,
-              CollectionValidation::RepairMode::kNone,
+        ? collection_validation::parseValidateOptions(
+              opCtx, nss, validateOptions, skipAtClusterTime)
+        : collection_validation::ValidationOptions(
+              collection_validation::ValidateMode::kForegroundFull,
+              collection_validation::RepairMode::kNone,
               /*logDiagnostics=*/false);
-    if (parsedOptions.getRepairMode() != CollectionValidation::RepairMode::kNone) {
+    if (parsedOptions.getRepairMode() != collection_validation::RepairMode::kNone) {
         return Status{ErrorCodes::InvalidOptions,
                       "Repair is not allowed in offline validation mode"};
     }
     ValidateResults validateResults;
     try {
-        Status status = CollectionValidation::validate(opCtx, nss, parsedOptions, &validateResults);
+        Status status =
+            collection_validation::validate(opCtx, nss, parsedOptions, &validateResults);
 
         if (!status.isOK()) {
             LOGV2_ERROR(11790200,

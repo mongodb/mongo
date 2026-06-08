@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-namespace CollectionValidation {
+namespace collection_validation {
 /**
  * Returns the number of additional characters (N) we are appending to each hashPrefix
  * that is passed in.
@@ -67,7 +67,7 @@ namespace CollectionValidation {
  */
 size_t getNumberOfAdditionalCharactersForHashDrillDown(size_t numHashPrefixes,
                                                        size_t hashPrefixLength);
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 
 class IndexDescriptor;
 class OperationContext;
@@ -78,7 +78,7 @@ class OperationContext;
  */
 class ValidateAdaptor {
 public:
-    ValidateAdaptor(OperationContext* opCtx, CollectionValidation::ValidateState* validateState)
+    ValidateAdaptor(OperationContext* opCtx, collection_validation::ValidateState* validateState)
 
         : _keyBasedIndexConsistency(opCtx, validateState), _validateState(validateState) {}
 
@@ -178,7 +178,7 @@ public:
 
 private:
     KeyStringIndexConsistency _keyBasedIndexConsistency;
-    CollectionValidation::ValidateState* _validateState;
+    collection_validation::ValidateState* _validateState;
 
     // Saves the record count from the record store traversal to be used later to validate the index
     // entries count. Reset every time traverseRecordStore() is called.

@@ -232,7 +232,7 @@ public:
     }
 
     void validate(RecoveryUnit&,
-                  const CollectionValidation::ValidationOptions&,
+                  const collection_validation::ValidationOptions&,
                   ValidateResults*) final {
         unimplementedTasserted();
     }

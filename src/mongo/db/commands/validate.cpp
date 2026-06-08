@@ -245,8 +245,8 @@ public:
         }
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
-        CollectionValidation::ValidationOptions options =
-            CollectionValidation::parseValidateOptions(opCtx, nss, cmdObj);
+        collection_validation::ValidationOptions options =
+            collection_validation::parseValidateOptions(opCtx, nss, cmdObj);
 
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
@@ -290,7 +290,7 @@ public:
 
         ValidateResults validateResults;
         Status status =
-            CollectionValidation::validate(opCtx, nss, std::move(options), &validateResults);
+            collection_validation::validate(opCtx, nss, std::move(options), &validateResults);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

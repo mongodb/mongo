@@ -48,9 +48,9 @@ namespace {
 const auto kNss =
     NamespaceString::createNamespaceString_forTest("indexConsistencyDB.indexConsistencyColl");
 const auto kDefaultValidateOptions =
-    CollectionValidation::ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                            CollectionValidation::RepairMode::kNone,
-                                            /*logDiagnostics=*/true};
+    collection_validation::ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                             collection_validation::RepairMode::kNone,
+                                             /*logDiagnostics=*/true};
 
 using IndexConsistencyTest = CatalogTestFixture;
 
@@ -58,7 +58,7 @@ using IndexConsistencyTest = CatalogTestFixture;
 ValidateResults validate(OperationContext* opCtx) {
     ValidateResults validateResults;
     ASSERT_OK(
-        CollectionValidation::validate(opCtx, kNss, kDefaultValidateOptions, &validateResults));
+        collection_validation::validate(opCtx, kNss, kDefaultValidateOptions, &validateResults));
     return validateResults;
 }
 
@@ -370,7 +370,7 @@ TEST_F(IndexConsistencyTest, FailedKeygen) {
         wuow.commit();
     }
 
-    CollectionValidation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+    collection_validation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
 
     const auto unhashableDoc = std::invoke([] {
         BSONArrayBuilder bab;
@@ -415,7 +415,7 @@ TEST_F(IndexConsistencyTest, GeoKeygenFailureReportsStructuredError) {
         wuow.commit();
     }
 
-    CollectionValidation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+    collection_validation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
 
     // Longitude 200 is out of bounds. We assert that neither the _id ('secret-id') nor the
     // per-document reason ('out of bounds') reaches res.errors; both stay in the log.
@@ -465,7 +465,7 @@ TEST_F(IndexConsistencyTest, GeoKeygenFailuresCollapseAcrossDocuments) {
         wuow.commit();
     }
 
-    CollectionValidation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+    collection_validation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
     const auto geoIndex = coll->getIndexCatalog()->findIndexByName(opCtx, geoIndexName);
 
     ValidateResults results;

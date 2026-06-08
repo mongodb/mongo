@@ -53,7 +53,7 @@ class SortedDataBuilderInterface;
 class IndexValidateResults;
 class SortedDataKeyValueView;
 
-namespace CollectionValidation {
+namespace collection_validation {
 class ValidationOptions;
 }
 
@@ -256,7 +256,7 @@ public:
     virtual IndexValidateResults validate(
         OperationContext* opCtx,
         RecoveryUnit& ru,
-        const CollectionValidation::ValidationOptions& options) const = 0;
+        const collection_validation::ValidationOptions& options) const = 0;
 
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    RecoveryUnit& ru,

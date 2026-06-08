@@ -45,7 +45,7 @@ class BSONObjBuilder;
 class Status;
 class ValidateResults;
 
-namespace CollectionValidation {
+namespace collection_validation {
 
 /**
  * Checks if 'hashPrefixes' contains valid hash strings. Throws if any is invalid.
@@ -82,5 +82,5 @@ Status validate(OperationContext* opCtx,
  */
 MONGO_MOD_FILE_PRIVATE bool getIsValidationPausedForTest();
 
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 }  // namespace mongo

@@ -86,7 +86,7 @@ ResourceMutex validateLock("validateLock");
 MONGO_FAIL_POINT_DEFINE(hangDuringValidationInitialization);
 MONGO_FAIL_POINT_DEFINE(skipEnforcingFastSizeAndCount);
 
-namespace CollectionValidation {
+namespace collection_validation {
 
 StringData toString(FastCountType fastCountType) {
     switch (fastCountType) {
@@ -392,5 +392,5 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     _firstRecordId = record ? std::move(record->id) : RecordId();
 }
 
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 }  // namespace mongo

@@ -59,7 +59,7 @@
 
 namespace mongo {
 
-namespace CollectionValidation {
+namespace collection_validation {
 class ValidationOptions;
 }
 
@@ -149,7 +149,7 @@ public:
     IndexValidateResults validate(
         OperationContext* opCtx,
         RecoveryUnit& ru,
-        const CollectionValidation::ValidationOptions& options) const override;
+        const collection_validation::ValidationOptions& options) const override;
 
     bool appendCustomStats(OperationContext* opCtx,
                            RecoveryUnit& ru,

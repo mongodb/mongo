@@ -393,14 +393,14 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     {
         ValidateResults validateResults;
 
-        ASSERT_OK(
-            CollectionValidation::validate(_opCtx.get(),
-                                           _nss,
-                                           CollectionValidation::ValidationOptions{
-                                               CollectionValidation::ValidateMode::kForegroundFull,
-                                               CollectionValidation::RepairMode::kNone,
-                                               /*logDiagnostics=*/false},
-                                           &validateResults));
+        ASSERT_OK(collection_validation::validate(
+            _opCtx.get(),
+            _nss,
+            collection_validation::ValidationOptions{
+                collection_validation::ValidateMode::kForegroundFull,
+                collection_validation::RepairMode::kNone,
+                /*logDiagnostics=*/false},
+            &validateResults));
         ASSERT_TRUE(validateResults.isValid());
     }
 

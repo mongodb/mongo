@@ -101,15 +101,15 @@ void ValidateResults::addMissingIndexEntry(BSONObj entry) {
     }
 }
 
-void ValidateResults::setRepairMode(CollectionValidation::RepairMode mode) {
+void ValidateResults::setRepairMode(collection_validation::RepairMode mode) {
     switch (mode) {
-        case CollectionValidation::RepairMode::kNone:
+        case collection_validation::RepairMode::kNone:
             _repairMode = "None";
             break;
-        case CollectionValidation::RepairMode::kFixErrors:
+        case collection_validation::RepairMode::kFixErrors:
             _repairMode = "FixErrors";
             break;
-        case CollectionValidation::RepairMode::kAdjustMultikey:
+        case collection_validation::RepairMode::kAdjustMultikey:
             _repairMode = "AdjustMultikey";
             break;
     }

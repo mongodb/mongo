@@ -29,7 +29,7 @@
 
 #include "mongo/db/validate/validate_options.h"
 
-namespace mongo::CollectionValidation {
+namespace mongo::collection_validation {
 
 ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      RepairMode repairMode,
@@ -48,4 +48,4 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
       _hashPrefixes(std::move(hashPrefixes)),
       _revealHashedIds(std::move(revealHashedIds)) {}
 
-}  // namespace mongo::CollectionValidation
+}  // namespace mongo::collection_validation

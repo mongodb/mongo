@@ -100,7 +100,7 @@ public:
     static const size_t kNumHashBuckets;
 
     IndexConsistency(OperationContext* opCtx,
-                     CollectionValidation::ValidateState* validateState,
+                     collection_validation::ValidateState* validateState,
                      size_t numHashBuckets = kNumHashBuckets);
 
     /**
@@ -117,7 +117,7 @@ protected:
         uint32_t bucketSizeBytes = 0;
     };
 
-    CollectionValidation::ValidateState* _validateState;
+    collection_validation::ValidateState* _validateState;
 
     // We map the hashed KeyString values to a bucket that contains the count of how many
     // index keys and document keys we've seen in each bucket. This counter is unsigned to avoid
@@ -158,7 +158,7 @@ class KeyStringIndexConsistency final : protected IndexConsistency {
 
 public:
     KeyStringIndexConsistency(OperationContext* opCtx,
-                              CollectionValidation::ValidateState* validateState,
+                              collection_validation::ValidateState* validateState,
                               size_t numHashBuckets = kNumHashBuckets);
 
     void setSecondPhase() {

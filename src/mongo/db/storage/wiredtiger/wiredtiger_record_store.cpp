@@ -1101,7 +1101,7 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
 }
 
 void WiredTigerRecordStore::validate(RecoveryUnit& ru,
-                                     const CollectionValidation::ValidationOptions& options,
+                                     const collection_validation::ValidationOptions& options,
                                      ValidateResults* results) {
     if (_inMemory) {
         return;
@@ -1543,7 +1543,7 @@ std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getCursor(
 }
 
 void WiredTigerRecordStore::Oplog::validate(RecoveryUnit& ru,
-                                            const CollectionValidation::ValidationOptions& options,
+                                            const collection_validation::ValidationOptions& options,
                                             ValidateResults* results) {
     if (_inMemory) {
         return;

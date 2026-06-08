@@ -47,7 +47,7 @@ namespace timeseries::bucket_catalog {
 class MinMax;
 }  // namespace timeseries::bucket_catalog
 
-namespace CollectionValidation {
+namespace collection_validation {
 
 class ValidateState;
 
@@ -204,5 +204,5 @@ TimeseriesValidationStatus validateTimeSeriesBucketRecord(OperationContext* opCt
                                                           const BSONObj& recordBson,
                                                           ValidateResults& results);
 
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 }  // namespace mongo

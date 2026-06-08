@@ -86,12 +86,12 @@ void TimeseriesTestFixture::validateCollectionsHelper(
     const std::set<NamespaceString>& collections) {
     ValidateResults validateResults;
     for (const NamespaceString& nss : collections) {
-        ASSERT_OK(CollectionValidation::validate(
+        ASSERT_OK(collection_validation::validate(
             _opCtx,
             nss,
-            CollectionValidation::ValidationOptions{
-                /*mode=*/CollectionValidation::ValidateMode::kForegroundFull,
-                /*repairMode=*/CollectionValidation::RepairMode::kNone,
+            collection_validation::ValidationOptions{
+                /*mode=*/collection_validation::ValidateMode::kForegroundFull,
+                /*repairMode=*/collection_validation::RepairMode::kNone,
                 /*logDiagnostics=*/false},
             &validateResults));
         ASSERT(validateResults.isValid());

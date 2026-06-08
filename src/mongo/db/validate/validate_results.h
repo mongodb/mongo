@@ -50,10 +50,10 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
-namespace CollectionValidation {
+namespace collection_validation {
 // forwards declaring RepairMode to avoid adding validate_option to core headers
 enum class RepairMode;
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 
 class ValidateResultsIf {
 public:
@@ -250,7 +250,7 @@ public:
         _readTimestamp = std::move(readTimestampOpt);
     }
 
-    void setFastCountType(boost::optional<CollectionValidation::FastCountType> fastCountType) {
+    void setFastCountType(boost::optional<collection_validation::FastCountType> fastCountType) {
         _fastCountType = fastCountType;
     }
 
@@ -327,7 +327,7 @@ public:
         return _repairMode;
     }
 
-    void setRepairMode(CollectionValidation::RepairMode mode);
+    void setRepairMode(collection_validation::RepairMode mode);
 
     // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
     // validate results.
@@ -351,7 +351,7 @@ private:
     bool _hasStructuralDamage = false;
     boost::optional<Timestamp> _readTimestamp = boost::none;
 
-    boost::optional<CollectionValidation::FastCountType> _fastCountType = boost::none;
+    boost::optional<collection_validation::FastCountType> _fastCountType = boost::none;
 
     // Collection stats.
     // If validate doesn't progress far enough to determine these, they will remain nullopt.

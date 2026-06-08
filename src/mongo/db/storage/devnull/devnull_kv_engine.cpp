@@ -175,7 +175,7 @@ public:
     }
 
     void validate(RecoveryUnit&,
-                  const CollectionValidation::ValidationOptions&,
+                  const collection_validation::ValidationOptions&,
                   ValidateResults*) override {}
 
     void appendNumericCustomStats(RecoveryUnit& ru,
@@ -411,7 +411,7 @@ public:
     IndexValidateResults validate(
         OperationContext* opCtx,
         RecoveryUnit& ru,
-        const CollectionValidation::ValidationOptions& options) const override {
+        const collection_validation::ValidationOptions& options) const override {
         return IndexValidateResults{};
     }
 

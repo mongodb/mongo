@@ -144,11 +144,11 @@ std::vector<ValidateResults> foregroundValidate(
     const NamespaceString& nss,
     OperationContext* opCtx,
     const ForegroundValidateTestResults& expected,
-    std::initializer_list<CollectionValidation::ValidateMode> modes =
-        {CollectionValidation::ValidateMode::kForeground,
-         CollectionValidation::ValidateMode::kForegroundFull,
-         CollectionValidation::ValidateMode::kForegroundFullCheckBSON},
-    CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone,
+    std::initializer_list<collection_validation::ValidateMode> modes =
+        {collection_validation::ValidateMode::kForeground,
+         collection_validation::ValidateMode::kForegroundFull,
+         collection_validation::ValidateMode::kForegroundFullCheckBSON},
+    collection_validation::RepairMode repairMode = collection_validation::RepairMode::kNone,
     ValidationVersion validationVersion = currentValidationVersion) {
 
     std::vector<ValidateResults> results;
@@ -156,10 +156,10 @@ std::vector<ValidateResults> foregroundValidate(
     for (const auto mode : modes) {
         ValidateResults validateResults;
         EXPECT_EQ(ErrorCodes::OK,
-                  CollectionValidation::validate(
+                  collection_validation::validate(
                       opCtx,
                       nss,
-                      CollectionValidation::ValidationOptions{
+                      collection_validation::ValidationOptions{
                           mode, repairMode, /*logDiagnostics=*/false, validationVersion},
                       &validateResults))
             << "Validation Mode: " << static_cast<int>(mode);
@@ -335,7 +335,7 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCount) {
                         .numRecords = insertDataRange(opCtx, 0, 5),
                         .numInvalidDocuments = 0,
                         .numErrors = 0},
-                       {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount});
+                       {collection_validation::ValidateMode::kForegroundFullEnforceFastCount});
 }
 
 // Verify calling validate() with enforceFastSize=true.
@@ -347,7 +347,7 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastSize) {
                         .numRecords = insertDataRange(opCtx, 0, 5),
                         .numInvalidDocuments = 0,
                         .numErrors = 0},
-                       {CollectionValidation::ValidateMode::kForegroundFullEnforceFastSize});
+                       {collection_validation::ValidateMode::kForegroundFullEnforceFastSize});
 }
 
 // Verify calling validate() with enforceFastCount=true and enforceFastSize=true.
@@ -360,7 +360,7 @@ TEST_F(CollectionValidationTest, ValidateEnforceFastCountAndSize) {
          .numRecords = insertDataRange(opCtx, 0, 5),
          .numInvalidDocuments = 0,
          .numErrors = 0},
-        {CollectionValidation::ValidateMode::kForegroundFullEnforceFastCountAndSize});
+        {collection_validation::ValidateMode::kForegroundFullEnforceFastCountAndSize});
 }
 
 TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeUserLimit) {
@@ -372,7 +372,7 @@ TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeUserLimit) {
                         .numInvalidDocuments = 0,
                         .numErrors = 0,
                         .numWarnings = 0},
-                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+                       {collection_validation::ValidateMode::kForegroundCheckBSON});
 }
 
 TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeOverUserLimit) {
@@ -384,7 +384,7 @@ TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeOverUserLimit) {
                         .numInvalidDocuments = 1,
                         .numErrors = 1,
                         .numWarnings = 0},
-                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+                       {collection_validation::ValidateMode::kForegroundCheckBSON});
 }
 
 TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeInternalLimit) {
@@ -396,7 +396,7 @@ TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeInternalLimit) {
                         .numInvalidDocuments = 1,
                         .numErrors = 1,
                         .numWarnings = 0},
-                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+                       {collection_validation::ValidateMode::kForegroundCheckBSON});
 }
 
 TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeOverInternalLimit) {
@@ -408,7 +408,7 @@ TEST_F(CollectionValidationTest, ValidateCollectionDocumentSizeOverInternalLimit
                         .numInvalidDocuments = 1,
                         .numErrors = 1,
                         .numWarnings = 0},
-                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+                       {collection_validation::ValidateMode::kForegroundCheckBSON});
 }
 
 TEST_F(CollectionValidationTest, ValidateCollectionDocumentMixedSizes) {
@@ -424,7 +424,7 @@ TEST_F(CollectionValidationTest, ValidateCollectionDocumentMixedSizes) {
                         .numInvalidDocuments = 3,
                         .numErrors = 1,
                         .numWarnings = 0},
-                       {CollectionValidation::ValidateMode::kForegroundCheckBSON});
+                       {collection_validation::ValidateMode::kForegroundCheckBSON});
 }
 
 TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErrors) {
@@ -439,7 +439,7 @@ TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErro
          .numInvalidDocuments = std::numeric_limits<int32_t>::min(),  // uninitialized
          .numErrors = 1,
          .numWarnings = 1},
-        {CollectionValidation::ValidateMode::kForegroundFull});
+        {collection_validation::ValidateMode::kForegroundFull});
 }
 
 /**
@@ -449,10 +449,10 @@ TEST_F(CollectionValidationDiskTest, ValidateIndexDetailResultsSurfaceVerifyErro
  * A failpoint in the validate() code should have been set prior to calling this function.
  */
 void waitUntilValidateFailpointHasBeenReached() {
-    while (!CollectionValidation::getIsValidationPausedForTest()) {
+    while (!collection_validation::getIsValidationPausedForTest()) {
         sleepmillis(100);  // a fairly arbitrary sleep period.
     }
-    ASSERT(CollectionValidation::getIsValidationPausedForTest());
+    ASSERT(collection_validation::getIsValidationPausedForTest());
 }
 
 /**
@@ -586,24 +586,24 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
 }
 
 TEST_F(CollectionValidationTest, HashPrefixesEmptyString) {
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({""}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({""}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({""}, /*equalLength=*/false),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({""}, /*equalLength=*/false),
                        DBException,
                        ErrorCodes::InvalidOptions);
 }
 
 TEST_F(CollectionValidationTest, HashPrefixesTooLong) {
     constexpr int kHashStringMaxLen = 64;
-    ASSERT_DOES_NOT_THROW(CollectionValidation::validateHashes(
+    ASSERT_DOES_NOT_THROW(collection_validation::validateHashes(
         {std::string(kHashStringMaxLen, 'A')}, /*equalLength=*/true));
 
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes(
+    ASSERT_THROWS_CODE(collection_validation::validateHashes(
                            {std::string(kHashStringMaxLen + 1, 'A')}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes(
+    ASSERT_THROWS_CODE(collection_validation::validateHashes(
                            {std::string(kHashStringMaxLen + 1, 'A')}, /*equalLength=*/false),
                        DBException,
                        ErrorCodes::InvalidOptions);
@@ -611,28 +611,28 @@ TEST_F(CollectionValidationTest, HashPrefixesTooLong) {
 
 TEST_F(CollectionValidationTest, HashPrefixesDifferentLengths) {
     ASSERT_DOES_NOT_THROW(
-        CollectionValidation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/false));
+        collection_validation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/false));
 
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
 }
 
 TEST_F(CollectionValidationTest, HashPrefixesHexString) {
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"NOTHEX"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"NOTHEX"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"NOTHEX"}, /*equalLength=*/false),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"NOTHEX"}, /*equalLength=*/false),
                        DBException,
                        ErrorCodes::InvalidOptions);
 }
 
 TEST_F(CollectionValidationTest, HashPrefixesDuplicates) {
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"ABC", "ABC"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"ABC", "ABC"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(
-        CollectionValidation::validateHashes({"ABC", "ABCD", "A"}, /*equalLength=*/false),
+        collection_validation::validateHashes({"ABC", "ABCD", "A"}, /*equalLength=*/false),
         DBException,
         ErrorCodes::InvalidOptions);
 }
@@ -640,24 +640,24 @@ TEST_F(CollectionValidationTest, HashPrefixesDuplicates) {
 TEST_F(CollectionValidationTest, HashPrefixesCases) {
     constexpr int kHashStringMaxLen = 64;
     ASSERT_DOES_NOT_THROW(
-        CollectionValidation::validateHashes({"AAA1", "BBB1", "CCC1"}, /*equalLength=*/true));
-    ASSERT_DOES_NOT_THROW(CollectionValidation::validateHashes(
+        collection_validation::validateHashes({"AAA1", "BBB1", "CCC1"}, /*equalLength=*/true));
+    ASSERT_DOES_NOT_THROW(collection_validation::validateHashes(
         {std::string(kHashStringMaxLen, 'A')}, /*equalLength=*/true));
 
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"a"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"a"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"AAA", "BBBB"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"nothex"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"nothex"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
-    ASSERT_THROWS_CODE(CollectionValidation::validateHashes({"AAA", "AAA"}, /*equalLength=*/true),
+    ASSERT_THROWS_CODE(collection_validation::validateHashes({"AAA", "AAA"}, /*equalLength=*/true),
                        DBException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(
-        CollectionValidation::validateHashes({"abcd", "a", "ABCDEF"}, /*equalLength=*/true),
+        collection_validation::validateHashes({"abcd", "a", "ABCDEF"}, /*equalLength=*/true),
         DBException,
         ErrorCodes::InvalidOptions);
 }
@@ -979,8 +979,8 @@ public:
     NamespaceString _nss;
     OperationContext* _opCtx{nullptr};
     CollectionOptions _options;
-    CollectionValidation::ValidateMode _validateMode{
-        CollectionValidation::ValidateMode::kForeground};
+    collection_validation::ValidateMode _validateMode{
+        collection_validation::ValidateMode::kForeground};
     RAIIServerParameterControllerForTest _allowCorruptTimeseriesBuckets;
 
 protected:
@@ -1375,7 +1375,7 @@ TEST_P(TimeseriesCollectionValidationSchemaViolationTest,
         foregroundValidate(_nss,
                            _opCtx,
                            {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
-                           {CollectionValidation::ValidateMode::kForegroundFullCheckBSON});
+                           {collection_validation::ValidateMode::kForegroundFullCheckBSON});
     }
 }
 
@@ -1442,7 +1442,7 @@ TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
         _opCtx,
         {.valid = false, .numRecords = 1, .numInvalidDocuments = 1, .numErrors = 1},
         {_validateMode},
-        CollectionValidation::RepairMode::kNone,
+        collection_validation::RepairMode::kNone,
         V1_Original);
 
     ASSERT_EQ(results.size(), 1U);

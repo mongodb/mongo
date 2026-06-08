@@ -124,7 +124,7 @@ public:
     StatusWith<int64_t> _compact(OperationContext*, RecoveryUnit&, const CompactOptions&) override;
 
     void validate(RecoveryUnit&,
-                  const CollectionValidation::ValidationOptions&,
+                  const collection_validation::ValidationOptions&,
                   ValidateResults*) override;
 
     void appendNumericCustomStats(RecoveryUnit& ru,

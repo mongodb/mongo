@@ -69,7 +69,7 @@ class OperationContext;
 class RecoveryUnit;
 class ValidateResults;
 
-namespace CollectionValidation {
+namespace collection_validation {
 class ValidationOptions;
 }
 
@@ -631,7 +631,7 @@ public:
      * structures. If corruption is found, details of the errors will be in the results parameter.
      */
     virtual void validate(RecoveryUnit&,
-                          const CollectionValidation::ValidationOptions&,
+                          const collection_validation::ValidationOptions&,
                           ValidateResults*) = 0;
 
     /**

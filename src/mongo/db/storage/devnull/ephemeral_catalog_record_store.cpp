@@ -512,7 +512,7 @@ StatusWith<int64_t> EphemeralForTestRecordStore::_compact(OperationContext*,
 }
 
 void EphemeralForTestRecordStore::validate(RecoveryUnit&,
-                                           const CollectionValidation::ValidationOptions&,
+                                           const collection_validation::ValidationOptions&,
                                            ValidateResults*) {}
 
 void EphemeralForTestRecordStore::reserveRecordIds(OperationContext* opCtx,

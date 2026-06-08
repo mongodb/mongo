@@ -294,12 +294,12 @@ Status repairCollection(OperationContext* opCtx,
 
     // Exclude full record store validation because we have already validated the underlying
     // record store in the call to repairRecordStore above.
-    status = CollectionValidation::validate(
+    status = collection_validation::validate(
         opCtx,
         nss,
-        CollectionValidation::ValidationOptions(
-            CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
-            CollectionValidation::RepairMode::kFixErrors,
+        collection_validation::ValidationOptions(
+            collection_validation::ValidateMode::kForegroundFullIndexOnly,
+            collection_validation::RepairMode::kFixErrors,
             /*logDiagnostics=*/false),
         &validateResults);
     if (!status.isOK()) {

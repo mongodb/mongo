@@ -126,7 +126,7 @@ IndexInfo::IndexInfo(const IndexCatalogEntry& entry)
       accessMethod(entry.accessMethod()) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
-                                   CollectionValidation::ValidateState* validateState,
+                                   collection_validation::ValidateState* validateState,
                                    const size_t numHashBuckets)
     : _validateState(validateState), _firstPhase(true) {
     _indexKeyBuckets.resize(numHashBuckets);
@@ -139,7 +139,7 @@ void IndexConsistency::setSecondPhase() {
 
 KeyStringIndexConsistency::KeyStringIndexConsistency(
     OperationContext* opCtx,
-    CollectionValidation::ValidateState* validateState,
+    collection_validation::ValidateState* validateState,
     const size_t numHashBuckets)
     : IndexConsistency(opCtx, validateState, numHashBuckets) {
     for (const auto& indexIdent : _validateState->getIndexIdents()) {

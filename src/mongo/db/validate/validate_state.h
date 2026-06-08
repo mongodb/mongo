@@ -64,7 +64,7 @@
 
 namespace mongo {
 
-namespace CollectionValidation {
+namespace collection_validation {
 
 /**
  * Returns a scoped object, which holds the 'validateLock' in exclusive mode for
@@ -247,5 +247,5 @@ private:
     DataThrottle _dataThrottle;
 };
 
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 }  // namespace mongo

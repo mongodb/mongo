@@ -97,7 +97,7 @@ using std::string;
 
 MONGO_FAIL_POINT_DEFINE(pauseCollectionValidationWithLock);
 
-namespace CollectionValidation {
+namespace collection_validation {
 
 namespace {
 
@@ -699,7 +699,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         for (const auto& e : rawHashPrefixes.Array()) {
             hashPrefixes->push_back(boost::algorithm::to_upper_copy(e.String()));
         }
-        CollectionValidation::validateHashes(*hashPrefixes, /*equalLength=*/true);
+        collection_validation::validateHashes(*hashPrefixes, /*equalLength=*/true);
         if (!hashPrefixes->size()) {
             hashPrefixes->push_back(std::string(""));
         }
@@ -748,7 +748,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
         for (const auto& e : rawRevealHashedIdsArr) {
             revealHashedIds->push_back(boost::algorithm::to_upper_copy(e.String()));
         }
-        CollectionValidation::validateHashes(*revealHashedIds, /*equalLength=*/false);
+        collection_validation::validateHashes(*revealHashedIds, /*equalLength=*/false);
     }
 
     boost::optional<Timestamp> timestamp = boost::none;
@@ -787,64 +787,64 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
     const bool enforceFastCountAndSize = enforceFastCount && enforceFastSize;
     const auto validateMode = [&] {
         if (metadata) {
-            return CollectionValidation::ValidateMode::kMetadata;
+            return collection_validation::ValidateMode::kMetadata;
         }
         if (hashPrefixes) {
-            return CollectionValidation::ValidateMode::kHashDrillDown;
+            return collection_validation::ValidateMode::kHashDrillDown;
         }
         if (collHash) {
-            return CollectionValidation::ValidateMode::kCollectionHash;
+            return collection_validation::ValidateMode::kCollectionHash;
         }
         if (background) {
-            return checkBSONConformance ? CollectionValidation::ValidateMode::kBackgroundCheckBSON
-                                        : CollectionValidation::ValidateMode::kBackground;
+            return checkBSONConformance ? collection_validation::ValidateMode::kBackgroundCheckBSON
+                                        : collection_validation::ValidateMode::kBackground;
         }
         if (enforceFastCountAndSize) {
-            return CollectionValidation::ValidateMode::kForegroundFullEnforceFastCountAndSize;
+            return collection_validation::ValidateMode::kForegroundFullEnforceFastCountAndSize;
         }
         if (enforceFastCount) {
-            return CollectionValidation::ValidateMode::kForegroundFullEnforceFastCount;
+            return collection_validation::ValidateMode::kForegroundFullEnforceFastCount;
         }
         if (enforceFastSize) {
-            return CollectionValidation::ValidateMode::kForegroundFullEnforceFastSize;
+            return collection_validation::ValidateMode::kForegroundFullEnforceFastSize;
         }
         if (fullValidate) {
             return checkBSONConformance
-                ? CollectionValidation::ValidateMode::kForegroundFullCheckBSON
-                : CollectionValidation::ValidateMode::kForegroundFull;
+                ? collection_validation::ValidateMode::kForegroundFullCheckBSON
+                : collection_validation::ValidateMode::kForegroundFull;
         }
         if (checkBSONConformance) {
-            return CollectionValidation::ValidateMode::kForegroundCheckBSON;
+            return collection_validation::ValidateMode::kForegroundCheckBSON;
         }
-        return CollectionValidation::ValidateMode::kForeground;
+        return collection_validation::ValidateMode::kForeground;
     }();
 
     const auto repairMode = [&] {
         if (opCtx->readOnly()) {
             // On read-only mode we can't make any adjustments.
-            return CollectionValidation::RepairMode::kNone;
+            return collection_validation::RepairMode::kNone;
         }
         switch (validateMode) {
-            case CollectionValidation::ValidateMode::kForeground:
-            case CollectionValidation::ValidateMode::kCollectionHash:
-            case CollectionValidation::ValidateMode::kHashDrillDown:
-            case CollectionValidation::ValidateMode::kForegroundCheckBSON:
-            case CollectionValidation::ValidateMode::kForegroundFull:
-            case CollectionValidation::ValidateMode::kForegroundFullIndexOnly:
+            case collection_validation::ValidateMode::kForeground:
+            case collection_validation::ValidateMode::kCollectionHash:
+            case collection_validation::ValidateMode::kHashDrillDown:
+            case collection_validation::ValidateMode::kForegroundCheckBSON:
+            case collection_validation::ValidateMode::kForegroundFull:
+            case collection_validation::ValidateMode::kForegroundFullIndexOnly:
                 // Foreground validation may not repair data while running as a replica set node
                 // because we do not have timestamps that are required to perform writes.
                 if (replCoord->getSettings().isReplSet()) {
-                    return CollectionValidation::RepairMode::kNone;
+                    return collection_validation::RepairMode::kNone;
                 }
                 if (repair) {
-                    return CollectionValidation::RepairMode::kFixErrors;
+                    return collection_validation::RepairMode::kFixErrors;
                 }
                 if (fixMultikey) {
-                    return CollectionValidation::RepairMode::kAdjustMultikey;
+                    return collection_validation::RepairMode::kAdjustMultikey;
                 }
-                return CollectionValidation::RepairMode::kNone;
+                return collection_validation::RepairMode::kNone;
             default:
-                return CollectionValidation::RepairMode::kNone;
+                return collection_validation::RepairMode::kNone;
         }
     }();
 
@@ -1093,5 +1093,5 @@ bool getIsValidationPausedForTest() {
     return _validationIsPausedForTest.load();
 }
 
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 }  // namespace mongo

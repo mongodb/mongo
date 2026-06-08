@@ -178,7 +178,7 @@ public:
     virtual IndexValidateResults validate(
         OperationContext* opCtx,
         RecoveryUnit& ru,
-        const CollectionValidation::ValidationOptions& options) const = 0;
+        const collection_validation::ValidationOptions& options) const = 0;
 
     /**
      * Returns the number of keys in the index, traversing the index to do so.
@@ -664,7 +664,7 @@ public:
     IndexValidateResults validate(
         OperationContext* opCtx,
         RecoveryUnit& ru,
-        const CollectionValidation::ValidationOptions& options) const final;
+        const collection_validation::ValidationOptions& options) const final;
 
     int64_t numKeys(OperationContext* opCtx, RecoveryUnit& ru) const final;
 

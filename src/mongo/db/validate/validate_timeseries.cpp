@@ -68,7 +68,7 @@
 
 
 namespace mongo {
-namespace CollectionValidation {
+namespace collection_validation {
 
 namespace {
 /**
@@ -716,5 +716,5 @@ TimeseriesValidationStatus validateTimeSeriesBucketRecord(OperationContext* opCt
     return {TimeseriesValidationResult::kValid, ""};
 }
 
-}  // namespace CollectionValidation
+}  // namespace collection_validation
 }  // namespace mongo

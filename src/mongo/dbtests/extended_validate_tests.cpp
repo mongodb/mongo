@@ -61,7 +61,7 @@ namespace mongo {
 namespace ValidateTests {
 namespace {
 
-using CollectionValidation::ValidationOptions;
+using collection_validation::ValidationOptions;
 
 Timestamp timestampToUse = Timestamp(1, 1);
 void advanceTimestamp() {
@@ -158,20 +158,20 @@ public:
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss2);
         });
 
-        ASSERT_OK(CollectionValidation::validate(
+        ASSERT_OK(collection_validation::validate(
             &_opCtx,
             _nss1,
-            ValidationOptions{CollectionValidation::ValidateMode::kCollectionHash,
-                              CollectionValidation::RepairMode::kNone,
+            ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
+                              collection_validation::RepairMode::kNone,
                               /*logDiagnostics=*/true},
             &results1));
         ASSERT_TRUE(results1.isValid()) << "Validation failed when it should've worked.";
 
-        ASSERT_OK(CollectionValidation::validate(
+        ASSERT_OK(collection_validation::validate(
             &_opCtx,
             _nss2,
-            ValidationOptions{CollectionValidation::ValidateMode::kCollectionHash,
-                              CollectionValidation::RepairMode::kNone,
+            ValidationOptions{collection_validation::ValidateMode::kCollectionHash,
+                              collection_validation::RepairMode::kNone,
                               /*logDiagnostics=*/true},
             &results2));
         ASSERT_TRUE(results2.isValid()) << "Validation failed when it should've worked.";
@@ -291,7 +291,7 @@ public:
             1, 2, 3, 4, 10, 50, 100, 250, 200, 400, 800, 2000, 4000, 8000, 10000, 20000, 40000};
         for (auto hashPrefixLength : hashPrefixLengthCases) {
             for (auto numPrefixes : numPrefixesCases) {
-                size_t N = CollectionValidation::getNumberOfAdditionalCharactersForHashDrillDown(
+                size_t N = collection_validation::getNumberOfAdditionalCharactersForHashDrillDown(
                     numPrefixes, hashPrefixLength);
                 size_t numBuckets = numPrefixes * std::pow(16, N);
                 auto bucketKeyLength = std::min(hashPrefixLength + N, someHash.size());

@@ -39,7 +39,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo::CollectionValidation {
+namespace mongo::collection_validation {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.validateState");
@@ -342,4 +342,4 @@ INSTANTIATE_TEST_SUITE_P(
 DEATH_TEST(FastCountToStringDeathTest, DiesOnBadFastCountType, "11853100") {
     toString(static_cast<FastCountType>(-1));
 }
-}  // namespace mongo::CollectionValidation
+}  // namespace mongo::collection_validation

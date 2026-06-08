@@ -368,7 +368,7 @@ boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx,
 IndexValidateResults WiredTigerIndex::validate(
     OperationContext* opCtx,
     RecoveryUnit& ru,
-    const CollectionValidation::ValidationOptions& options) const {
+    const collection_validation::ValidationOptions& options) const {
     IndexValidateResults results;
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerUtil::validateTableLogging(

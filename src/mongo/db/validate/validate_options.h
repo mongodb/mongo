@@ -34,7 +34,7 @@
 
 MONGO_MOD_PUBLIC;
 
-namespace mongo::CollectionValidation {
+namespace mongo::collection_validation {
 
 enum class ValidateMode {
     // Only performs validation on the collection metadata.
@@ -241,4 +241,4 @@ private:
     boost::optional<std::vector<std::string>> _revealHashedIds;
 };
 
-}  // namespace mongo::CollectionValidation
+}  // namespace mongo::collection_validation

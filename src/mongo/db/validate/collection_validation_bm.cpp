@@ -138,8 +138,8 @@ size_t insertRecords(OperationContext* opCtx, const DataSpec& spec) {
 }
 
 // Builds a fresh storage environment, populates a collection per 'state's range args, and times
-// repeated CollectionValidation::validate() calls in the requested mode.
-void BM_Validate(benchmark::State& state, CollectionValidation::ValidateMode mode) {
+// repeated collection_validation::validate() calls in the requested mode.
+void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mode) {
     const DataSpec spec{
         .numRecords = static_cast<int>(state.range(0)),
         .numFields = static_cast<int>(state.range(1)),
@@ -157,11 +157,11 @@ void BM_Validate(benchmark::State& state, CollectionValidation::ValidateMode mod
 
     for (auto _ : state) {
         ValidateResults results;
-        uassertStatusOK(CollectionValidation::validate(
+        uassertStatusOK(collection_validation::validate(
             opCtx,
             kNss,
-            CollectionValidation::ValidationOptions{
-                mode, CollectionValidation::RepairMode::kNone, /*logDiagnostics=*/false},
+            collection_validation::ValidationOptions{
+                mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
             &results));
         invariant(results.isValid());
         benchmark::DoNotOptimize(results);
@@ -204,35 +204,35 @@ void IndexCountArgs(benchmark::internal::Benchmark* b) {
 // Record-count scaling, across hash-off (kForeground), full, and hash-on (kCollectionHash) modes.
 BENCHMARK_CAPTURE(BM_Validate,
                   Foreground_RecordCount,
-                  CollectionValidation::ValidateMode::kForeground)
+                  collection_validation::ValidateMode::kForeground)
     ->Apply(RecordCountArgs);
 BENCHMARK_CAPTURE(BM_Validate,
                   ForegroundFull_RecordCount,
-                  CollectionValidation::ValidateMode::kForegroundFull)
+                  collection_validation::ValidateMode::kForegroundFull)
     ->Apply(RecordCountArgs);
 BENCHMARK_CAPTURE(BM_Validate,
                   CollectionHash_RecordCount,
-                  CollectionValidation::ValidateMode::kCollectionHash)
+                  collection_validation::ValidateMode::kCollectionHash)
     ->Apply(RecordCountArgs);
 
 // Document-size axis, hash off vs on (where the per-record SHA256 cost scales with bytes).
-BENCHMARK_CAPTURE(BM_Validate, Foreground_DocSize, CollectionValidation::ValidateMode::kForeground)
+BENCHMARK_CAPTURE(BM_Validate, Foreground_DocSize, collection_validation::ValidateMode::kForeground)
     ->Apply(DocSizeArgs);
 BENCHMARK_CAPTURE(BM_Validate,
                   CollectionHash_DocSize,
-                  CollectionValidation::ValidateMode::kCollectionHash)
+                  collection_validation::ValidateMode::kCollectionHash)
     ->Apply(DocSizeArgs);
 
 // Field-count axis (BSON-validation traversal cost per byte).
 BENCHMARK_CAPTURE(BM_Validate,
                   Foreground_FieldCount,
-                  CollectionValidation::ValidateMode::kForeground)
+                  collection_validation::ValidateMode::kForeground)
     ->Apply(FieldCountArgs);
 
 // Index-count axis (full validation also traverses index keys against the record store).
 BENCHMARK_CAPTURE(BM_Validate,
                   ForegroundFull_IndexCount,
-                  CollectionValidation::ValidateMode::kForegroundFull)
+                  collection_validation::ValidateMode::kForegroundFull)
     ->Apply(IndexCountArgs);
 
 // ── Timeseries variant ────────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ size_t insertTimeseriesBuckets(OperationContext* opCtx,
     return totalBytes;
 }
 
-void BM_ValidateTimeseries(benchmark::State& state, CollectionValidation::ValidateMode mode) {
+void BM_ValidateTimeseries(benchmark::State& state, collection_validation::ValidateMode mode) {
     const int numBuckets = static_cast<int>(state.range(0));
     const int measurementsPerBucket = static_cast<int>(state.range(1));
 
@@ -323,11 +323,11 @@ void BM_ValidateTimeseries(benchmark::State& state, CollectionValidation::Valida
 
     for (auto _ : state) {
         ValidateResults results;
-        uassertStatusOK(CollectionValidation::validate(
+        uassertStatusOK(collection_validation::validate(
             opCtx,
             kTsNss,
-            CollectionValidation::ValidationOptions{
-                mode, CollectionValidation::RepairMode::kNone, /*logDiagnostics=*/false},
+            collection_validation::ValidationOptions{
+                mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
             &results));
         invariant(results.isValid());
         benchmark::DoNotOptimize(results);
@@ -354,12 +354,12 @@ void TimeseriesMeasurementsPerBucketArgs(benchmark::internal::Benchmark* b) {
 
 BENCHMARK_CAPTURE(BM_ValidateTimeseries,
                   ForegroundFull_TS_BucketCount,
-                  CollectionValidation::ValidateMode::kForegroundFull)
+                  collection_validation::ValidateMode::kForegroundFull)
     ->Apply(TimeseriesBucketCountArgs);
 
 BENCHMARK_CAPTURE(BM_ValidateTimeseries,
                   ForegroundFull_TS_MeasurementsPerBucket,
-                  CollectionValidation::ValidateMode::kForegroundFull)
+                  collection_validation::ValidateMode::kForegroundFull)
     ->Apply(TimeseriesMeasurementsPerBucketArgs);
 
 }  // namespace

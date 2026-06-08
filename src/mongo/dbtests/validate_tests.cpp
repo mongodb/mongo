@@ -100,7 +100,7 @@ namespace mongo {
 namespace ValidateTests {
 namespace {
 
-using CollectionValidation::ValidationOptions;
+using collection_validation::ValidationOptions;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 const bool kLogDiagnostics = true;
@@ -236,15 +236,15 @@ protected:
 
         auto mode = [&] {
             if (_background)
-                return CollectionValidation::ValidateMode::kBackground;
-            return _full ? CollectionValidation::ValidateMode::kForegroundFull
-                         : CollectionValidation::ValidateMode::kForeground;
+                return collection_validation::ValidateMode::kBackground;
+            return _full ? collection_validation::ValidateMode::kForegroundFull
+                         : collection_validation::ValidateMode::kForeground;
         }();
-        auto repairMode = CollectionValidation::RepairMode::kNone;
+        auto repairMode = collection_validation::RepairMode::kNone;
         ValidateResults results;
 
         forceCheckpoint(_background);
-        ASSERT_OK(CollectionValidation::validate(
+        ASSERT_OK(collection_validation::validate(
             &_opCtx, _nss, ValidationOptions{mode, repairMode, kLogDiagnostics}, &results));
 
         //  Check if errors are reported if and only if valid is set to false.
@@ -1267,11 +1267,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -1376,11 +1376,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -1451,11 +1451,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -1550,11 +1550,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -1580,11 +1580,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -1617,11 +1617,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -1732,11 +1732,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -1764,11 +1764,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -1794,11 +1794,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -1875,11 +1875,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -1908,11 +1908,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -1937,11 +1937,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2090,11 +2090,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2121,11 +2121,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -2186,11 +2186,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2354,11 +2354,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2388,11 +2388,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -2456,11 +2456,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2724,11 +2724,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2755,11 +2755,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -2823,11 +2823,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2953,11 +2953,11 @@ public:
         // Confirm missing multikey document found on non-multikey index error detected by validate.
         {
             ValidateResults results;
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -2985,11 +2985,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -3018,11 +3018,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -3412,8 +3412,8 @@ public:
         releaseDb();
 
         {
-            auto mode = _background ? CollectionValidation::ValidateMode::kBackground
-                                    : CollectionValidation::ValidateMode::kForeground;
+            auto mode = _background ? collection_validation::ValidateMode::kBackground
+                                    : collection_validation::ValidateMode::kForeground;
 
             ValidateResults results;
 
@@ -3428,10 +3428,10 @@ public:
                     originalReadSource);
             });
             forceCheckpoint(_background);
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
+                ValidationOptions{mode, collection_validation::RepairMode::kNone, kLogDiagnostics},
                 &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
@@ -3504,11 +3504,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -3536,11 +3536,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -3572,11 +3572,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -3601,11 +3601,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -3777,11 +3777,11 @@ public:
         // Confirm multikey document found on non-multikey index error detected by validate.
         {
             ValidateResults results;
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -3807,11 +3807,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -3838,11 +3838,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -3998,11 +3998,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -4028,11 +4028,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kFixErrors,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kFixErrors,
                                   kLogDiagnostics},
                 &results));
 
@@ -4055,11 +4055,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -4161,11 +4161,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kAdjustMultikey,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kAdjustMultikey,
                                   kLogDiagnostics},
                 &results));
 
@@ -4198,11 +4198,11 @@ public:
             // sanitizer/test-only forceful collection instantiation.
             shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kAdjustMultikey,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kAdjustMultikey,
                                   kLogDiagnostics},
                 &results));
 
@@ -4308,11 +4308,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -4437,11 +4437,11 @@ public:
         releaseDb();
 
         ValidateResults results;
-        ASSERT_OK(CollectionValidation::validate(
+        ASSERT_OK(collection_validation::validate(
             &_opCtx,
             _nss,
-            ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                              CollectionValidation::RepairMode::kNone,
+            ValidationOptions{collection_validation::ValidateMode::kForeground,
+                              collection_validation::RepairMode::kNone,
                               kLogDiagnostics},
             &results));
 
@@ -4564,11 +4564,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 
@@ -4639,8 +4639,8 @@ public:
         releaseDb();
 
         {
-            auto mode = _background ? CollectionValidation::ValidateMode::kBackground
-                                    : CollectionValidation::ValidateMode::kForeground;
+            auto mode = _background ? collection_validation::ValidateMode::kBackground
+                                    : collection_validation::ValidateMode::kForeground;
 
             ValidateResults results;
 
@@ -4655,10 +4655,10 @@ public:
                     originalReadSource);
             });
             forceCheckpoint(_background);
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
+                ValidationOptions{mode, collection_validation::RepairMode::kNone, kLogDiagnostics},
                 &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
@@ -4730,8 +4730,8 @@ public:
         releaseDb();
 
         {
-            auto mode = _background ? CollectionValidation::ValidateMode::kBackground
-                                    : CollectionValidation::ValidateMode::kForeground;
+            auto mode = _background ? collection_validation::ValidateMode::kBackground
+                                    : collection_validation::ValidateMode::kForeground;
 
             ValidateResults results;
 
@@ -4746,10 +4746,10 @@ public:
                     originalReadSource);
             });
             forceCheckpoint(_background);
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
+                ValidationOptions{mode, collection_validation::RepairMode::kNone, kLogDiagnostics},
                 &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
@@ -5010,8 +5010,8 @@ public:
         releaseDb();
 
         {
-            auto mode = _background ? CollectionValidation::ValidateMode::kBackground
-                                    : CollectionValidation::ValidateMode::kForeground;
+            auto mode = _background ? collection_validation::ValidateMode::kBackground
+                                    : collection_validation::ValidateMode::kForeground;
 
             ValidateResults results;
 
@@ -5026,10 +5026,10 @@ public:
                     originalReadSource);
             });
             forceCheckpoint(_background);
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{mode, CollectionValidation::RepairMode::kNone, kLogDiagnostics},
+                ValidationOptions{mode, collection_validation::RepairMode::kNone, kLogDiagnostics},
                 &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
@@ -5049,8 +5049,8 @@ public:
         // Run validate with repair, expect that extra index entries are removed and missing index
         // entries are inserted.
         {
-            auto mode = _background ? CollectionValidation::ValidateMode::kBackground
-                                    : CollectionValidation::ValidateMode::kForeground;
+            auto mode = _background ? collection_validation::ValidateMode::kBackground
+                                    : collection_validation::ValidateMode::kForeground;
 
             ValidateResults results;
 
@@ -5068,11 +5068,11 @@ public:
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
                 ValidationOptions{
-                    mode, CollectionValidation::RepairMode::kFixErrors, kLogDiagnostics},
+                    mode, collection_validation::RepairMode::kFixErrors, kLogDiagnostics},
                 &results));
 
             ScopeGuard dumpOnErrorGuard([&] {
@@ -5172,11 +5172,11 @@ public:
         {
             ValidateResults results;
 
-            ASSERT_OK(CollectionValidation::validate(
+            ASSERT_OK(collection_validation::validate(
                 &_opCtx,
                 _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                  CollectionValidation::RepairMode::kNone,
+                ValidationOptions{collection_validation::ValidateMode::kForegroundFull,
+                                  collection_validation::RepairMode::kNone,
                                   kLogDiagnostics},
                 &results));
 

@@ -576,7 +576,7 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
 IndexValidateResults SortedDataIndexAccessMethod::validate(
     OperationContext* opCtx,
     RecoveryUnit& ru,
-    const CollectionValidation::ValidationOptions& options) const {
+    const collection_validation::ValidationOptions& options) const {
     return _newInterface->validate(opCtx, ru, options);
 }
 

@@ -217,7 +217,7 @@ public:
     }
 
     void validate(RecoveryUnit& ru,
-                  const CollectionValidation::ValidationOptions& options,
+                  const collection_validation::ValidationOptions& options,
                   ValidateResults* results) override;
 
     void appendNumericCustomStats(RecoveryUnit& ru,
@@ -468,7 +468,7 @@ public:
                                                     bool forward = true) const override;
 
     void validate(RecoveryUnit&,
-                  const CollectionValidation::ValidationOptions&,
+                  const collection_validation::ValidationOptions&,
                   ValidateResults*) override;
 
     RecordStore::Capped* capped() override;
