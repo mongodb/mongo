@@ -1014,7 +1014,7 @@ error_codes:
     }
   - {
       code: 445,
-      name: DatabaseMetadataRefreshCanceledDueToFCVTransition,
+      name: MetadataRefreshCanceledDueToFCVTransition,
       categories: [InternalOnly],
     }
   # This error code must NEVER be used outside of cluster user management commands.

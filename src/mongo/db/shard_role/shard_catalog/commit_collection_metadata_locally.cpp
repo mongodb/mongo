@@ -475,9 +475,24 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
 
 void commitCollectionMetadataLocally(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     bool isDbPrimaryShard) {
+                                     bool isDbPrimaryShard,
+                                     const boost::optional<UUID>& uuid,
+                                     boost::optional<bool> expectedAllowChunkOperations) {
     auto coll = fetchCollection(opCtx, nss);
-    auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
+
+    uassert(ErrorCodes::InvalidUUID,
+            fmt::format(
+                "Collection uuid {} in the request does not match the current uuid {} for ns {}",
+                uuid->toString(),
+                coll.getUuid().toString(),
+                nss.toStringForErrorMsg()),
+            !uuid || uuid == coll.getUuid());
+    tassert(12120907,
+            "Retrieved allowChunkOperations from CSRS doesn't match",
+            !expectedAllowChunkOperations ||
+                coll.getAllowChunkOperations() == *expectedAllowChunkOperations);
+
+    const auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
 
     // Drop any prior chunk entries for this collection so repeated calls (e.g. when an unsplittable
     // collection is sharded) don't accumulate stale rows. The new chunk documents may carry
@@ -502,6 +517,12 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
     invalidateCollectionMetadataOnSecondaries(
         opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
+
+    if (expectedAllowChunkOperations) {
+        // Write an oplog 'c' entry to send the new allowChunkOperations value to secondaries.
+        setAllowChunkOperationsOnSecondaries(
+            opCtx, nss, coll.getUuid(), *expectedAllowChunkOperations);
+    }
 }
 
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
@@ -529,21 +550,18 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           bool allowChunkOperations,
-                                          const boost::optional<UUID>& uuid) {
-    const auto [metadata, isAuthoritative] = [&]() {
+                                          const boost::optional<UUID>& uuid,
+                                          bool isPrimaryShard) {
+    const auto [metadata, isAuthoritative, isUnowned] = [&] {
         const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-        return std::make_pair(csr->getCurrentMetadataIfKnown(),
-                              csr->getAuthoritativeState() ==
-                                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
+        return std::make_tuple(csr->getCurrentMetadataIfKnown(),
+                               csr->getAuthoritativeState() ==
+                                   CollectionShardingRuntime::AuthoritativeState::kAuthoritative,
+                               csr->isUnowned());
     }();
 
     if (isAuthoritative) {
-        // This function is always be called after having passed a shard version check. If the
-        // installed metadata is authoritative, then it can't be unknown by this point, unless there
-        // was a concurrent invalidation. The StaleConfigInfo will cause a refresh in case the
-        // metadata is unknown.
-        // TODO (SERVER-127444): investigate if this can be a tassert once there can't be concurrent
-        // flushes.
+        // The in-memory metadata could be unknown, throwing this StaleConfig forces a refresh.
         uassert(StaleConfigInfo(nss,
                                 *OperationShardingState::get(opCtx).getShardVersion(nss),
                                 boost::none /* wantedVersion */,
@@ -553,14 +571,22 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                             nss.toStringForErrorMsg()),
                 metadata);
 
+        if (isUnowned || !metadata->hasRoutingTable()) {
+            // If the collection is unowned, we know that we don't own metadata for this collection
+            // at all, so just do nothing.
+            // If the collection doesn't have a routing table, then it's either untracked or
+            // unsplittable, in any case just return.
+            return;
+        }
+
         uassert(
             ErrorCodes::InvalidUUID,
             fmt::format(
                 "Collection uuid {} in the request does not match the current uuid {} for ns {}",
                 uuid->toString(),
-                metadata->hasRoutingTable() ? metadata->getUUID().toString() : "(no routing table)",
+                metadata->getUUID().toString(),
                 nss.toStringForErrorMsg()),
-            !uuid || (metadata->hasRoutingTable() && uuid == metadata->getUUID()));
+            !uuid || uuid == metadata->getUUID());
 
         writeCollectionAllowChunkOperationsLocally(opCtx, nss, allowChunkOperations);
 
@@ -575,42 +601,7 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
               "nss"_attr = nss,
               "allowChunkOperations"_attr = allowChunkOperations);
     } else {
-        const auto coll = fetchCollection(opCtx, nss);
-
-        uassert(
-            ErrorCodes::InvalidUUID,
-            fmt::format(
-                "Collection uuid {} in the request does not match the current uuid {} for ns {}",
-                uuid->toString(),
-                coll.getUuid().toString(),
-                nss.toStringForErrorMsg()),
-            !uuid || uuid == coll.getUuid());
-
-        const auto chunks = fetchOwnedChunks(opCtx, nss, coll);
-        tassert(12120907,
-                "Retrieved allowChunkOperations from CSRS doesn't match",
-                coll.getAllowChunkOperations() == allowChunkOperations);
-
-        // The CSR is non-authoritative at this point, so the durable shard catalog may still hold
-        // rows written during a prior authoritative phase that nothing has cleaned up since. Drop
-        // the older chunks before upserting the currently-owned ones so it doesn't end up
-        // coexisting with real chunk rows for the same UUID.
-        DBDirectClient dbClient(opCtx);
-        executeLocalDelete(dbClient,
-                           NamespaceString::kConfigShardCatalogChunksNamespace,
-                           BSON(ChunkType::collectionUUID() << coll.getUuid()),
-                           true /* multi */);
-
-        writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), chunks);
-
-        // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
-        invalidateCollectionMetadataOnSecondaries(
-            opCtx, nss, coll.getUuid(), /*forDropCollection=*/false);
-        // Write an oplog 'c' entry to send the new allowChunkOperations value to secondaries.
-        setAllowChunkOperationsOnSecondaries(opCtx, nss, metadata->getUUID(), allowChunkOperations);
-
-        updateShardCatalogCache(opCtx, nss, coll, chunks);
-
+        commitCollectionMetadataLocally(opCtx, nss, isPrimaryShard, uuid, allowChunkOperations);
         LOGV2(12120906,
               "commitSetAllowChunkOperationsLocally non-authoritatively",
               "nss"_attr = nss,

@@ -252,7 +252,8 @@ void setAllowChunkOperations(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID>& expectedCollectionUUID,
                              std::function<OperationSessionInfo()> osiGenerator,
-                             bool allowChunkOperations) {
+                             bool allowChunkOperations,
+                             boost::optional<ShardId> primaryShardId) {
     {
         ConfigsvrSetAllowChunkOperations configsvrSetAllowChunkOperationsCmd(nss);
         configsvrSetAllowChunkOperationsCmd.setDbName(nss.dbName());
@@ -289,36 +290,27 @@ void setAllowChunkOperations(OperationContext* opCtx,
         }
     }
 
-    // Use the router loop to target data-bearing shards. Shards containing no chunks of a
-    // collection don't maintain any metadata for that collection, so we should not target them. By
-    // using the shard protocol, we guarantee we are not missing any shard.
-    sharding::router::CollectionRouter router(opCtx, nss);
-    router.routeWithRoutingContext(
-        "setAllowChunkOperations", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-            const auto osi = osiGenerator();
-            ShardsvrSetAllowChunkOperations shardsvrSetAllowChunkOperationsCmd(nss);
-            shardsvrSetAllowChunkOperationsCmd.setDbName(nss.dbName());
-            shardsvrSetAllowChunkOperationsCmd.setAllowChunkOperations(allowChunkOperations);
-            shardsvrSetAllowChunkOperationsCmd.setCollectionUUID(expectedCollectionUUID);
-            generic_argument_util::setMajorityWriteConcern(shardsvrSetAllowChunkOperationsCmd);
-            generic_argument_util::setOperationSessionInfo(shardsvrSetAllowChunkOperationsCmd, osi);
+    // Broadcast to all shards.
+    ShardsvrSetAllowChunkOperations shardsvrSetAllowChunkOperationsCmd(nss);
+    shardsvrSetAllowChunkOperationsCmd.setDbName(nss.dbName());
+    shardsvrSetAllowChunkOperationsCmd.setAllowChunkOperations(allowChunkOperations);
+    shardsvrSetAllowChunkOperationsCmd.setCollectionUUID(expectedCollectionUUID);
+    shardsvrSetAllowChunkOperationsCmd.setPrimaryShardId(
+        primaryShardId.get_value_or(ShardingState::get(opCtx)->shardId()));
+    generic_argument_util::setMajorityWriteConcern(shardsvrSetAllowChunkOperationsCmd);
+    generic_argument_util::setOperationSessionInfo(shardsvrSetAllowChunkOperationsCmd,
+                                                   osiGenerator());
 
-            const auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
-                opCtx,
-                routingCtx,
-                nss,
-                shardsvrSetAllowChunkOperationsCmd.toBSON(),
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                Shard::RetryPolicy::kIdempotent,
-                /*query=*/{},
-                /*collation=*/{},
-                /*letParameters=*/boost::none,
-                /*runtimeConstants=*/boost::none);
+    const auto shardResponses =
+        scatterGatherUnversionedTargetAllShards(opCtx,
+                                                nss.dbName(),
+                                                shardsvrSetAllowChunkOperationsCmd.toBSON(),
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                Shard::RetryPolicy::kIdempotent);
 
-            for (const auto& response : shardResponses) {
-                uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
-            }
-        });
+    for (const auto& response : shardResponses) {
+        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+    }
 }
 
 }  // namespace
@@ -569,9 +561,11 @@ void stopMigrations(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const boost::optional<UUID>& expectedCollectionUUID,
                     std::function<OperationSessionInfo()> osiGenerator,
-                    AuthoritativeMetadataAccessLevelEnum authoritativeState) {
+                    AuthoritativeMetadataAccessLevelEnum authoritativeState,
+                    boost::optional<ShardId> primaryShardId) {
     if (authoritativeState != AuthoritativeMetadataAccessLevelEnum::kNone) {
-        setAllowChunkOperations(opCtx, nss, expectedCollectionUUID, osiGenerator, false);
+        setAllowChunkOperations(
+            opCtx, nss, expectedCollectionUUID, osiGenerator, false, primaryShardId);
     } else {
         setAllowMigrationsOnConfigServer(opCtx, nss, expectedCollectionUUID, osiGenerator(), false);
     }
@@ -581,9 +575,11 @@ void resumeMigrations(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const boost::optional<UUID>& expectedCollectionUUID,
                       std::function<OperationSessionInfo()> osiGenerator,
-                      AuthoritativeMetadataAccessLevelEnum authoritativeState) {
+                      AuthoritativeMetadataAccessLevelEnum authoritativeState,
+                      boost::optional<ShardId> primaryShardId) {
     if (authoritativeState != AuthoritativeMetadataAccessLevelEnum::kNone) {
-        setAllowChunkOperations(opCtx, nss, expectedCollectionUUID, osiGenerator, true);
+        setAllowChunkOperations(
+            opCtx, nss, expectedCollectionUUID, osiGenerator, true, primaryShardId);
     } else {
         setAllowMigrationsOnConfigServer(opCtx, nss, expectedCollectionUUID, osiGenerator(), true);
     }

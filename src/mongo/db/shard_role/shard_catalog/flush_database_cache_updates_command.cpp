@@ -200,7 +200,7 @@ public:
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);
 
-                uasserted(ErrorCodes::DatabaseMetadataRefreshCanceledDueToFCVTransition,
+                uasserted(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
                           "This command is deprecated, as shards are authoritative for database "
                           "metadata. The secondary node must transition to the authoritative "
                           "refresh model.");

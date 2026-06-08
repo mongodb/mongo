@@ -46,10 +46,11 @@
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/util/assert_util.h"
 
 #include <string>
@@ -93,32 +94,41 @@ public:
 
         void setAllowChunkOperations(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     boost::optional<CollectionAcquisition> acq,
                                      bool allowChunkOperations,
-                                     const boost::optional<UUID>& uuid) {
-            shard_catalog_commit::commitSetAllowChunkOperationsLocally(
-                opCtx, nss, allowChunkOperations, uuid);
-
-            if (allowChunkOperations) {
-                // If we are setting chunk operations back on, there's nothing to drain.
-                return;
-            }
+                                     const boost::optional<UUID>& uuid,
+                                     bool isPrimaryShard) {
 
             boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
 
             {
+                // Holding this acquisition guarantees serialization with the critical section
+                // (both the blocking writes CS and the blocking reads CS), so it is guaranteed
+                // that no chunk operation commits while this acquisition is held.
+                const CollectionAcquisition acq = acquireCollection(
+                    opCtx,
+                    CollectionAcquisitionRequest::fromOpCtx(
+                        opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+                    MODE_IX);
+
+                shard_catalog_commit::commitSetAllowChunkOperationsLocally(
+                    opCtx, nss, allowChunkOperations, uuid, isPrimaryShard);
+
+                if (allowChunkOperations) {
+                    // If we are setting chunk operations back on, there's nothing to drain.
+                    return;
+                }
+
                 const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
                 if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
                     waitForMigrationAbort.emplace(msm->abort());
                 }
             }
-
-            // Release the collection acquisition at this point. If some chunk operation (or
+            // We release the collection acquisition at this point. If some chunk operation (or
             // migration) was in the commit phase, we have to release the acquisition so that it can
             // acquire the critical section to attempt to commit. The commit should always fail,
             // because by the time this command is invoked, the CSRS has already stored
-            // "allowMigrations: false", so it should reject any commit attempt.
-            acq.reset();
+            // "allowMigrations: false", so it should reject any commit attempt (except for
+            // migration destinations).
 
             if (waitForMigrationAbort) {
                 waitForMigrationAbort->get(opCtx);
@@ -156,10 +166,6 @@ public:
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) !=
                         AuthoritativeMetadataAccessLevelEnum::kNone);
 
-            uassert(12120901,
-                    "This command must be invoked following the shard protocol",
-                    OperationShardingState::isVersioned(opCtx, nss));
-
             const auto allowChunkOperations = request().getAllowChunkOperations();
             const auto collectionUUID = request().getCollectionUUID();
 
@@ -177,30 +183,22 @@ public:
                 AuthorizationSession::get(newOpCtx->getClient())->grantInternalAuthorization();
                 newOpCtx->setWriteConcern(opCtx->getWriteConcern());
 
-                // ScopedSetShardRole to transfer the shard version to the new opCtx.
+                // Enter the shard role with an IGNORED shard version. This ensures that
+                // acquisitions are considered "versioned" and will honor the critical section, but
+                // no actual version check will be performed.
                 ScopedSetShardRole scopedSetShardRole(
-                    newOpCtx,
-                    nss,
-                    OperationShardingState::get(opCtx).getShardVersion(nss),
-                    OperationShardingState::get(opCtx).getDbVersion(nss.dbName()));
+                    newOpCtx, nss, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
 
                 // DBDirectClient retries WriteConflictException only when yielding is allowed.
                 // This command holds a CollectionAcquisition across the commit path, so yielding
                 // is disabled and WriteConflictException would otherwise propagate.
                 writeConflictRetry(newOpCtx, "ShardsvrSetAllowChunkOperations", nss, [&] {
-                    // This command is invoked following the shard version protocol, so it is
-                    // necessary to acquire the target collection to enforce it. Additionally,
-                    // holding this acquisition guarantees serialization with the critical section
-                    // (both the blocking writes CS and the blocking reads CS), so it is guaranteed
-                    // that no chunk operation commits while this acquisition is held.
-                    boost::optional<CollectionAcquisition> acq = acquireCollection(
-                        newOpCtx,
-                        CollectionAcquisitionRequest::fromOpCtx(
-                            newOpCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
-                        MODE_IX);
-
-                    setAllowChunkOperations(
-                        newOpCtx, nss, std::move(acq), allowChunkOperations, collectionUUID);
+                    setAllowChunkOperations(newOpCtx,
+                                            nss,
+                                            allowChunkOperations,
+                                            collectionUUID,
+                                            ShardingState::get(newOpCtx)->shardId() ==
+                                                request().getPrimaryShardId());
                 });
             }
 

@@ -612,8 +612,11 @@ TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUse
     ScopedSetShardRole scopedSetShardRole{
         operationContext(), kTestNss, shardVersion, boost::none /* databaseVersion */};
 
-    shard_catalog_commit::commitSetAllowChunkOperationsLocally(
-        operationContext(), kTestNss, false /* allowChunkOperations */, collType.getUuid());
+    shard_catalog_commit::commitSetAllowChunkOperationsLocally(operationContext(),
+                                                               kTestNss,
+                                                               false /* allowChunkOperations */,
+                                                               collType.getUuid(),
+                                                               true /* isPrimaryShard */);
 
     auto oplogEntries =
         findLocalDocs(NamespaceString::kRsOplogNamespace,

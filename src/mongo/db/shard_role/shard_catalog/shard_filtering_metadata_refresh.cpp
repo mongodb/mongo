@@ -35,12 +35,14 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/operation_context.h"
@@ -386,6 +388,9 @@ bool runRefreshInChildOperationContext(OperationContext* parent,
     try {
         fn(cancelableOpCtx.get());
         return false;
+    } catch (const ExceptionFor<ErrorCodes::MetadataRefreshCanceledDueToFCVTransition>&) {
+        // FCV changed while the refresh was taking place, retry.
+        return true;
     } catch (const DBException&) {
         // If the caller's opCtx was killed, propagate its actual kill status instead of retrying.
         parent->checkForInterrupt();
@@ -555,7 +560,7 @@ Status FilteringMetadataCache::onDbVersionMismatch(
 
             // If the error indicates an FCV transition, retry the operation. This ensures the
             // secondary node correctly transitions to the authoritative model.
-            if (status != ErrorCodes::DatabaseMetadataRefreshCanceledDueToFCVTransition) {
+            if (status != ErrorCodes::MetadataRefreshCanceledDueToFCVTransition) {
                 return status;
             }
         }
@@ -568,7 +573,7 @@ Status FilteringMetadataCache::forceDatabaseMetadataRefresh_DEPRECATED(
         const auto refresh = FilteringMetadataRefreshTracker::get(opCtx)->acquire(
             opCtx, FilteringMetadataRefreshKind::kNonAuthoritative);
         _onDbVersionMismatch(opCtx, dbName, boost::none, refresh.cancellationToken);
-        uassert(ErrorCodes::DatabaseMetadataRefreshCanceledDueToFCVTransition,
+        uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
                 "Database metadata refresh was canceled",
                 !refresh.cancellationToken.isCanceled());
         return Status::OK();
@@ -1281,19 +1286,27 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                 }
             }
 
-            // `dbPrimaryShard` is only populated when we took the DSR snapshot above (Mode B),
-            // and even then only when this shard is the current DB primary shard. So:
+            // `dbPrimaryShard` is only populated when we took the DSR snapshot above (Mode B). We
+            // classify an empty filtering entry based on whether this shard is the DB primary:
             //   * Mode A: `dbPrimaryShard` is empty, but `noRoutingTableAs` is irrelevant because
             //     `metadata` has a routing table and the CSS will be classified as kTracked
             //     regardless.
-            //   * Mode B and this shard is the DB primary: `dbPrimaryShard` has a value, so an
-            //     empty filtering entry authoritatively means the collection is not tracked.
-            //   * Mode B and this shard is not the DB primary: `dbPrimaryShard` is empty (under
-            //     authoritative DB metadata, the primary shard value is only set on the owning
-            //     shard), so the most we can say is that this node holds no chunks (kUnowned).
-            const auto noRoutingTableAs = dbPrimaryShard.has_value()
+            //   * Mode B and this shard is the DB primary: `dbPrimaryShard` equals this shard, so
+            //     an empty filtering entry authoritatively means the collection is not tracked.
+            //   * Mode B and this shard is not the DB primary: the most we can say is that this
+            //     node holds no chunks (kUnowned).
+            // TODO (SERVER-128275): investigate if we can simply dbPrimaryShard.has_value() here.
+            const auto noRoutingTableAs = dbPrimaryShard == ShardingState::get(opCtx)->shardId()
                 ? CollectionShardingRuntime::NoRoutingTableAs::kUntracked
                 : CollectionShardingRuntime::NoRoutingTableAs::kUnowned;
+
+            // Before committing, make sure the feature flag hasn't changed.
+            FixedFCVRegion guard{opCtx};
+            uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
+                    "Authoritative collection metadata refresh can't proceed: FCV has changed",
+                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                        VersionContext::getDecoration(opCtx), guard->acquireFCVSnapshot()) ==
+                        AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
 
             // cancellationToken needs to be checked under the CSR lock before overwriting the
             // filtering metadata to serialize with other threads calling 'clearFilteringMetadata'.

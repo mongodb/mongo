@@ -538,6 +538,7 @@ void checkCollectionMetadataInShardCatalog(
     const boost::optional<CollectionType> collectionInGlobalCatalog,
     std::vector<MetadataInconsistencyItem>& inconsistencies) {
     boost::optional<CollectionMetadata> inMemoryShardCatalogMetadata;
+    bool isUnowned = false;
     ChunkVersion collectionPlacementVersion;
 
     // Optimistic approach to avoid holding the CSR lock during the remote call to fetch information
@@ -547,6 +548,7 @@ void checkCollectionMetadataInShardCatalog(
     {
         const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
         inMemoryShardCatalogMetadata = scopedCsr->getCurrentMetadataIfKnown();
+        isUnowned = scopedCsr->isUnowned();
 
         if (!inMemoryShardCatalogMetadata) {
             return;
@@ -576,7 +578,7 @@ void checkCollectionMetadataInShardCatalog(
     bool expectTracked = collectionInGlobalCatalog.has_value();
 
     if ((!expectTracked && inMemoryShardCatalogMetadata->hasRoutingTable()) ||
-        (expectTracked && !inMemoryShardCatalogMetadata->hasRoutingTable())) {
+        (expectTracked && !inMemoryShardCatalogMetadata->hasRoutingTable() && !isUnowned)) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
@@ -589,7 +591,7 @@ void checkCollectionMetadataInShardCatalog(
         return;
     }
 
-    if (!expectTracked) {
+    if (!expectTracked || isUnowned) {
         return;
     }
 

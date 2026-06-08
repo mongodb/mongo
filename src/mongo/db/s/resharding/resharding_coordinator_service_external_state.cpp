@@ -690,12 +690,18 @@ void ReshardingCoordinatorExternalStateImpl::stopMigrations(
     const NamespaceString& nss,
     const UUID& expectedCollectionUUID,
     std::function<OperationSessionInfo()> osiGenerator) {
+    const auto dbPrimaryShard =
+        Grid::get(opCtx)
+            ->catalogClient()
+            ->getDatabase(opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern)
+            .getPrimary();
     // TODO (SERVER-127443): take AuthoritativeMetadataAccessLevelEnum from coordinator document.
     sharding_ddl_util::stopMigrations(opCtx,
                                       nss,
                                       expectedCollectionUUID,
                                       osiGenerator,
-                                      AuthoritativeMetadataAccessLevelEnum::kNone);
+                                      AuthoritativeMetadataAccessLevelEnum::kNone,
+                                      ShardId{dbPrimaryShard});
 }
 
 void ReshardingCoordinatorExternalStateImpl::resumeMigrations(
@@ -703,12 +709,18 @@ void ReshardingCoordinatorExternalStateImpl::resumeMigrations(
     const NamespaceString& nss,
     const UUID& expectedCollectionUUID,
     std::function<OperationSessionInfo()> osiGenerator) {
+    const auto dbPrimaryShard =
+        Grid::get(opCtx)
+            ->catalogClient()
+            ->getDatabase(opCtx, nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern)
+            .getPrimary();
     // TODO (SERVER-127443): take AuthoritativeMetadataAccessLevelEnum from coordinator document.
     sharding_ddl_util::resumeMigrations(opCtx,
                                         nss,
                                         expectedCollectionUUID,
                                         osiGenerator,
-                                        AuthoritativeMetadataAccessLevelEnum::kNone);
+                                        AuthoritativeMetadataAccessLevelEnum::kNone,
+                                        ShardId{dbPrimaryShard});
 }
 
 std::unique_ptr<CausalityBarrier> ReshardingCoordinatorExternalStateImpl::buildCausalityBarrier(

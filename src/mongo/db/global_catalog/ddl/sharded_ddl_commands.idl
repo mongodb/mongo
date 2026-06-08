@@ -1241,6 +1241,15 @@ commands:
         reply_type: OkReply
         chained_structs:
             SetAllowChunkOperationsFields: SetAllowChunkOperationsFields
+        fields:
+            # TODO (SERVER-127444): remove this field. We need to know the primary shard ID when
+            # _shardsvrSetAllowChunkOperations runs on a shard with non-authoritative metadata installed
+            # and it needs to install authorative metadata, but after SERVER-127444 this won't be
+            # necessary anymore.
+            primaryShardId:
+                type: shard_id
+                description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
+                optional: false
 
     _configsvrSetAllowChunkOperations:
         command_name: _configsvrSetAllowChunkOperations
