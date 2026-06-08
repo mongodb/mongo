@@ -18,6 +18,7 @@ export function getIndexStatusMetrics(metricsDir, afterDate) {
         started: metrics["index_builds.started"]?.value ?? 0,
         succeeded: metrics["index_builds.succeeded"]?.value ?? 0,
         failed: metrics["index_builds.failed"]?.value ?? 0,
+        toBeResumed: metrics["index_builds.to_be_resumed"]?.value ?? 0,
     };
 }
 
