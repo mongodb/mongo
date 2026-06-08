@@ -7,8 +7,8 @@
  * entire replica set.
  *
  * @tags: [
- *   # On step up, we abort in-progress index builds on the new primary.
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
+ *   # With primary-driven index builds, secondaries do not scan the collection themselves.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */
