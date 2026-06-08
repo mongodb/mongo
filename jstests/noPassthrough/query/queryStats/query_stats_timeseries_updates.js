@@ -145,7 +145,7 @@ describe("time-series query stats (standalone)", function () {
 
     before(function () {
         conn = MongoRunner.runMongod({
-            setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+            setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
         });
         testDB = conn.getDB("test");
         coll = createTimeseriesCollectionWithData(testDB, collName);
@@ -179,7 +179,6 @@ describe("time-series query stats (sharded)", function () {
 
     before(function () {
         const queryStatsParams = {
-            internalQueryStatsRateLimit: -1,
             internalQueryStatsWriteCmdSampleRate: 1,
         };
         const tsUpdatesParam = {featureFlagTimeseriesUpdatesSupport: true};

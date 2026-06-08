@@ -34,10 +34,10 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
             shards: 1,
             mongos: 1,
             mongosOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
             },
             shardOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
             },
         });
 

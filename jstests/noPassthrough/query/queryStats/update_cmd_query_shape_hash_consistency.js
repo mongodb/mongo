@@ -83,7 +83,7 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
             shards: 2,
             mongos: 1,
             mongosOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
             },
         });
 

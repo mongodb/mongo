@@ -186,7 +186,7 @@ runUpdateCmdMetricsTests(
     "Standalone",
     () => {
         const conn = MongoRunner.runMongod({
-            setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+            setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
         });
         const testDB = conn.getDB("test");
         testDB[collName].drop();
@@ -200,7 +200,7 @@ runUpdateCmdMetricsTests(
     () => {
         const st = new ShardingTest({
             shards: 2,
-            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1}},
+            mongosOptions: {setParameter: {internalQueryStatsWriteCmdSampleRate: 1}},
         });
         const testDB = st.s.getDB("test");
         st.shardColl(testDB[collName], {_id: 1}, {_id: 1});

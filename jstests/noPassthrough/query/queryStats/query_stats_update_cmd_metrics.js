@@ -150,7 +150,7 @@ describe("query stats update command metrics (sharded)", function () {
         st = new ShardingTest({
             shards: 2,
             mongosOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
             },
         });
         testDB = st.s.getDB("test");

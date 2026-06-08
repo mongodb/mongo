@@ -381,7 +381,7 @@ runTokenizationTestsForTopology(
     "update command one way tokenization (Standalone)",
     () => {
         const conn = MongoRunner.runMongod({
-            setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+            setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
         });
         return {fixture: conn, testDB: conn.getDB("test")};
     },
@@ -396,7 +396,7 @@ runTokenizationTestsForTopology(
         const st = new ShardingTest({
             shards: 2,
             mongosOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
             },
         });
         const testDB = st.s.getDB("test");

@@ -32,10 +32,10 @@ describe("Query Shape Hash Output Tests", function () {
             shards: 2,
             mongos: 1,
             mongosOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
             },
             shardOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
             },
         });
 
