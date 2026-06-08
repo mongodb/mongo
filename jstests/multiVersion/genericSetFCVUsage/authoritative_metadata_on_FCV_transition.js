@@ -36,27 +36,27 @@ const describeOrSkip = (() => {
     return describe;
 })();
 
+const kAuthoritativeDb = "config";
+const kAuthoritativeDbsColl = "shard.catalog.databases";
+const kAuthoritativeCollectionsColl = "shard.catalog.collections";
+const kAuthoritativeChunksColl = "shard.catalog.chunks";
+
+function assertAuthoritativeShardCatalog(shard, {authoritativeCollections, haveDatabases}) {
+    const configDB = shard.getDB(kAuthoritativeDb);
+    const colls = configDB.getCollectionNames();
+    assert.eq(authoritativeCollections, colls.includes(kAuthoritativeCollectionsColl), shard.host);
+    assert.eq(authoritativeCollections, colls.includes(kAuthoritativeChunksColl), shard.host);
+    if (authoritativeCollections) {
+        assert.gt(configDB.getCollection(kAuthoritativeChunksColl).getIndexes().length, 1, shard.host);
+    }
+    // shard.catalog.databases is only created lazily once the shard owns databases
+    assert.eq(haveDatabases, colls.includes(kAuthoritativeDbsColl), shard.host);
+}
+
 describeOrSkip("FCV lifecycle for authoritative metadata", function () {
     const kDbName = "testDb";
-    const kAuthoritativeDb = "config";
-    const kAuthoritativeColl = "shard.catalog.databases";
-    const kShardCatalogColls = "shard.catalog.collections";
-    const kShardCatalogChunks = "shard.catalog.chunks";
 
     let st, mongos, shard0, shard1;
-
-    function assertAuthoritativeCollectionExists(shard, {shouldExist}) {
-        const colls = shard.getDB(kAuthoritativeDb).getCollectionNames();
-        if (shouldExist) {
-            assert.contains(kAuthoritativeColl, colls, `Authoritative collection should exist on ${shard.shardName}`);
-        } else {
-            assert.eq(
-                -1,
-                colls.indexOf(kAuthoritativeColl),
-                `Authoritative collection should not exist on ${shard.shardName}`,
-            );
-        }
-    }
 
     function assertFeatureFlags({enabled}) {
         const db = mongos.getDB(kDbName);
@@ -70,6 +70,17 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
             FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardsCRUD"),
             `AuthoritativeShardsCRUD flag should be ${enabled}`,
         );
+    }
+
+    // Manually creates an authoritative shard catalog (databases + collections + chunks w/indexes) on
+    // the given shard to simulate leftovers from a previously aborted upgrade.
+    function createDirtyShardCatalog(shard, rs) {
+        const configDB = shard.getDB(kAuthoritativeDb);
+        assert.commandWorked(configDB.getCollection(kAuthoritativeDbsColl).insertOne({_id: kDbName}));
+        assert.commandWorked(configDB.createCollection(kAuthoritativeCollectionsColl));
+        const chunks = configDB.getCollection(kAuthoritativeChunksColl);
+        assert.commandWorked(chunks.createIndex({uuid: 1, min: 1}, {unique: true}));
+        rs.awaitLastOpCommitted();
     }
 
     beforeEach(function () {
@@ -91,34 +102,30 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
 
     it("should correctly create and remove metadata on FCV upgrade and downgrade", function () {
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: false, haveDatabases: false});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: false, haveDatabases: false});
 
-        // The upgrade should succeed, creating the collection on shard0.
+        // The upgrade creates the databases metadata on the primary shard, and the catalog on every shard.
         assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
         assertFeatureFlags({enabled: true});
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: true});
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: true, haveDatabases: true});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: true, haveDatabases: false});
 
-        // The downgrade should succeed, dropping the collection from shard0.
+        // The downgrade drops everything from every shard.
         assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: false, haveDatabases: false});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: false, haveDatabases: false});
     });
 
     it("should drop pre-existing metadata collection on FCV upgrade", function () {
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: false, haveDatabases: false});
 
-        assert.commandWorked(
-            shard0.getDB(kAuthoritativeDb).getCollection(kAuthoritativeColl).insertOne({
-                _id: kDbName,
-            }),
-        );
-        st.rs0.awaitLastOpCommitted();
-
-        // Manually create the collection on shard0 to simulate a dirty state.
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: true});
+        // Manually create the authoritative shard catalog collections on shard0 to simulate a dirty state.
+        createDirtyShardCatalog(shard0, st.rs0);
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: true, haveDatabases: true});
 
         // Dry-run should succeed and do not block on a dirty state.
         assert.commandWorked(
@@ -133,22 +140,17 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         );
 
         assertFeatureFlags({enabled: true});
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: true});
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: true, haveDatabases: true});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: true, haveDatabases: false});
     });
 
     it("should drop pre-existing metadata collection on a non-primary shard during FCV upgrade", function () {
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: false, haveDatabases: false});
 
-        // Manually create the collection on the a non-primary shard.
-        assert.commandWorked(
-            shard1.getDB(kAuthoritativeDb).getCollection(kAuthoritativeColl).insertOne({
-                _id: kDbName,
-            }),
-        );
-        st.rs1.awaitLastOpCommitted();
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: true});
+        // Manually create the authoritative shard catalog collections on a non-primary shard.
+        createDirtyShardCatalog(shard1, st.rs1);
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: true, haveDatabases: true});
 
         // The upgrade should succeed, dropping the bad collection on shard1 and creating the
         // correct one on shard0.
@@ -158,30 +160,30 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         );
 
         assertFeatureFlags({enabled: true});
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: true});
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: true, haveDatabases: true});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: true, haveDatabases: false});
     });
 
     it("should drop metadata collection from all shards on FCV downgrade", function () {
         assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: true});
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: true, haveDatabases: true});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: true, haveDatabases: false});
 
-        // Manually create the collection on shard1 to simulate a dirty state.
+        // Manually create the databases collection on shard1 to simulate a dirty state.
         assert.commandWorked(
-            shard1.getDB(kAuthoritativeDb).getCollection(kAuthoritativeColl).insertOne({
+            shard1.getDB(kAuthoritativeDb).getCollection(kAuthoritativeDbsColl).insertOne({
                 _id: kDbName,
             }),
         );
         st.rs1.awaitLastOpCommitted();
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: true});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: true, haveDatabases: true});
 
         assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
-        // Assert the collection is gone from both shards.
+        // Assert everything is gone from both shards.
         assertFeatureFlags({enabled: false});
-        assertAuthoritativeCollectionExists(shard0, {shouldExist: false});
-        assertAuthoritativeCollectionExists(shard1, {shouldExist: false});
+        assertAuthoritativeShardCatalog(shard0, {authoritativeCollections: false, haveDatabases: false});
+        assertAuthoritativeShardCatalog(shard1, {authoritativeCollections: false, haveDatabases: false});
     });
 
     function getGlobalCollectionMetadata(ns) {
@@ -201,7 +203,7 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
 
         // The DB primary always keeps a collection entry even if it owns no chunks.
         const hasEntry = ownedChunks.length > 0 || isDbPrimary;
-        const shardMeta = shard.getDB("config").getCollection(kShardCatalogColls).findOne({_id: ns});
+        const shardMeta = shard.getDB("config").getCollection(kAuthoritativeCollectionsColl).findOne({_id: ns});
         if (!hasEntry) {
             assert.eq(null, shardMeta, `${ns}: unexpected metadata on ${shard.shardName}`);
         } else {
@@ -212,7 +214,7 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
 
         const shardChunks = shard
             .getDB("config")
-            .getCollection(kShardCatalogChunks)
+            .getCollection(kAuthoritativeChunksColl)
             .find({uuid: meta.uuid})
             .sort({min: 1})
             .toArray();
@@ -239,8 +241,8 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
         assert.commandWorked(db.runCommand({createUnsplittableCollection: "tracked", dataShard: shard1.shardName}));
 
         // Nothing is cloned into the shard catalogs while still on lastLTS.
-        assert.eq(null, shard0.getDB("config").getCollection(kShardCatalogColls).findOne({_id: shardedNs}));
-        assert.eq(null, shard1.getDB("config").getCollection(kShardCatalogColls).findOne({_id: shardedNs}));
+        assert.eq(null, shard0.getDB("config").getCollection(kAuthoritativeCollectionsColl).findOne({_id: shardedNs}));
+        assert.eq(null, shard1.getDB("config").getCollection(kAuthoritativeCollectionsColl).findOne({_id: shardedNs}));
 
         assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
         st.awaitReplicationOnShards();
@@ -250,5 +252,17 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
 
         assertShardCatalogMatchesGlobal(shard1, trackedNs, {isDbPrimary: false});
         assertShardCatalogMatchesGlobal(shard0, trackedNs, {isDbPrimary: true});
+    });
+});
+
+// Fresh cluster: the authoritative collections are created by addShard's lastLTS->latest FCV upgrade.
+describeOrSkip("authoritative shard catalog on a new latestFCV cluster", function () {
+    it("exists on the shard", function () {
+        const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
+        try {
+            assertAuthoritativeShardCatalog(st.shard0, {authoritativeCollections: true, haveDatabases: false});
+        } finally {
+            st.stop();
+        }
     });
 });

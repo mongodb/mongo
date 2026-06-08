@@ -772,11 +772,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.eq(null, getGlobalCatalogCollMetadata(trackedUserNs));
             assert.neq(null, getGlobalCatalogCollMetadata(shardedBucketsNs));
             assert.neq(null, getGlobalCatalogCollMetadata(trackedBucketsNs));
-            assertTrackedCollectionMetadataOnShardCatalogs(shardedBucketsNs, {
-                oldTrackedNs: shardedUserNs,
-            });
-            assertTrackedCollectionMetadataOnShardCatalogs(trackedBucketsNs, {
-                oldTrackedNs: trackedUserNs,
+            // Downgrade drops the shard catalog collections.
+            forEachNodeOnAllShards((node) => {
+                assertShardCatalogCollMetadataAbsentAtNsOnNode(node, shardedUserNs);
+                assertShardCatalogCollMetadataAbsentAtNsOnNode(node, shardedBucketsNs);
+                assertShardCatalogCollMetadataAbsentAtNsOnNode(node, trackedUserNs);
+                assertShardCatalogCollMetadataAbsentAtNsOnNode(node, trackedBucketsNs);
             });
 
             assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));

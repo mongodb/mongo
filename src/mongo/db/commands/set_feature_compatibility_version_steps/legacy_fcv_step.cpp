@@ -65,6 +65,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries_sharded_cluster.h"
@@ -208,19 +209,22 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
     }()));
 }
 
-void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
+void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
     // No shards should be added until we have forwarded the command to all shards. We use the DDL
     // lock here to serialize with all of add shard and to avoid deadlocks with the DDL blocking
     // used by add/remove shard.
     DDLLockManager::ScopedCollectionDDLLock ddlLock(opCtx,
                                                     NamespaceString::kConfigsvrShardsNamespace,
-                                                    "DropAuthoritativeDatabaseMetadata",
+                                                    "DropAuthoritativeShardCatalogMetadata",
                                                     LockMode::MODE_S);
 
     const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
         opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
 
-    const auto& nss = NamespaceString::kConfigShardCatalogDatabasesNamespace;
+    const auto collNames =
+        BSON_ARRAY(NamespaceString::kConfigShardCatalogDatabasesNamespace.coll()
+                   << NamespaceString::kConfigShardCatalogCollectionsNamespace.coll()
+                   << NamespaceString::kConfigShardCatalogChunksNamespace.coll());
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
@@ -230,19 +234,19 @@ void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
         }
         const auto shard = uassertStatusOK(shardStatus);
 
-        // Build the listCollections command to find the collection's UUID.
+        // Find the UUIDs of the shard catalog collections that exist on this shard.
         ListCollections listCollectionsCmd;
         listCollectionsCmd.setDbName(DatabaseName::kConfig);
-        listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+        listCollectionsCmd.setFilter(BSON("name" << BSON("$in" << collNames)));
 
         const auto listCollRes = uassertStatusOK(
             shard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              nss.dbName(),
+                                              DatabaseName::kConfig,
                                               listCollectionsCmd.toBSON(),
                                               Milliseconds(-1)));
 
-        // If the collection doesn't exist, we're done.
+        // If the collections don't exist, we're done.
         if (listCollRes.docs.empty()) {
             continue;
         }
@@ -250,37 +254,38 @@ void dropAuthoritativeDatabaseCollectionOnShards(OperationContext* opCtx) {
         // Make noop write to be sure that we are the primary before sending the dropCollection.
         sharding_ddl_util::performNoopMajorityWriteLocally(opCtx);
 
-        auto parsedResponse = ListCollectionsReplyItem::parse(listCollRes.docs[0]);
+        for (const auto& doc : listCollRes.docs) {
+            const auto item = ListCollectionsReplyItem::parse(doc);
 
-        // Build and run the drop command using the uuid found as replay protection.
-        const auto uuid = parsedResponse.getInfo()->getUuid();
-        tassert(10289900,
-                "Expected uuid to be set for config.shard.catalog.databases collection",
-                uuid.has_value());
-        const auto dropCmd = BSON("drop" << nss.coll() << "collectionUUID" << *uuid
-                                         << "writeConcern" << BSON("w" << "majority"));
+            // Build and run the drop command using the uuid found as replay protection.
+            const auto uuid = item.getInfo()->getUuid();
+            tassert(
+                10289900, "Expected uuid to be set for shard catalog collection", uuid.has_value());
+            const auto dropCmd = BSON("drop" << item.getName() << "collectionUUID" << *uuid
+                                             << "writeConcern" << BSON("w" << "majority"));
 
-        auto dropResponse =
-            shard->runCommand(opCtx,
-                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                              NamespaceString::kConfigShardCatalogDatabasesNamespace.dbName(),
-                              dropCmd,
-                              Shard::RetryPolicy::kIdempotent);
+            auto dropResponse =
+                shard->runCommand(opCtx,
+                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                  DatabaseName::kConfig,
+                                  dropCmd,
+                                  Shard::RetryPolicy::kIdempotent);
 
-        auto status = Shard::CommandResponse::getEffectiveStatus(dropResponse);
+            auto status = Shard::CommandResponse::getEffectiveStatus(dropResponse);
 
-        if (status == ErrorCodes::CollectionUUIDMismatch) {
-            // Dropping a collection by UUID isn't idempotent. An old primary may have already
-            // dropped it, so re-running the drop can trigger a CollectionUUIDMismatch. This can be
-            // safely ignored since the collection is already gone.
-            //
-            // Another edge case: the collection might have been dropped and re-created with the
-            // same name but a different UUID (e.g., during a split-brain scenario). We also ignore
-            // this to avoid deleting valid metadata.
-            continue;
+            if (status == ErrorCodes::CollectionUUIDMismatch) {
+                // Dropping a collection by UUID isn't idempotent. An old primary may have already
+                // dropped it, so re-running the drop can trigger a CollectionUUIDMismatch. This can
+                // be safely ignored since the collection is already gone.
+                //
+                // Another edge case: the collection might have been dropped and re-created with the
+                // same name but a different UUID (e.g., during a split-brain scenario). We also
+                // ignore this to avoid deleting valid metadata.
+                continue;
+            }
+
+            uassertStatusOK(status);
         }
-
-        uassertStatusOK(status);
     }
 }
 
@@ -622,10 +627,23 @@ private:
                 requestedVersion, originalVersion) &&
             !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
                  .isUpgradingOrDowngrading()) {
-            // Drop the authoritative database collection before transitioning to kUpgrading
-            // to ensure we don't start from a state containing leftovers from a previous
-            // upgrade.
-            dropAuthoritativeDatabaseCollectionOnShards(opCtx);
+            // Drop the authoritative shard catalog collections before transitioning to kUpgrading
+            // to ensure we don't start from a state containing leftovers from a previous upgrade.
+            dropAuthoritativeShardCatalogCollectionsOnShards(opCtx);
+        }
+
+        // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+        // This is gated by based on the --shardsvr command line (`serverGlobalParams.clusterRole`)
+        // rather than the shard identity (`role`), consistently with the creation of the shard
+        // local catalog on stepup by `ShardingInitializationMongoD`. This is so a shard running
+        // setFCV from addShard (before installing the shard identity) creates the collections.
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            feature_flags::gAuthoritativeShardsDDL.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            // Create the shard catalog collections and their indexes before transitioning to
+            // kUpgrading, since authoritative metadata writes can begin as soon as this shard
+            // enters kUpgrading and those writes do not create the required indexes themselves.
+            uassertStatusOK(ensureShardLocalCatalogIndexes(opCtx));
         }
     }
 
@@ -1088,10 +1106,9 @@ private:
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
         if (isConfigsvr &&
             !feature_flags::gAuthoritativeShardsDDL.isEnabledOnVersion(requestedVersion)) {
-            // Dropping the authoritative collections (config.shard.catalog.databases) as the final
-            // step of the downgrade ensures that no leftover data remains. This guarantees a clean
-            // downgrade and makes it safe to upgrade again.
-            dropAuthoritativeDatabaseCollectionOnShards(opCtx);
+            // Dropping the authoritative shard catalog collections as the final step of the
+            // downgrade ensures that no leftover data remains.
+            dropAuthoritativeShardCatalogCollectionsOnShards(opCtx);
         }
 
         // TODO SERVER-94927: Remove once 9.0 becomes last lts.

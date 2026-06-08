@@ -62,6 +62,14 @@ describe("Promote replica set to shard adds authoritative data", function () {
         assert.eq(dbMeta, configMeta);
     });
 
+    it("check shard-local authoritative catalog exists after promotion", () => {
+        const configDB = this.rs1.getPrimary().getDB("config");
+        const colls = configDB.getCollectionNames();
+        assert.contains("shard.catalog.collections", colls);
+        assert.contains("shard.catalog.chunks", colls);
+        assert.gt(configDB["shard.catalog.chunks"].getIndexes().length, 1);
+    });
+
     it("check shard catalog cache", () => {
         const expectedMeta = this.getDbMetadataFromGlobalCatalog("TestDB");
         this.rs1.nodes.forEach((node) => {

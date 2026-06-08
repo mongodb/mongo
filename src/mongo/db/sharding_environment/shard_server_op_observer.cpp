@@ -591,6 +591,23 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
         ShardIdentityRollbackNotifier::get(opCtx)->recordThatRollbackHappened();
     }
 
+    // Clear the CSR authoritative state once we drop shard.catalog.collections on FCV downgrade.
+    // Otherwise, a follow up FCV upgrade can see Auth. Shards enabled & an authoritative CSR,
+    // but the corresponding persisted authoritative metadata would already be gone from disk.
+    // TODO(SERVER-127444): Remove once the authoritativeState flag is removed from the CSR.
+    if (collectionName == NamespaceString::kConfigShardCatalogCollectionsNamespace) {
+        for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+            if (scopedCsr->getAuthoritativeState() ==
+                CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
+                LOGV2(12494600,
+                      "Clearing CSR authoritative state on shard.catalog.collections drop",
+                      logAttrs(nss));
+                scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+            }
+        }
+    }
+
     return {};
 }
 

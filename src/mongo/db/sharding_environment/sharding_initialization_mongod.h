@@ -162,6 +162,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void initializeShardingAwarenessAndLoadGlobalSetting
 /**
  * Ensures that the shard-local catalog collections exist with the correct indexes.
  */
-Status ensureShardLocalCatalogIndexes(OperationContext* opCtx);
+// TODO (SERVER-98118): remove MONGO_MOD_NEEDS_REPLACEMENT once 9.0 becomes last LTS.
+MONGO_MOD_NEEDS_REPLACEMENT Status ensureShardLocalCatalogIndexes(OperationContext* opCtx);
 
 }  // namespace mongo
