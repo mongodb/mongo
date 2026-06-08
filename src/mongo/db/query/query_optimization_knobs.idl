@@ -1080,6 +1080,15 @@ server_parameters:
             query_knob:
                 wire_name: enablePipelineOptimizationAdditionalTestingRules
 
+    internalEnableDependencyGraphValidation:
+        description: "Enable insertion of $_internalAssertDataAssumptions stages to validate dependency graph arrayness analysis."
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableDependencyGraphValidation"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        test_only: true
+        redact: false
+
     internalEnablePathArrayness:
         description: "Whether or not to use PathArrayness when applying optimizations"
         set_at: [startup, runtime]
