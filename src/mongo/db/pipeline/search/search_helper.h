@@ -84,6 +84,14 @@ void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
  */
 bool hasReferenceToSearchMeta(const DocumentSource& ds);
 
+// TODO: Move this into $_internalDocumentResultsAndMetadata once $search is removed.
+/**
+ * Returns true if the current stage can move past a search source stage to the shard side
+ * during pipeline splitting. Blocks stages that reference $$SEARCH_META or don't preserve
+ * order and metadata.
+ */
+bool canMovePastDuringSplit(const DocumentSource& ds);
+
 /**
  * Check if this is a $search pipeline, specifically that the front of the pipeline is
  * a $search stage.

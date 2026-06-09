@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
@@ -39,7 +40,9 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 
+#include <functional>
 #include <set>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -78,6 +81,17 @@ class DocumentSourceInternalDocumentResultsAndMetadata final : public DocumentSo
 public:
     static constexpr StringData kStageName = "$_internalDocumentResultsAndMetadata"_sd;
 
+    // Sort pattern for merge-sorting the document results stream across shards, and the
+    // merge pipeline for the metadata stream on the router. Provided by the configured
+    // source stage via the merge plan provider callback.
+    struct ShardedPlanSpec {
+        BSONObj resultsSortPattern;
+        std::vector<BSONObj> metaMergePipeline;
+    };
+
+    // Provided by the source stage to supply its merge-sort and metadata merge info.
+    using ShardedPlanProvider = std::function<const ShardedPlanSpec&(ExpressionContext*)>;
+
     /**
      * Creates a DocumentSource from StageParams produced by the LiteParsed layer.
      */
@@ -112,10 +126,12 @@ public:
                                                  DocumentSourceContainer* container);
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
-        const DistributedPlanContext* ctx) final {
-        // TODO: SERVER-126255
-        return boost::none;
-    }
+        const DistributedPlanContext* ctx) final;
+
+    // Returns true if the current stage can move past this stage to the shard side during
+    // pipeline splitting. Blocks stages that reference $$SEARCH_META or don't preserve order
+    // and metadata.
+    static bool canMovePastDuringSplit(const DocumentSource& ds);
 
     // The metadata variable is set by this stage, not referenced by it.
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
@@ -130,6 +146,10 @@ public:
 
     bool getReturnCursor() const {
         return _returnCursor;
+    }
+
+    void setShardedPlanProvider(ShardedPlanProvider provider) {
+        _shardedPlanProvider = std::move(provider);
     }
 
     void stashAdditionalCursorPipeline(std::unique_ptr<Pipeline> pipeline) {
@@ -161,6 +181,7 @@ private:
     // Stashed by the exec translation function when returnCursor is true. run_aggregate.cpp takes
     // it via takeAdditionalCursorPipeline() to register as a secondary SearchMetaResult executor.
     std::unique_ptr<Pipeline> _additionalCursorPipeline;
+    ShardedPlanProvider _shardedPlanProvider;
 };
 
 }  // namespace mongo

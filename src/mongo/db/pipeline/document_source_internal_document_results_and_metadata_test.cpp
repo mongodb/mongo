@@ -40,8 +40,11 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_mock_stages.h"
 #include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/lite_parsed_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
@@ -91,6 +94,8 @@ private:
     std::unique_ptr<InternalDocumentResultsAndMetadataLiteParsed> _liteParsed;
     DocumentSourceContainer _stages;
 };
+using DocumentSourceInternalDocumentResultsAndMetadataDeathTest =
+    DocumentSourceInternalDocumentResultsAndMetadataTest;
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, ParsesFullSpec) {
     auto* stage = parse(BSON(kStageName << kFullSpec));
@@ -105,9 +110,6 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, ParsesSpecWithoutMe
     ASSERT_FALSE(stage->getMetadata().has_value());
     ASSERT_FALSE(stage->getReturnCursor());
 }
-
-using DocumentSourceInternalDocumentResultsAndMetadataDeathTest =
-    DocumentSourceInternalDocumentResultsAndMetadataTest;
 
 DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
              RejectsSourceThatRequiresInputDocSource,
@@ -340,7 +342,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     // Standalone path: Exchange (2 consumers) + $replaceRoot + $setVar.
     auto expCtx = getExpCtx();
     auto queueStage = DocumentSourceQueue::create(expCtx, {});
-    MetadataBindSpec meta{"SEARCH_META"};
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/false);
     auto sourcePipeline = Pipeline::create({ds}, expCtx);
@@ -360,7 +362,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     // Sharded path: Exchange (2 consumers) + $replaceRoot and meta pipeline stashed on DS.
     auto expCtx = getExpCtx();
     auto queueStage = DocumentSourceQueue::create(expCtx, {});
-    MetadataBindSpec meta{"SEARCH_META"};
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
     auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
         expCtx, queueStage, meta, /*returnCursor=*/true);
     boost::intrusive_ptr<DocumentSourceInternalDocumentResultsAndMetadata> dsRef = ds;
@@ -399,6 +401,118 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     const auto& stages = execPipeline->getStages();
     ASSERT_EQ(stages.size(), 2u);
     ASSERT_FALSE(dsRef->hasAdditionalCursorPipeline());
+}
+
+// DPL tests
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicWithoutCallbackReturnsNone) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    ASSERT_FALSE(ds->distributedPlanLogic(nullptr).has_value());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, CanMovePastBlocksSearchMetaReference) {
+    auto expCtx = getExpCtx();
+    auto projectWithMeta =
+        DocumentSource::parse(expCtx, BSON("$project" << BSON("m" << "$$SEARCH_META"))).front();
+    ASSERT_FALSE(
+        DocumentSourceInternalDocumentResultsAndMetadata::canMovePastDuringSplit(*projectWithMeta));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       CanMovePastAllowsOrderPreservingStageWithoutSearchMeta) {
+    auto expCtx = getExpCtx();
+    // DocumentSourceCanSwapWithSort has preservesOrderAndMetadata = true and does not
+    // reference $$SEARCH_META.
+    auto orderPreservingStage = DocumentSourceCanSwapWithSort::create(expCtx);
+    ASSERT_TRUE(DocumentSourceInternalDocumentResultsAndMetadata::canMovePastDuringSplit(
+        *orderPreservingStage));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       CanMovePastBlocksNonOrderPreservingStage) {
+    auto expCtx = getExpCtx();
+    auto groupStage = DocumentSource::parse(expCtx, BSON("$group" << BSON("_id" << "$x"))).front();
+    // $group does not preserve order and metadata.
+    ASSERT_FALSE(
+        DocumentSourceInternalDocumentResultsAndMetadata::canMovePastDuringSplit(*groupStage));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicWithCallbackNoMetadataSetsSortOnly) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, /*metadata=*/boost::none, /*returnCursor=*/false);
+
+    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
+        BSON("score" << 1), std::vector<BSONObj>{});
+    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto dpl = ds->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_TRUE(dpl->mergeSortPattern.has_value());
+    ASSERT_BSONOBJ_EQ(*dpl->mergeSortPattern, BSON("score" << 1));
+    ASSERT_TRUE(dpl->mergingStages.empty());
+}
+
+DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
+             DistributedPlanLogicWithCallbackTassertsOnEmptySortPattern,
+             "12625501") {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
+        BSONObj{}, std::vector<BSONObj>{});
+    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    ds->distributedPlanLogic(nullptr);
+}
+
+DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
+             DistributedPlanLogicWithCallbackTassertsOnMissingMergePipeline,
+             "12625502") {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
+        BSON("score" << 1), std::vector<BSONObj>{});
+    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    ds->distributedPlanLogic(nullptr);
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       DistributedPlanLogicWithCallbackSetsMergingStages) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto meta = MetadataBindSpec::parse(BSON("as" << "SEARCH_META"));
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+
+    auto spec = std::make_shared<DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec>(
+        BSON("score" << 1),
+        std::vector<BSONObj>{BSON(
+            "$group" << BSON("_id" << BSONNULL << "meta" << BSON("$mergeObjects" << "$payload")))});
+    ds->setShardedPlanProvider([spec](ExpressionContext*) -> const auto& { return *spec; });
+
+    auto dpl = ds->distributedPlanLogic(nullptr);
+    ASSERT_TRUE(dpl.has_value());
+    ASSERT_TRUE(dpl->mergeSortPattern.has_value());
+    ASSERT_BSONOBJ_EQ(*dpl->mergeSortPattern, BSON("score" << 1));
+    ASSERT_EQ(dpl->mergingStages.size(), 1u);
+    ASSERT_EQ(StringData(dpl->mergingStages.front()->getSourceName()),
+              "$setVariableFromSubPipeline"_sd);
 }
 
 }  // namespace

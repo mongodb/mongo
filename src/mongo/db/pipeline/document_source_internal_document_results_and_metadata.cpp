@@ -29,8 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
@@ -39,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/logv2/log.h"
@@ -261,6 +260,53 @@ DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetada
         // skip_stream is added to MongoExtensionLogicalAggStageVTable in api.h.
     }
     return std::next(itr);
+}
+
+boost::optional<DocumentSource::DistributedPlanLogic>
+DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
+    const DistributedPlanContext* ctx) {
+    // This stage acts as transport layer, DPL info is provided by configured source stage via the
+    // callback. Without it, this stage has no distributed plan logic to provide.
+    if (!_shardedPlanProvider) {
+        return boost::none;
+    }
+
+    DistributedPlanLogic logic;
+    logic.shardsStage = this;
+    logic.needsSplit = false;
+    logic.canMovePast = canMovePastDuringSplit;
+
+    const auto& expCtx = getExpCtx();
+    const auto& dplResult = _shardedPlanProvider(expCtx.get());
+    tassert(12625501,
+            str::stream() << kStageName << " DPL callback must return a non-empty sort pattern",
+            !dplResult.resultsSortPattern.isEmpty());
+    logic.mergeSortPattern = dplResult.resultsSortPattern.getOwned();
+
+    // No metadata: only merge-sort is needed, no merging pipeline for metadata stream.
+    if (!_metadata) {
+        return logic;
+    }
+
+    // Wrap the merge pipeline in $setVariableFromSubPipeline to bind
+    // $$SEARCH_META on the router.
+    tassert(12625502,
+            str::stream() << kStageName
+                          << " DPL callback must return a non-empty merge pipeline when "
+                             "metadata is present",
+            !dplResult.metaMergePipeline.empty());
+    logic.mergingStages = {DocumentSourceSetVariableFromSubPipeline::create(
+        expCtx,
+        pipeline_factory::makePipeline(
+            dplResult.metaMergePipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        Variables::kSearchMetaId)};
+
+    return logic;
+}
+
+bool DocumentSourceInternalDocumentResultsAndMetadata::canMovePastDuringSplit(
+    const DocumentSource& ds) {
+    return search_helpers::canMovePastDuringSplit(ds);
 }
 
 }  // namespace mongo

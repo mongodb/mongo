@@ -320,9 +320,7 @@ DepsTracker::State DocumentSourceSearch::getDependencies(DepsTracker* deps) cons
 }
 
 bool DocumentSourceSearch::canMovePastDuringSplit(const DocumentSource& ds) {
-    // Check if next stage uses the variable.
-    return !search_helpers::hasReferenceToSearchMeta(ds) &&
-        ds.constraints().preservesOrderAndMetadata;
+    return search_helpers::canMovePastDuringSplit(ds);
 }
 
 }  // namespace mongo

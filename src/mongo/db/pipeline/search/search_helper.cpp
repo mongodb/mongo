@@ -256,6 +256,10 @@ bool hasReferenceToSearchMeta(const DocumentSource& ds) {
                                              std::set<Variables::Id>{Variables::kSearchMetaId});
 }
 
+bool canMovePastDuringSplit(const DocumentSource& ds) {
+    return !hasReferenceToSearchMeta(ds) && ds.constraints().preservesOrderAndMetadata;
+}
+
 bool isSearchPipeline(const Pipeline* pipeline) {
     if (!pipeline || pipeline->empty()) {
         return false;
