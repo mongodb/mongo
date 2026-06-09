@@ -10,9 +10,10 @@ import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noP
 checkPlatformCompatibleWithExtensions();
 
 /*
- * Extension $search accepts an empty spec and acts as a no-op, returning all documents.
- * Legacy $search throws SearchNotEnabled when mongot is not configured. We can use this
- * behavior to test whether extension or legacy $search is being used.
+ * Extension $search models the two-stream approach: it wraps $_extensionSearch in
+ * $_internalDocumentResultsAndMetadata (which sets $$SEARCH_META). Legacy $search throws
+ * SearchNotEnabled when mongot is not configured. We can use this behavior to test whether
+ * extension or legacy $search is being used.
  */
 const pipeline = [{$search: {}}];
 
@@ -48,9 +49,9 @@ withExtensions({"libsearch_extension.so": {}}, (conn) => {
     ];
     assert.commandWorked(coll.insertMany(testData));
 
-    // Flag enabled; extension is used (no-op, returns all documents).
+    // Flag enabled; extension is used. The mock emits no doc results, so the pipeline returns [].
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: true}));
-    assertArrayEq({actual: coll.aggregate(pipeline).toArray(), expected: testData});
+    assertArrayEq({actual: coll.aggregate(pipeline).toArray(), expected: []});
 
     // Flag disabled; legacy is used (errors because mongot is not configured).
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: false}));
@@ -61,7 +62,7 @@ withExtensions({"libsearch_extension.so": {}}, (conn) => {
     const complexPipeline = [{$search: {}}, {$match: {_id: {$in: [0, 2]}}}, {$project: {text: 1, _id: 0}}];
     assertArrayEq({
         actual: coll.aggregate(complexPipeline).toArray(),
-        expected: [{text: "apple"}, {text: "cherry"}],
+        expected: [],
     });
 
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: false}));

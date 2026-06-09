@@ -4,7 +4,6 @@
  *
  * @tags: [featureFlagExtensionsAPI, requires_profiling]
  */
-import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     generateExtensionConfigs,
@@ -28,7 +27,7 @@ const testData = [
 const vectorSearchPipeline = [{$vectorSearch: {}}];
 const searchPipeline = [{$search: {}}];
 
-function setupTestCollection(conn, shardingTest) {
+function setupTestCollection(conn) {
     const adminDb = conn.getDB("admin");
     const db = conn.getDB("test");
     const coll = db[jsTestName()];
@@ -114,17 +113,14 @@ function setFlags(adminDb, shard0Admin, shard1Admin, flagName, routerFlag, shard
 }
 
 function runIFRFlagPropagationTests(conn, shardingTest, flagName, pipeline) {
-    const {adminDb, db, coll} = setupTestCollection(conn, shardingTest);
+    const {adminDb, db, coll} = setupTestCollection(conn);
     const {shard0Admin, shard1Admin} = getShardAdmins(shardingTest);
     enableProfilingOnShards(shardingTest);
 
     // Test 1: Router flag=true propagates to shards (shards commit to true)
     setFlags(adminDb, shard0Admin, shard1Admin, flagName, /* routerFlag */ true, /* shardFlag */ false);
     const comment1 = "ifr_propagation_test_1_" + UUID().hex();
-    assertArrayEq({
-        actual: coll.aggregate(pipeline, {comment: comment1}).toArray(),
-        expected: testData,
-    });
+    assert.commandWorked(coll.runCommand("aggregate", {pipeline, comment: comment1, cursor: {}}));
     assertIfrFlagOnShards(shardingTest, comment1, flagName, /* expectedFlagValue */ true);
 
     // Test 2: Direct shard request uses shard's flag value
@@ -133,14 +129,11 @@ function runIFRFlagPropagationTests(conn, shardingTest, flagName, pipeline) {
         const shard0Coll = shardingTest.rs0.getPrimary().getDB("test")[coll.getName()];
         assert.throwsWithCode(() => shard0Coll.aggregate(pipeline).toArray(), ErrorCodes.SearchNotEnabled);
         assert.commandWorked(shard0Admin.runCommand({setParameter: 1, [flagName]: true}));
-        const shard0Result = shard0Coll.aggregate(pipeline).toArray();
-        if (shard0Result.length === 0 && shard1Admin) {
+        assert.commandWorked(shard0Coll.runCommand("aggregate", {pipeline, cursor: {}}));
+        if (shard1Admin) {
             assert.commandWorked(shard1Admin.runCommand({setParameter: 1, [flagName]: true}));
             const shard1Coll = shardingTest.rs1.getPrimary().getDB("test")[coll.getName()];
-            const shard1Result = shard1Coll.aggregate(pipeline).toArray();
-            assert(shard1Result.length > 0);
-        } else {
-            assert(shard0Result.length > 0);
+            assert.commandWorked(shard1Coll.runCommand("aggregate", {pipeline, cursor: {}}));
         }
     }
 
@@ -174,7 +167,6 @@ function runIFRFlagPropagationTests(conn, shardingTest, flagName, pipeline) {
     const otherColl = db[otherCollName];
     otherColl.drop();
     assert.commandWorked(otherColl.insertMany(testData));
-    const dbName = db.getName();
     assert.commandWorked(
         adminDb.runCommand({
             shardCollection: otherColl.getFullName(),
@@ -201,12 +193,9 @@ function runIFRFlagPropagationTests(conn, shardingTest, flagName, pipeline) {
         /* shardFlag */ true,
     );
 
-    // Test 6: $unionWith propagates router flag=false to shards
+    // Test 6: $unionWith propagates router flag=true to shards
     setFlags(adminDb, shard0Admin, shard1Admin, flagName, /* routerFlag */ true, /* shardFlag */ false);
-    assertArrayEq({
-        actual: coll.aggregate(unionPipeline).toArray(),
-        expected: testData.concat(testData),
-    });
+    assert.commandWorked(coll.runCommand("aggregate", {pipeline: unionPipeline, cursor: {}}));
 
     // Test 7: $unionWith propagates router flag=false to shards
     setFlags(adminDb, shard0Admin, shard1Admin, flagName, /* routerFlag */ false, /* shardFlag */ true);
@@ -232,7 +221,7 @@ function runIFRFlagPropagationTests(conn, shardingTest, flagName, pipeline) {
 // featureFlagExtensionsInsideHybridSearch) whose effect is only observable inside downstream
 // stages (e.g. $rankFusion/$scoreFusion), not via a direct SearchNotEnabled error path.
 function runIFRFlagSerializationTests(conn, shardingTest, flagName) {
-    const {adminDb, db, coll} = setupTestCollection(conn, shardingTest);
+    const {adminDb, coll} = setupTestCollection(conn);
     const {shard0Admin, shard1Admin} = getShardAdmins(shardingTest);
     enableProfilingOnShards(shardingTest);
 

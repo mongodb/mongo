@@ -60,8 +60,7 @@ checkPlatformCompatibleWithExtensions();
             const {coll, testData, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
 
             const initialMetrics = getMetrics();
-            const result = coll.aggregate([{$search: {}}]).toArray();
-            assert.eq(result.length, testData.length, "Search should return all documents");
+            assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$search: {}}], cursor: {}}));
             const finalMetrics = getMetrics();
 
             assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, ["extensionSearchUsed"]);
