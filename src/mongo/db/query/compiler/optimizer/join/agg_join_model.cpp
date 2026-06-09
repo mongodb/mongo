@@ -196,23 +196,6 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
         dynamic_cast<DocumentSourceMatch*>(lookup.getResolvedIntrospectionPipeline().peekFront());
 }
 
-// Insert the given join predicates into the given join graph.
-Status addExprJoinPredicates(MutableJoinGraph& graph,
-                             const std::vector<JoinPredicateExpr>& joinPreds,
-                             PathResolver& pathResolver,
-                             NodeId foreignNodeId) {
-    for (auto&& joinPred : joinPreds) {
-        auto localPath = pathResolver.resolve(joinPred.localField());
-        if (!localPath) {
-            return Status(ErrorCodes::BadValue, "Local path could not be resolved");
-        }
-        PathId foreignPath = pathResolver.addPath(foreignNodeId, joinPred.foreignField());
-        auto localNodeId = pathResolver[*localPath].nodeId;
-        graph.addExprEqualityEdge(localNodeId, foreignNodeId, *localPath, foreignPath);
-    }
-    return Status::OK();
-}
-
 bool canJoinPredicateFieldIncludeArrays(
     const pipeline::dependency_graph::DependencyGraph& baseCollDeps,
     ExpressionContext* expCtx,
@@ -413,36 +396,58 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 return Status(ErrorCodes::BadValue, "Graph is too big: too many nodes");
             }
 
-            // Add join predicate expressed as local/foreign field syntax to join graph.
+            // Resolve all local-side join fields BEFORE adding the foreign node to the path
+            // resolver. The order is important: a local reference is evaluated against the input
+            // document before the foreign results are embedded at the "as" field, so it must
+            // resolve to the base/earlier node that owns it -- even when it is prefixed by the
+            // foreign collection's embedPath (e.g. 'let: {l: "$X.y"}' combined with 'as: "X"').
+            // Resolving it after the foreign node has been added would misattribute the local
+            // field to the foreign node and produce an illegal self-edge.
+            boost::optional<PathId> localFieldPathId;
             if (lookup->hasLocalFieldForeignFieldJoin()) {
-                // The order of resolving the paths are important here: localPathId shouln't be
-                // resolved to the foreign collection even if it is prefixed by the foreign
-                // collection's embedPath.
-                auto localPathId = pathResolver.resolve(*lookup->getLocalField());
+                localFieldPathId = pathResolver.resolve(*lookup->getLocalField());
+                if (!localFieldPathId) {
+                    return Status(ErrorCodes::BadValue, "Local path could not be resolved");
+                }
+            }
 
+            std::vector<PathId> exprLocalPathIds;
+            exprLocalPathIds.reserve(preds.joinPredicates.size());
+            for (const auto& joinPred : preds.joinPredicates) {
+                auto localPathId = pathResolver.resolve(joinPred.localField());
                 if (!localPathId) {
                     return Status(ErrorCodes::BadValue, "Local path could not be resolved");
                 }
-                pathResolver.addNode(*foreignNodeId, lookup->getAsField());
+                exprLocalPathIds.push_back(*localPathId);
+            }
 
+            // Now register the foreign node's scope. Foreign-side fields are attributed to it
+            // explicitly via addPath(), so the foreign node only needs to be in the resolver from
+            // this point on.
+            pathResolver.addNode(*foreignNodeId, lookup->getAsField());
+
+            // Add join predicate expressed as local/foreign field syntax to join graph.
+            if (lookup->hasLocalFieldForeignFieldJoin()) {
                 auto foreignPathId =
                     pathResolver.addPath(*foreignNodeId, *lookup->getForeignField());
 
-                auto edgeId = graph.addSimpleEqualityEdge(
-                    pathResolver[*localPathId].nodeId, *foreignNodeId, *localPathId, foreignPathId);
+                auto edgeId = graph.addSimpleEqualityEdge(pathResolver[*localFieldPathId].nodeId,
+                                                          *foreignNodeId,
+                                                          *localFieldPathId,
+                                                          foreignPathId);
                 if (!edgeId) {
                     // Cannot add an edge for existing nodes.
                     return Status(ErrorCodes::BadValue, "Graph is too big: too many edges");
                 }
-            } else {
-                pathResolver.addNode(*foreignNodeId, lookup->getAsField());
             }
 
             // Add join predicates expressed as $expr in subpipelines to join graph.
-            auto status = addExprJoinPredicates(
-                graph, std::move(preds.joinPredicates), pathResolver, *foreignNodeId);
-            if (!status.isOK()) {
-                return status;
+            for (size_t i = 0; i < preds.joinPredicates.size(); ++i) {
+                PathId foreignPathId =
+                    pathResolver.addPath(*foreignNodeId, preds.joinPredicates[i].foreignField());
+                auto localNodeId = pathResolver[exprLocalPathIds[i]].nodeId;
+                graph.addExprEqualityEdge(
+                    localNodeId, *foreignNodeId, exprLocalPathIds[i], foreignPathId);
             }
 
             auto next = suffix->popFront();
