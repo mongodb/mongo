@@ -861,18 +861,35 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForPartialUnprepared
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
 }
 
-TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsDeriveCrudOpsForMultiApplyOpsBasic) {
+class ReshardingOplogBatchPreparerRetryableApplyOpsTest
+    : public ReshardingOplogBatchPreparerTest,
+      public ::testing::WithParamInterface<repl::MultiOplogEntryType> {};
+
+INSTANTIATE_TEST_SUITE_P(ReshardingOplogBatchPreparerTest,
+                         ReshardingOplogBatchPreparerRetryableApplyOpsTest,
+                         ::testing::Values(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                           repl::MultiOplogEntryType::kApplyOpsAppliedAtomically),
+                         [](const ::testing::TestParamInfo<repl::MultiOplogEntryType>& info) {
+                             return info.param ==
+                                     repl::MultiOplogEntryType::kApplyOpsAppliedSeparately
+                                 ? "kApplyOpsAppliedSeparately"
+                                 : "kApplyOpsAppliedAtomically";
+                         });
+
+TEST_P(ReshardingOplogBatchPreparerRetryableApplyOpsTest,
+       SessionWriteVectorsUnrollsRetryableApplyOps) {
+    const auto multiOpType = GetParam();
+
     const auto lsid = makeLogicalSessionIdForTest();
     const TxnNumber txnNumber{1};
 
     OplogBatch batch;
-    // 'makeApplyOpsForInsert' uses the "_id" of each document as the "stmtId"
     batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)},
                                              lsid,
                                              txnNumber,
                                              false /* isPrepare */,
                                              false /* isPartial */,
-                                             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                             multiOpType,
                                              true /* useStmtIds */));
 
     std::list<repl::OplogEntry> derivedOps;
@@ -890,6 +907,46 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsDeriveCrudOpsForMult
         ASSERT_BSONOBJ_EQ(writer[i]->getObject(), (BSON("_id" << static_cast<int>(i))));
         ASSERT_FALSE(writer[i]->getMultiOpType());
     }
+}
+
+// A retryable op on a non-terminal (partialTxn) entry of an atomic-write chain is still unrolled.
+TEST_F(ReshardingOplogBatchPreparerTest,
+       SessionWriteVectorsUnrollsRetryableOpInNonTerminalAtomicApplyOps) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    const TxnNumber txnNumber{1};
+
+    OplogBatch batch;
+    // Non-terminal ('partialTxn') entry carrying the retryable statement (stmtId 0).
+    batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 0)},
+                                             lsid,
+                                             txnNumber,
+                                             false /* isPrepare */,
+                                             true /* isPartial */,
+                                             repl::MultiOplogEntryType::kApplyOpsAppliedAtomically,
+                                             true /* useStmtIds */));
+    // Terminal entry holding only non-retryable ops (no stmtIds), like index side writes.
+    batch.emplace_back(makeApplyOpsForInsert({BSON("_id" << 1)},
+                                             lsid,
+                                             txnNumber,
+                                             false /* isPrepare */,
+                                             false /* isPartial */,
+                                             repl::MultiOplogEntryType::kApplyOpsAppliedAtomically,
+                                             false /* useStmtIds */));
+
+    std::list<repl::OplogEntry> derivedOps;
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOps);
+
+    // Only the retryable op from the non-terminal entry should be unrolled into a session op; the
+    // terminal entry's non-retryable ops are skipped.
+    ASSERT_EQ(derivedOps.size(), 1U);
+
+    auto writer = getNonEmptyWriterVector(writerVectors);
+    ASSERT_EQ(writer.size(), 1U);
+    ASSERT_EQ(writer[0]->getSessionId(), lsid);
+    ASSERT_EQ(*writer[0]->getTxnNumber(), txnNumber);
+    ASSERT(writer[0]->getOpType() == repl::OpTypeEnum::kInsert);
+    ASSERT_BSONOBJ_EQ(writer[0]->getObject(), (BSON("_id" << 0)));
+    ASSERT_FALSE(writer[0]->getMultiOpType());
 }
 
 }  // namespace

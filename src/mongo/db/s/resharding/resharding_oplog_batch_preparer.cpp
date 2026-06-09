@@ -76,14 +76,17 @@ bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
     }
 
     if (op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        // This applyOps oplog entry is guaranteed to correspond to a committed transaction since
-        // the resharding aggregation pipeline does not output applyOps oplog entries for aborted
-        // transactions (i.e. it only outputs the abortTransaction oplog entry).
+        // The resharding aggregation pipeline does not output applyOps oplog entries for aborted
+        // transactions (it outputs the abortTransaction oplog entry instead), so any applyOps
+        // entry here is a retryable write or a committed transaction, never an aborted one.
 
-        if (isInternalSessionForRetryableWrite(*op.getSessionId())) {
-            // For a retryable internal transaction, we need to update the config.transactions
-            // collection upon writing the noop oplog entries for retryable operations contained
-            // within each applyOps oplog entry.
+        if (isInternalSessionForRetryableWrite(*op.getSessionId()) ||
+            op.applyOpsIsMarkedRetryable()) {
+            // For a retryable internal transaction or a retryable-write applyOps, we need to
+            // update the config.transactions collection upon writing the noop oplog entries for
+            // the retryable operations contained within each applyOps oplog entry. A
+            // retryable-write chain can carry a stmtId on a non-terminal (partialTxn) entry, so
+            // every entry must be checked, not just the terminal one.
             return true;
         }
 
@@ -92,7 +95,6 @@ bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
         // config.transactions collection upon seeing the final applyOps oplog entry.
         return !op.isPartialTransaction();
     }
-
     return false;
 }
 
@@ -282,7 +284,7 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
 
             const auto& sessionId = *op.getSessionId();
 
-            if (op.getMultiOpType() == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately) {
+            if (op.applyOpsIsMarkedRetryable()) {
                 unrollApplyOpsAndUpdateSessionTracker(
                     sessionTracker, derivedOps, op, sessionId, *op.getTxnNumber());
             } else if (isInternalSessionForRetryableWrite(sessionId) &&
