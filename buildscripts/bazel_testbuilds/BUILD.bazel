@@ -59,6 +59,10 @@ mongo_cc_unit_test(
         "ci_wrapper_integration_test",
         "manual",
     ],
+    target_compatible_with = select({
+        "//bazel/config:not_windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
 )
 
 resmoke_suite_test(
