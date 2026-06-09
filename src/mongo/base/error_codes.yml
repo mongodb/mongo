@@ -592,6 +592,14 @@ error_codes:
         categories: [CancellationError, InternalOnly],
       }
 
+    # Reserved for future load-shedding specific rejection code.
+    # Keep unused for now until mongo-side code is finalized and rolled out.
+    - {
+        code: 489,
+        name: SearchRequestRejectedDueToOverload,
+        categories: [SystemOverloadedError],
+      }
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
