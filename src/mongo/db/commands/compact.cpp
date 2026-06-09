@@ -126,11 +126,15 @@ public:
 
         _assertCanRunCompact(opCtx, params);
 
+        // Use LocalWrite intent so the IntentRegistry does not enforce primary-only
+        // write access, allowing compact to run on secondaries as intended.
         Lock::GlobalLock lk(opCtx,
                             MODE_IX,
                             Date_t::max(),
                             Lock::InterruptBehavior::kThrow,
-                            {.skipFlowControlTicket = true, .skipRSTLLock = true});
+                            {.skipFlowControlTicket = true,
+                             .skipRSTLLock = true,
+                             .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
 
         // Check the pre-shard write blocking state. dryRun is estimation-only (no data is
         // rewritten or deleted) so it is exempt from this restriction.
