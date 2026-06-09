@@ -35,9 +35,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 class SBEBuiltinNewArrayFromRangeTest : public EExpressionTestFixture {
@@ -187,5 +188,23 @@ TEST_F(SBEBuiltinNewArrayFromRangeTest, ZeroStep) {
 
     runAndAssertExpression(
         std::move(start), std::move(end), std::move(step), std::move(expectedRes));
+}
+
+TEST_F(SBEBuiltinNewArrayFromRangeTest, NewArrayFromRangeWithinLimitSucceeds) {
+    // Range [0, 1000) produces 1000 int32 values; limit set well above that.
+    RAIIServerParameterControllerForTest limit("internalQueryMaxRangeBytes", 16 * 1024);
+    auto [resTag, resVal] = runExpression(makeInt32(0), makeInt32(1000), makeInt32(1));
+    value::ValueGuard guard(resTag, resVal);
+
+    ASSERT(value::isArray(resTag));
+    ASSERT_EQUALS(value::getArrayView(resVal)->size(), 1000u);
+}
+
+TEST_F(SBEBuiltinNewArrayFromRangeTest, NewArrayFromRangeExceedsMemoryLimit) {
+    // Range [0, 1000) produces 1000 int32 values; limit set well below that.
+    RAIIServerParameterControllerForTest limit("internalQueryMaxRangeBytes", 1024);
+    ASSERT_THROWS_CODE(runExpression(makeInt32(0), makeInt32(1000), makeInt32(1)),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
 }
 }  // namespace mongo::sbe

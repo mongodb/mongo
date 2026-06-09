@@ -2194,10 +2194,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityTy
     auto arr = value::getArrayView(val);
 
     if (arity) {
+        size_t currentMemoryBytes = 0;
+        const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
         arr->reserve(arity);
         for (ArityType idx = 0; idx < arity; ++idx) {
             auto [tag, val] = moveOwnedFromStack(idx);
             arr->push_back(tag, val);
+            currentMemoryBytes += value::getApproximateSize(tag, val);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$array would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
         }
     }
 
@@ -2320,6 +2331,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType
     values.reserve(tmpVectorLen);
     names.reserve(tmpVectorLen);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; idx += 2) {
         {
             auto [owned, tag, val] = getFromStack(idx);
@@ -2332,6 +2346,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType
         }
         {
             auto [owned, tag, val] = getFromStack(idx + 1);
+            currentMemoryBytes += names.back().size() + value::getApproximateSize(tag, val);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$object would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
             typeTags.push_back(tag);
             values.push_back(val);
         }
@@ -4058,6 +4080,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArrayView(resVal);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto [_, tag, val] = getFromStack(idx);
         if (!value::isArray(tag)) {
@@ -4067,6 +4092,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
         value::arrayForEach(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
             auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
             resView->push_back(copyTag, copyVal);
+            currentMemoryBytes += value::getApproximateSize(copyTag, copyVal);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$concatArrays would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
         });
     }
 
@@ -4466,13 +4499,25 @@ FastTuple<bool, value::TypeTags, value::Value> setUnion(
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (size_t idx = 0; idx < argVals.size(); ++idx) {
         auto argTag = argTags[idx];
         auto argVal = argVals[idx];
 
         value::arrayForEach(argTag, argVal, [&](value::TypeTags elTag, value::Value elVal) {
             auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-            resView->push_back(copyTag, copyVal);
+            if (resView->push_back(copyTag, copyVal)) {
+                currentMemoryBytes += value::getApproximateSize(elTag, elVal);
+                if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                    uasserted(ErrorCodes::ExceededMemoryLimit,
+                              str::stream()
+                                  << "$setUnion would use too much memory (" << currentMemoryBytes
+                                  << " bytes) and cannot spill to disk. Memory limit: "
+                                  << maxMemoryBytes << " bytes");
+                }
+            }
         });
     }
     resGuard.reset();
