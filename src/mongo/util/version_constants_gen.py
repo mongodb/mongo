@@ -242,8 +242,6 @@ def generate_config_header(
     version_parts = [int(x) for x in version_parts[:4]]
 
     modules = ["enterprise"] if "build_enterprise_enabled" in extra_definitions_dict else []
-    if "build_atlas_enabled" in extra_definitions_dict:
-        modules.append("atlas")
     module_list = ",\n".join(['"{0}"_sd'.format(x) for x in modules])
 
     replacements = {
