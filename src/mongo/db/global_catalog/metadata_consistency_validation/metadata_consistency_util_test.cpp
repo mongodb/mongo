@@ -1327,17 +1327,25 @@ protected:
     }
 
     std::vector<MetadataInconsistencyItem> checkConsistency(
-        const CollectionType& globalCatalogColl) {
+        const std::vector<CollectionType>& globalCatalogCollections,
+        const ShardId& primaryId = kShard0) {
         return metadata_consistency_util::checkCollectionMetadataConsistency(
             operationContext(),
             _shardId,
-            _shardId,
-            {globalCatalogColl},
+            primaryId,
+            globalCatalogCollections,
             _localCatalogSnapshot,
             _localCatalogCollections,
             false /*checkRangeDeletionIndexes*/,
             false /*optionalCheckIndexes*/);
     }
+
+    std::vector<MetadataInconsistencyItem> checkConsistency(const CollectionType& globalCatalogColl,
+                                                            const ShardId& primaryId = kShard0) {
+        std::vector<CollectionType> globalCatalogCollections{globalCatalogColl};
+        return checkConsistency(globalCatalogCollections, primaryId);
+    }
+
 
     size_t countInconsistenciesWithDetailField(
         const std::vector<MetadataInconsistencyItem>& inconsistencies, StringData fieldValue) {
@@ -1393,6 +1401,14 @@ protected:
         } else {
             scopedCSR->clearFilteringMetadata_authoritative(operationContext());
         }
+    }
+
+    void setCSRUnowned() {
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
+        scopedCSR->setFilteringMetadata_authoritative(
+            operationContext(),
+            CollectionMetadata::UNTRACKED(),
+            CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
     }
 
     void insertDurableShardCatalogCollection(const CollectionType& coll) {
@@ -1637,29 +1653,6 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest,
-       ValidateCollectionMetadata_ChunkDomainMismatch_ExtraGlobalCatalogChunks) {
-    const auto localUuid = setUpLocalCollection();
-    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
-
-    // Shard catalog: this shard owns [MinKey, 0), kShard1 owns [0, MaxKey).
-    // Global catalog: this shard owns [MinKey, MaxKey).
-    const OID epoch = OID::gen();
-    auto rtChunk1 = generateChunk(
-        localUuid, _shardId, _keyPattern.globalMin(), BSON("x" << 0), kShard0History, epoch);
-    auto rtChunk2 = generateChunk(
-        localUuid, kShard1, BSON("x" << 0), _keyPattern.globalMax(), kShard1History, epoch);
-    auto globalCatalogChunk = generateChunk(
-        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
-
-    setShardCatalogMetadata(localUuid, _keyPattern, {rtChunk1, rtChunk2});
-    _catalogClient->setChunksToReturn({globalCatalogChunk});
-
-    const auto inconsistencies = checkConsistency(globalCatalogColl);
-
-    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
-}
-
-TEST_F(MetadataConsistencyShardCatalogTest,
        ValidateCollectionMetadata_MultipleSplitChunksBothSides_SameDomain) {
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -1683,6 +1676,29 @@ TEST_F(MetadataConsistencyShardCatalogTest,
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
     ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       ValidateCollectionMetadata_ChunkDomainMismatch_ExtraGlobalCatalogChunks) {
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    // Shard catalog: this shard owns [MinKey, 0), kShard1 owns [0, MaxKey).
+    // Global catalog: this shard owns [MinKey, MaxKey).
+    const OID epoch = OID::gen();
+    auto rtChunk1 = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), BSON("x" << 0), kShard0History, epoch);
+    auto rtChunk2 = generateChunk(
+        localUuid, kShard1, BSON("x" << 0), _keyPattern.globalMax(), kShard1History, epoch);
+    auto globalCatalogChunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+
+    setShardCatalogMetadata(localUuid, _keyPattern, {rtChunk1, rtChunk2});
+    _catalogClient->setChunksToReturn({globalCatalogChunk});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+
+    ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "chunksDomain"_sd));
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_EmptyGlobalCatalogChunks) {
@@ -2002,6 +2018,257 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingChunksInDurableCa
     const auto inconsistencies = checkConsistency(globalCatalogColl);
 
     // Should report that no chunks were found in the durable shard catalog.
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, OrphanCollectrionEntryInUntrackedCollection) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    OperationContext* opCtx = operationContext();
+    createTestCollection(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto localUuid = localCatalogCollections[0]->uuid();
+    setCSRAuthoritative();
+    insertDurableShardCatalogCollection(generateCollectionType(_nss, localUuid, _keyPattern));
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, OrphanChunkEntryInUntrackedCollection) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    OperationContext* opCtx = operationContext();
+    createTestCollection(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto localUuid = localCatalogCollections[0]->uuid();
+
+    auto chunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+    setCSRAuthoritative();
+    insertDurableShardCatalogChunks({chunk});
+
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, OrphanChunkEntryInTrackedCollection) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    auto outdatedChunkInfo = generateChunk(localUuid,
+                                           _shardId,
+                                           _keyPattern.globalMin(),
+                                           _keyPattern.globalMax(),
+                                           {ChunkHistory(Timestamp(1, 0), _shardId)});
+    auto previouslyOwnedChunk = generateChunk(
+        localUuid,
+        kShard0,
+        _keyPattern.globalMin(),
+        _keyPattern.globalMax(),
+        {ChunkHistory(Timestamp(1, 0), _shardId), ChunkHistory(Timestamp(2, 0), kShard0)});
+
+    setShardCatalogMetadata(localUuid, _keyPattern, {outdatedChunkInfo});
+    setCSRAuthoritative();
+    insertDurableShardCatalogChunks({outdatedChunkInfo});
+
+    _catalogClient->setChunksToReturn({previouslyOwnedChunk});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       OrphanNoCurrentChunkEntriesButCollectionEntryInTrackedCollectionAccepted) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    setCSRAuthoritative();
+    insertDurableShardCatalogCollection(globalCatalogColl);
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+
+    ASSERT_EQ(0, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       OrphanNoCurrentChunkEntriesAndCollectionEntryInTrackedCollectionAccepted) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    setCSRAuthoritative();
+    insertDurableShardCatalogCollection(globalCatalogColl);
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+
+    ASSERT_EQ(0, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_NonPrimaryWithNoOwnedChunksIsAccepted) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    setCSRUnowned();
+    _catalogClient->setChunksToReturn({});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl, kShard1);
+
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isTracked"_sd));
+    ASSERT_EQ(0, countInconsistenciesWithDetailField(inconsistencies, "isPrimary"_sd));
+    ASSERT_EQ(0,
+              countInconsistenciesWithDetailFieldAndSource(
+                  inconsistencies, "ownedChunks"_sd, "inMemoryShardCatalog"_sd));
+    ASSERT_EQ(0,
+              countInconsistenciesWithDetailFieldAndSource(
+                  inconsistencies, "ownedChunks"_sd, "durableShardCatalog"_sd));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       UnownedCSR_PrimaryIsReportedWhenGlobalCatalogUntracked) {
+    setUpLocalCollection();
+
+    setCSRUnowned();
+
+    const auto inconsistencies =
+        checkConsistency(std::vector<CollectionType>{} /* globalCatalogCollections */, _shardId);
+
+    ASSERT_EQ(1,
+              countInconsistenciesWithDetailFieldAndSource(
+                  inconsistencies, "isPrimary"_sd, "inMemoryShardCatalog"_sd));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_PrimaryIsReportedWhenGlobalCatalogTracked) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    setCSRUnowned();
+    _catalogClient->setChunksToReturn({});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl, _shardId);
+
+    ASSERT_EQ(1,
+              countInconsistenciesWithDetailFieldAndSource(
+                  inconsistencies, "isPrimary"_sd, "inMemoryShardCatalog"_sd));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_GlobalCatalogOwnedChunksAreReported) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+    auto globalChunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+
+    setCSRUnowned();
+    _catalogClient->setChunksToReturn({globalChunk});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl, kShard1);
+
+    ASSERT_EQ(1,
+              countInconsistenciesWithDetailFieldAndSource(
+                  inconsistencies, "ownedChunks"_sd, "inMemoryShardCatalog"_sd));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_DurableOwnedChunksAreReported) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+    auto durableChunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+
+    setCSRUnowned();
+    insertDurableShardCatalogChunks({durableChunk});
+    _catalogClient->setChunksToReturn({});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl, kShard1);
+
+    ASSERT_EQ(1,
+              countInconsistenciesWithDetailFieldAndSource(
+                  inconsistencies, "ownedChunks"_sd, "durableShardCatalog"_sd));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       PrimaryHasNoCollectionEntryForChunklessCollectionGlobalCatalogHas) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    setCSRAuthoritative();
+    _catalogClient->setChunksToReturn({});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       GlobalCatalogHasNoCollectionEntryForChunklessCollectionPrimaryHas) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    OperationContext* opCtx = operationContext();
+    createTestCollection(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto localUuid = localCatalogCollections[0]->uuid();
+
+    setCSRAuthoritative();
+    insertDurableShardCatalogCollection(generateCollectionType(_nss, localUuid, _keyPattern));
+
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
+
     ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
 }
 
