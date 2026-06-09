@@ -132,9 +132,6 @@ public:
     WrapType<MinKeyInfo>& minKeyProto() {
         return _minKeyProto;
     }
-    WrapType<ObjectInfo>& objectProto() {
-        return _objectProto;
-    }
     WrapType<NativeFunctionInfo>& nativeFunctionProto() {
         return _nativeFunctionProto;
     }
@@ -185,32 +182,6 @@ public:
         _statusProto.install(global);
     }
 
-    /**
-     * Unroots every prototype/constructor while the JSContext is still alive, so this
-     * installer (and the JSClasses its WrapTypes own) can be destroyed only AFTER
-     * JS_DestroyContext has run the shutdown-GC finalizers. See MozJSScriptEngine::shutdown.
-     */
-    void dropRoots() {
-        _globalProto.dropRoots();
-        _binDataProto.dropRoots();
-        _bsonProto.dropRoots();
-        _codeProto.dropRoots();
-        _dbPointerProto.dropRoots();
-        _dbRefProto.dropRoots();
-        _errorProto.dropRoots();
-        _maxKeyProto.dropRoots();
-        _minKeyProto.dropRoots();
-        _nativeFunctionProto.dropRoots();
-        _numberDecimalProto.dropRoots();
-        _numberIntProto.dropRoots();
-        _numberLongProto.dropRoots();
-        _oidProto.dropRoots();
-        _objectProto.dropRoots();
-        _regExpProto.dropRoots();
-        _timestampProto.dropRoots();
-        _statusProto.dropRoots();
-    }
-
 private:
     JSContext* _cx = nullptr;
     WrapType<GlobalInfo> _globalProto;
@@ -254,8 +225,6 @@ public:
     err_code_t init(const wasm_mozjs_startup_options_t* opt, wasm_mozjs_error_t* err);
     err_code_t shutdown(wasm_mozjs_error_t* err);
     err_code_t interrupt(wasm_mozjs_error_t* err);
-    bool exec(StringData code, const std::string& name);
-
     err_code_t createFunction(const uint8_t* src,
                               size_t len,
                               uint64_t* out_handle,
@@ -299,8 +268,6 @@ public:
     /// Drain the emit buffer: returns accumulated {k,v} pairs, then clears.
     err_code_t drainEmitBuffer(mongo::BSONObj* out, wasm_mozjs_error_t* err);
 
-    void injectNative(const char* field, NativeFunction func, void* data = nullptr);
-
     // MozJSCommonRuntimeInterface implementation
     void gc() override;
     void sleep(Milliseconds ms) override;
@@ -340,12 +307,10 @@ private:
     bool _parseFunctionSource(StringData raw, std::string* out, wasm_mozjs_error_t* err);
 
     bool _initialized = false;
-    bool _javascriptProtection = false;
 
     JSContext* _cx = nullptr;
     JSRuntime* _rt = nullptr;
     JS::PersistentRootedObject _global;
-    JS::PersistentRooted<JS::Value> _parseHelperFn;
 
     std::vector<FunctionSlot> _slots;
     std::unique_ptr<MozJSPrototypeInstaller> _prototypeInstaller;

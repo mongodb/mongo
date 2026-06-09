@@ -36,12 +36,27 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/scripting/mozjs/common/hex_md5.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/md5.h"
 
 #include <string>
 
 namespace mongo {
+
+static BSONObj native_hex_md5(const BSONObj& args, void* data) {
+    uassert(10261,
+            "hex_md5 takes a single string argument -- hex_md5(string)",
+            args.nFields() == 1 && args.firstElement().type() == BSONType::string);
+    StringData sd = args.firstElement().valueStringDataSafe();
+
+    md5digest d;
+    md5_state_t st;
+    md5_init_state_deprecated(&st);
+    md5_append_deprecated(&st, reinterpret_cast<const md5_byte_t*>(sd.data()), sd.size());
+    md5_finish_deprecated(&st, d);
+
+    return BSON("" << digestToString(d));
+}
 
 static BSONObj native_tostrictjson(const mongo::BSONObj& args, void* data) {
     uassert(40275,

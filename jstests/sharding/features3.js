@@ -8,6 +8,8 @@
 // @tags: [
 //   expects_explicit_underscore_id_index,
 //   requires_scripting,
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
 // ]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

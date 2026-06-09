@@ -875,53 +875,6 @@ TEST(WasmtimeScope, TimeoutMap) {
                              [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
 }
 
-// --- exec() ---
-
-// exec() runs an arbitrary JS statement; side effects are visible afterward.
-// Pre-seed the global so the assignment targets an existing global property
-TEST(WasmtimeScope, Exec_StatementSideEffect) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
-
-    scope->setNumber("x", 0.0);
-    ASSERT_TRUE(scope->exec("x = 42;", "test", false, true, true));
-    ScriptingFunction fn = scope->createFunction("return x;");
-    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
-    ASSERT_EQ(42.0, scope->getNumber("__returnValue"));
-}
-
-// exec() successfully runs a delete statement — the loadStored cleanup path calls
-// execSetup("delete <name>") to remove stored functions from the scope that were
-// removed while loading stored procedures.
-TEST(WasmtimeScope, Exec_DeleteGlobal) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
-
-    // Mirror loadStored: install a Code element (system.js function).
-    BSONObj doc = BSON("myFunc" << BSONCode("function() { return 1; }"));
-    scope->setElement("myFunc", doc["myFunc"], doc);
-
-    // Verify the function is actually installed and callable before delete.
-    ScriptingFunction callFn = scope->createFunction("return myFunc();");
-    ASSERT_EQ(0, scope->invoke(callFn, nullptr, nullptr, 0));
-    ASSERT_EQ(1.0, scope->getNumber("__returnValue"));
-
-    ASSERT_TRUE(scope->exec("delete myFunc;", "clean up scope", false, false, false));
-
-    // Verify the function is gone after delete.
-    ScriptingFunction checkFn = scope->createFunction("return typeof myFunc === 'undefined';");
-    ASSERT_EQ(0, scope->invoke(checkFn, nullptr, nullptr, 0));
-    ASSERT_TRUE(scope->getBoolean("__returnValue"));
-}
-
-// exec() with a syntax error throws.
-TEST(WasmtimeScope, Exec_ErrorHandling) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
-
-    ASSERT_THROWS(scope->exec("{{{{", "test", false, false, false), DBException);
-}
-
 // Test timeouts with sleep.
 TEST(WasmtimeScope, TimeoutSleep) {
     WasmtimeScriptEngine engine;

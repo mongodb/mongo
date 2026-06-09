@@ -1,7 +1,8 @@
 /**
  * @tags: [
  *   requires_scripting,
- *   mozjs_wasm_unsupported
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 

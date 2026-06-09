@@ -4,6 +4,8 @@
  * cluster `find` will use a higher level API that will retry on retryable error codes.
  *
  * @tags: [
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

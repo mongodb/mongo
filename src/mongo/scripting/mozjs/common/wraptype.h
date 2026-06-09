@@ -296,22 +296,7 @@ public:
     }
 
     ~WrapType() {
-        // Persistent globals don't RAII, you have to reset() them manually.
-        dropRoots();
-    }
-
-    /**
-     * Drops the persistent prototype/constructor roots without freeing this object (and
-     * therefore without freeing the JSClass it owns).
-     *
-     * This must be called while the JSContext is still alive: PersistentRooted::reset()
-     * unlinks from the runtime's root list. It lets an owner unroot the prototypes before
-     * JS_DestroyContext, yet keep the JSClass alive until *after* the shutdown GC has run
-     * every finalizer (finalizers read JSClass->finalize; freeing the class first is a
-     * use-after-free). Idempotent: reset() is a no-op once already unlinked, so the call in
-     * ~WrapType after JS_DestroyContext is safe.
-     */
-    void dropRoots() {
+        // Persistent globals don't RAII, you have to reset() them manually
         _proto.reset();
         _constructor.reset();
     }

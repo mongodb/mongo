@@ -12,7 +12,7 @@
  *   requires_getmore,
  *   requires_fcv_62,
  *   requires_scripting,
- *   # TODO SERVER-128345: Reenable this test which is timing out on macos.
+ *   # TODO SERVER-116054: Add support for $where.
  *   mozjs_wasm_unsupported,
  *  ]
  */
