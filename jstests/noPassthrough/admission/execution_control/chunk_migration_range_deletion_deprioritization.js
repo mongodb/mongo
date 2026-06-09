@@ -4,6 +4,7 @@
  * totalMarkedNonDeprioritizable counter in serverStatus increases on both donor and
  * recipient during a migration that has transfer mods in the critical section.
  *
+ * Later, verifies that range deleter operations are executed as deprioritizable.
  * @tags: [
  *   requires_sharding,
  *   requires_fcv_83,
@@ -12,7 +13,10 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {getTotalMarkedNonDeprioritizableCount} from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
+import {
+    getTotalDeprioritizationCount,
+    getTotalMarkedNonDeprioritizableCount,
+} from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const dbName = jsTestName();
@@ -25,6 +29,7 @@ const st = new ShardingTest({
         rsOptions: {
             setParameter: {
                 executionControlDeprioritizationGate: true,
+                disableResumableRangeDeleter: true,
             },
         },
     },
@@ -73,32 +78,53 @@ for (let i = 0; i < 10; i++) {
     assert.commandWorked(testColl.update({_id: i}, {$set: {payload: "updated"}}));
 }
 
-const donorCountBefore = getTotalMarkedNonDeprioritizableCount(donorPrimary);
-const recipientCountBefore = getTotalMarkedNonDeprioritizableCount(recipientPrimary);
+const donorCountNonDeprioritizableBeforeMigration = getTotalMarkedNonDeprioritizableCount(donorPrimary);
+const recipientCountNonDeprioritizableBeforeMigration = getTotalMarkedNonDeprioritizableCount(recipientPrimary);
 
-jsTest.log.info("Donor totalMarkedNonDeprioritizable before critical section: " + donorCountBefore);
-jsTest.log.info("Recipient totalMarkedNonDeprioritizable before critical section: " + recipientCountBefore);
+jsTest.log.info(
+    "Donor totalMarkedNonDeprioritizable before critical section: " + donorCountNonDeprioritizableBeforeMigration,
+);
+jsTest.log.info(
+    "Recipient totalMarkedNonDeprioritizable before critical section: " +
+        recipientCountNonDeprioritizableBeforeMigration,
+);
 
 jsTest.log.info("Resuming migration into critical section");
 hangBeforeCriticalSectionFp.off();
 
 awaitResult();
 
-const donorCountAfter = getTotalMarkedNonDeprioritizableCount(donorPrimary);
-const recipientCountAfter = getTotalMarkedNonDeprioritizableCount(recipientPrimary);
+const donorCountNonDeprioritizableAfterMigration = getTotalMarkedNonDeprioritizableCount(donorPrimary);
+const recipientCountNonDeprioritizableAfterMigration = getTotalMarkedNonDeprioritizableCount(recipientPrimary);
 
-jsTest.log.info("Donor totalMarkedNonDeprioritizable after migration: " + donorCountAfter);
-jsTest.log.info("Recipient totalMarkedNonDeprioritizable after migration: " + recipientCountAfter);
+jsTest.log.info("Donor totalMarkedNonDeprioritizable after migration: " + donorCountNonDeprioritizableAfterMigration);
+jsTest.log.info(
+    "Recipient totalMarkedNonDeprioritizable after migration: " + recipientCountNonDeprioritizableAfterMigration,
+);
 
 assert.gt(
-    donorCountAfter,
-    donorCountBefore,
+    donorCountNonDeprioritizableAfterMigration,
+    donorCountNonDeprioritizableBeforeMigration,
     "Donor should have marked operations as non-deprioritizable during critical section",
 );
 assert.gt(
-    recipientCountAfter,
-    recipientCountBefore,
+    recipientCountNonDeprioritizableAfterMigration,
+    recipientCountNonDeprioritizableBeforeMigration,
     "Recipient should have marked operations as non-deprioritizable during critical section",
+);
+
+const donorCountDeprioritizableBeforeRangeDeletion = getTotalDeprioritizationCount(donorPrimary);
+
+assert.commandWorked(donorPrimary.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}));
+assert.soon(() => {
+    return donorPrimary.getCollection("config.rangeDeletions").countDocuments({}) === 0;
+}, "Timed out waiting for range deletions to complete on donor");
+
+const donorCountDeprioritizableAfterRangeDeletion = getTotalDeprioritizationCount(donorPrimary);
+assert.gt(
+    donorCountDeprioritizableAfterRangeDeletion,
+    donorCountDeprioritizableBeforeRangeDeletion,
+    "Donor should have executed range deletions as deprioritizable",
 );
 
 st.stop();
