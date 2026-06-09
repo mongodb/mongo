@@ -33,7 +33,6 @@ selector:
     - requires_capped
     - requires_rollbacks
     - requires_index_build_resumability
-    - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
   roots:
     - jstests/replsets/*index_build*.js
     - jstests/replsets/**/*index_build*.js
