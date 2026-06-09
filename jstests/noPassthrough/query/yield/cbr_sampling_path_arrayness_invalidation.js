@@ -15,6 +15,7 @@ const conn = MongoRunner.runMongod({
         internalEnablePathArrayness: true,
         internalQueryExecYieldIterations: 1,
         internalQueryExecYieldPeriodMS: 0,
+        featureFlagCostBasedRanker: true,
         internalQueryCBRCEMode: "samplingCE",
         // TODO SERVER-117707: remove once CBR supports SBE.
         internalQueryFrameworkControl: "forceClassicEngine",
