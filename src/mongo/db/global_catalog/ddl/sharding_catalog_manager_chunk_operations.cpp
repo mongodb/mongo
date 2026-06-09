@@ -2379,8 +2379,8 @@ void ShardingCatalogManager::setAllowChunkOperations(OperationContext* opCtx,
     const auto cm = uassertStatusOK(
         RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' is not sharded",
-            cm.isSharded());
+            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' is not tracked",
+            cm.hasRoutingTable());
 
     uassert(ErrorCodes::InvalidUUID,
             str::stream() << "Collection uuid " << collectionUUID
