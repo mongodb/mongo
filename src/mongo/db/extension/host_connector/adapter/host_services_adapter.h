@@ -115,7 +115,11 @@ private:
         ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept;
 
     static ::MongoExtensionStatus* _extCreateDocumentResultsAndMetadata(
-        ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept;
+        ::MongoExtensionByteView bsonSpec,
+        ::MongoExtensionDocResultsDPLCallback dplCallback,
+        void* dplCallbackUserData,
+        void (*dplCallbackDestroy)(void*),
+        ::MongoExtensionAggStageAstNode** node) noexcept;
 
     static constexpr ::MongoExtensionHostServicesVTable VTABLE = {
         .get_logger = &_extGetLogger,

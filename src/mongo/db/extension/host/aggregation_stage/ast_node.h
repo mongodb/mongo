@@ -32,6 +32,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -81,9 +82,11 @@ public:
         const NamespaceString& nss, const LiteParserOptions& options) const;
 
     /**
-     * Expands into executable DocumentSource(s).
+     * Expands into executable DocumentSource(s). The default re-parses buildStageBson(); subclasses
+     * may override to inject node-held state (e.g. an extension DPL callback) that cannot survive a
+     * BSON round-trip.
      */
-    std::list<boost::intrusive_ptr<DocumentSource>> expandToDocumentSource(
+    virtual std::list<boost::intrusive_ptr<DocumentSource>> expandToDocumentSource(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const;
 
     /**
@@ -121,24 +124,71 @@ private:
 };
 
 /**
- * DRM ($_internalDocumentResultsAndMetadata) AST node. Stores the full stage BSONObj directly,
- * without constructing a LiteParsedDocumentSource (which would require the nss and parsed pipelines
- * not available at construction time). The stored BSON is re-parsed with the real nss/options at
- * expansion time.
+ * Shared, single-use RAII owner for an extension-provided distributedPlanLogic() callback, carried
+ * by the DRM AST node.
+ *
+ * Ownership: holds the opaque extension callback and its cleanup hook in a shared control block, so
+ * the destroy hook runs exactly once no matter how many times the owner is copied (e.g. when the
+ * AST node is cloned).
+ *
+ * Invocation: getOrInvoke() calls the extension callback at most once and caches the parsed result,
+ * so the planner's repeated distributedPlanLogic() queries reuse a single invocation of the
+ * single-use C output buffers.
+ */
+class DPLCallbackOwner {
+public:
+    DPLCallbackOwner() = default;
+    DPLCallbackOwner(::MongoExtensionDocResultsDPLCallback callback,
+                     void* userData,
+                     void (*destroyFn)(void*));
+
+    /**
+     * True if an extension DPL callback is present.
+     */
+    bool hasCallback() const;
+
+    /**
+     * Invokes the extension callback at most once, caching and returning its parsed, validated
+     * sharded-plan output. Must only be called when hasCallback() is true.
+     *
+     * 'expCtx' supplies the host query execution context (opCtx, namespace) handed to the extension
+     * callback, which it may need to reach the host (e.g. $search's mongot network call). It is
+     * only consulted on the single invocation; later cached calls ignore it.
+     */
+    const DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec& getOrInvoke(
+        ExpressionContext* expCtx) const;
+
+private:
+    struct State;
+    std::shared_ptr<State> _state;
+};
+
+/**
+ * DRM ($_internalDocumentResultsAndMetadata) AST node. Stores the full stage BSONObj and a
+ * single-use DPL callback owner directly, without constructing a LiteParsedDocumentSource (which
+ * would require nss and parsed pipelines not available at construction time).
+ *
+ * On expansion, if a DPL callback is present, expandToDocumentSource() wraps it into the stage's
+ * sharded-plan provider (setShardedPlanProvider) so distributedPlanLogic() can produce the sharded
+ * merge sort pattern / metadata merge pipeline.
  */
 class DocumentResultsAndMetadataAstNode final : public AggStageAstNode {
 public:
-    explicit DocumentResultsAndMetadataAstNode(BSONObj stageBson);
+    DocumentResultsAndMetadataAstNode(BSONObj stageBson, DPLCallbackOwner dplOwner);
 
     const std::string& getName() const override;
 
     std::unique_ptr<AggStageAstNode> clone() const override;
+
+    std::list<boost::intrusive_ptr<DocumentSource>> expandToDocumentSource(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override;
 
 private:
     BSONObj buildStageBson() const override;
 
     std::string _stageName;
     BSONObj _stageBson;
+    DPLCallbackOwner _dplOwner;
 };
 
 /**

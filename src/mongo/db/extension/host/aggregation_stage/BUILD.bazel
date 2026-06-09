@@ -13,6 +13,8 @@ mongo_cc_library(
     srcs = ["ast_node.cpp"],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/extension/host:query_execution_context",
+        "//src/mongo/db/extension/host_connector/adapter:query_execution_context_adapter",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/shared",
         "//src/mongo/db/pipeline",

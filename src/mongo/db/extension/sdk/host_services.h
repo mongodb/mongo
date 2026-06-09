@@ -132,10 +132,15 @@ public:
         return AggStageAstNodeHandle{result};
     }
 
-    AggStageAstNodeHandle createDocumentResultsAndMetadata(BSONObj spec) const {
+    AggStageAstNodeHandle createDocumentResultsAndMetadata(
+        BSONObj spec,
+        ::MongoExtensionDocResultsDPLCallback dplCallback = nullptr,
+        void* dplCallbackUserData = nullptr,
+        void (*dplCallbackDestroy)(void*) = nullptr) const {
         ::MongoExtensionAggStageAstNode* result = nullptr;
         invokeCAndConvertStatusToException([&] {
-            return _vtable().create_document_results_and_metadata(objAsByteView(spec), &result);
+            return _vtable().create_document_results_and_metadata(
+                objAsByteView(spec), dplCallback, dplCallbackUserData, dplCallbackDestroy, &result);
         });
         return AggStageAstNodeHandle{result};
     }

@@ -8,6 +8,27 @@ exports_files(
     ]),
 )
 
+# The query execution context adapter is split into its own standalone target (it does not depend on
+# the stage adapters or host/aggregation_stage) so that lower layers such as host/aggregation_stage
+# can convert an ExpressionContext into a MongoExtensionQueryExecutionContext without forming a
+# dependency cycle with host_adapters.
+mongo_cc_library(
+    name = "query_execution_context_adapter",
+    srcs = [
+        "query_execution_context_adapter.cpp",
+    ],
+    hdrs = [
+        "query_execution_context_adapter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/extension/public:api",
+        "//src/mongo/db/extension/shared",
+        "//src/mongo/db/extension/shared/handle",
+        "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
+    ],
+)
+
 # Like the C++ SDK, we should do our best to minimize the dependencies of this connector layer so
 # that it can be mostly self-contained.
 mongo_cc_library(
@@ -18,11 +39,11 @@ mongo_cc_library(
         "logical_agg_stage_adapter.cpp",
         "pipeline_dependencies_adapter.cpp",
         "pipeline_rewrite_context_adapter.cpp",
-        "query_execution_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
         "view_info_adapter.cpp",
     ],
     deps = [
+        ":query_execution_context_adapter",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host:extension_host_utils",

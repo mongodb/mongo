@@ -125,9 +125,19 @@ void uassertWellFormedStageSpec(const BSONObj& specObj,
 }
 
 ::MongoExtensionStatus* HostServicesAdapter::_extCreateDocumentResultsAndMetadata(
-    ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept {
+    ::MongoExtensionByteView bsonSpec,
+    ::MongoExtensionDocResultsDPLCallback dplCallback,
+    void* dplCallbackUserData,
+    void (*dplCallbackDestroy)(void*),
+    ::MongoExtensionAggStageAstNode** node) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         *node = nullptr;
+
+        // Take ownership of the DPL callback's userData/destroy hook up front, before anything that
+        // can throw, so the destroy hook runs exactly once even when stage-spec parsing or
+        // validation below fails (otherwise a malformed bsonSpec would leak userData).
+        host::DPLCallbackOwner dplOwner{dplCallback, dplCallbackUserData, dplCallbackDestroy};
+
         // The DocumentResultsAndMetadataAstNode constructor takes its own owned copy, so the view
         // here does not need to be owned.
         BSONObj specObj = bsonObjFromByteView(bsonSpec);
@@ -139,7 +149,8 @@ void uassertWellFormedStageSpec(const BSONObj& specObj,
                                    "$_internalDocumentResultsAndMetadata stage");
 
         *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNodeAdapter(
-            std::make_unique<host::DocumentResultsAndMetadataAstNode>(std::move(specObj))));
+            std::make_unique<host::DocumentResultsAndMetadataAstNode>(std::move(specObj),
+                                                                      std::move(dplOwner))));
     });
 }
 }  // namespace mongo::extension::host_connector

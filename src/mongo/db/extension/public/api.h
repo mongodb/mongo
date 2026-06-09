@@ -1463,6 +1463,30 @@ typedef struct MongoExtensionHostServices {
 } MongoExtensionHostServices;
 
 /**
+ * Callback invoked by the host during distributedPlanLogic() to obtain sharded execution
+ * parameters for a $_internalDocumentResultsAndMetadata stage.
+ *
+ * 'execCtx' is a host-owned query execution context (opCtx, namespace, etc.) valid only for the
+ * duration of the call. The host retains ownership; the callback must not destroy it or retain it
+ * beyond the call.
+ *
+ * On success, the implementation must set:
+ *   - *docSortPatternOut: owned ByteBuf with the BSON sort key for merging shard streams
+ *                         (e.g. {"score": -1}). Required and must be non-empty.
+ *   - *metadataMergePipelineOut: owned ByteBuf with a BSON array of pipeline stage objects
+ *                         for the metadata merge pipeline. May be nullptr if none required (but
+ *                         must be non-empty when the stage binds metadata).
+ *
+ * Both output buffers (if non-null) are transferred to the caller, which is responsible for
+ * destroying them.
+ */
+typedef MongoExtensionStatus* (*MongoExtensionDocResultsDPLCallback)(
+    void* userData,
+    MongoExtensionQueryExecutionContext* execCtx,
+    MongoExtensionByteBuf** docSortPatternOut,
+    MongoExtensionByteBuf** metadataMergePipelineOut);
+
+/**
  * Virtual function table for MongoExtensionHostServices.
  */
 typedef struct MongoExtensionHostServicesVTable {
@@ -1520,9 +1544,26 @@ typedef struct MongoExtensionHostServicesVTable {
      *
      * 'bsonSpec' is the full stage BSON, e.g.
      *   {"$_internalDocumentResultsAndMetadata": {source: {...}, metadata: {as: "SEARCH_META"}}}.
+     *
+     * 'dplCallback' is an optional callback invoked at most once during distributedPlanLogic() to
+     * obtain the merge sort pattern and metadata merge pipeline for sharded execution. The host
+     * caches the result, so the callback's single-use output buffers are consumed only once even
+     * though the planner queries distributedPlanLogic() multiple times. Pass nullptr if sharded DPL
+     * is not needed.
+     *
+     * 'dplCallbackUserData' is the first argument to dplCallback. May be nullptr.
+     *
+     * 'dplCallbackDestroy' is an optional destructor for dplCallbackUserData. The host takes
+     * ownership of dplCallbackUserData when this function is called and invokes dplCallbackDestroy
+     * exactly once: when the resulting AST node is destroyed, or, if node creation fails, before
+     * this function returns the error. Pass nullptr if no cleanup is needed.
      */
     MongoExtensionStatus* (*create_document_results_and_metadata)(
-        MongoExtensionByteView bsonSpec, MongoExtensionAggStageAstNode** node);
+        MongoExtensionByteView bsonSpec,
+        MongoExtensionDocResultsDPLCallback dplCallback,
+        void* dplCallbackUserData,
+        void (*dplCallbackDestroy)(void*),
+        MongoExtensionAggStageAstNode** node);
 } MongoExtensionHostServicesVTable;
 
 /**

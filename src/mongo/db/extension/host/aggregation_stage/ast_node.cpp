@@ -29,6 +29,10 @@
 
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 
+#include "mongo/bson/bson_validate.h"
+#include "mongo/db/extension/host/query_execution_context.h"
+#include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
+#include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -37,6 +41,93 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::extension::host {
+
+// Shared control block for DPLCallbackOwner. Owns the extension callback's lifecycle (running the
+// destroy hook exactly once when the last shared copy is destroyed) and caches the single
+// invocation's parsed output.
+struct DPLCallbackOwner::State {
+    State(::MongoExtensionDocResultsDPLCallback callback, void* userData, void (*destroyFn)(void*))
+        : callback(callback), userData(userData), destroyFn(destroyFn) {}
+    State(const State&) = delete;
+    State& operator=(const State&) = delete;
+    ~State() {
+        if (destroyFn) {
+            destroyFn(userData);
+        }
+    }
+
+    ::MongoExtensionDocResultsDPLCallback callback;
+    void* userData;
+    void (*destroyFn)(void*);
+    bool invoked = false;
+    DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec result;
+};
+
+DPLCallbackOwner::DPLCallbackOwner(::MongoExtensionDocResultsDPLCallback callback,
+                                   void* userData,
+                                   void (*destroyFn)(void*))
+    // Allocate the control block whenever there is anything to manage (a callback to carry and/or a
+    // destroy hook to run), so the destroy hook still runs for a cleanup-only owner.
+    : _state((callback || destroyFn) ? std::make_shared<State>(callback, userData, destroyFn)
+                                     : nullptr) {}
+
+bool DPLCallbackOwner::hasCallback() const {
+    return _state && _state->callback;
+}
+
+const DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec&
+DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
+    tassert(12728604, "getOrInvoke() called without a DPL callback", hasCallback());
+    tassert(12728605, "getOrInvoke() requires a non-null ExpressionContext", expCtx != nullptr);
+    auto& state = *_state;
+    if (state.invoked) {
+        return state.result;
+    }
+    // Mark invoked up front so the single-use extension callback is never re-entered, even if the
+    // call or a later validation step throws.
+    state.invoked = true;
+
+    // Expose the host execution context (opCtx, namespace) to the extension callback, which it may
+    // need to reach the host while computing the sharded plan (e.g. $search's network call to
+    // mongot). The adapter is host-owned and only valid for the duration of the call.
+    auto wrappedCtx = std::make_unique<QueryExecutionContext>(expCtx);
+    host_connector::QueryExecutionContextAdapter execCtxAdapter(std::move(wrappedCtx));
+
+    ::MongoExtensionByteBuf* rawSort = nullptr;
+    ::MongoExtensionByteBuf* rawMerge = nullptr;
+    // Declared before the invocation so the output buffers are owned (and freed) even if status
+    // conversion throws after the callback has already allocated them.
+    ExtensionByteBufHandle sortHandle(nullptr);
+    ExtensionByteBufHandle mergeHandle(nullptr);
+    invokeCAndConvertStatusToException([&] {
+        auto* status = state.callback(state.userData, &execCtxAdapter, &rawSort, &rawMerge);
+        sortHandle = ExtensionByteBufHandle(rawSort);
+        mergeHandle = ExtensionByteBufHandle(rawMerge);
+        return status;
+    });
+
+    // bsonObjFromByteView only checks the outer length; validate the interior so a malformed
+    // extension buffer yields a clean error rather than an out-of-bounds read during traversal.
+    const auto ownedValidatedBson = [](const ::MongoExtensionByteView& view) {
+        BSONObj obj = bsonObjFromByteView(view).getOwned();
+        uassertStatusOK(validateBSON(obj.objdata(), obj.objsize()));
+        return obj;
+    };
+
+    if (rawSort) {
+        state.result.resultsSortPattern = ownedValidatedBson(sortHandle->getByteView());
+    }
+    if (rawMerge) {
+        BSONObj arr = ownedValidatedBson(mergeHandle->getByteView());
+        for (auto&& elem : arr) {
+            uassert(12728601,
+                    "DPL metaMergePipeline elements must be objects",
+                    elem.type() == BSONType::object);
+            state.result.metaMergePipeline.push_back(elem.Obj().getOwned());
+        }
+    }
+    return state.result;
+}
 
 std::unique_ptr<LiteParsedDocumentSource> AggStageAstNode::expandToLiteParsed(
     const NamespaceString& nss, const LiteParserOptions& options) const {
@@ -66,8 +157,11 @@ std::unique_ptr<AggStageAstNode> IdLookupAstNode::clone() const {
         std::make_unique<LiteParsedInternalSearchIdLookUp>(_liteParsed->getSpec()));
 }
 
-DocumentResultsAndMetadataAstNode::DocumentResultsAndMetadataAstNode(BSONObj stageBson)
-    : _stageName(stageBson.firstElementFieldName()), _stageBson(stageBson.getOwned()) {}
+DocumentResultsAndMetadataAstNode::DocumentResultsAndMetadataAstNode(BSONObj stageBson,
+                                                                     DPLCallbackOwner dplOwner)
+    : _stageName(stageBson.firstElementFieldName()),
+      _stageBson(stageBson.getOwned()),
+      _dplOwner(std::move(dplOwner)) {}
 
 const std::string& DocumentResultsAndMetadataAstNode::getName() const {
     return _stageName;
@@ -78,7 +172,37 @@ BSONObj DocumentResultsAndMetadataAstNode::buildStageBson() const {
 }
 
 std::unique_ptr<AggStageAstNode> DocumentResultsAndMetadataAstNode::clone() const {
-    return std::make_unique<DocumentResultsAndMetadataAstNode>(_stageBson);
+    // Share the single-use DPL callback owner with the clone. The shared control block guarantees
+    // the callback is invoked, and destroyed, only once, so cloning never silently drops the
+    // callback regardless of which node is ultimately expanded.
+    return std::make_unique<DocumentResultsAndMetadataAstNode>(_stageBson, _dplOwner);
+}
+
+std::list<boost::intrusive_ptr<DocumentSource>>
+DocumentResultsAndMetadataAstNode::expandToDocumentSource(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    // Parse through the normal StageParams path, then inject the node's DPL callback onto the
+    // resulting stage. The opaque callback cannot survive the BSON round-trip, so it is attached
+    // here rather than threaded through a bespoke BSON factory.
+    auto stages = AggStageAstNode::expandToDocumentSource(expCtx);
+    if (!_dplOwner.hasCallback()) {
+        return stages;
+    }
+    tassert(12728602,
+            "$_internalDocumentResultsAndMetadata must expand to exactly one stage",
+            stages.size() == 1);
+    auto* drm =
+        dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stages.front().get());
+    tassert(12728603,
+            "expanded $_internalDocumentResultsAndMetadata stage has unexpected type",
+            drm != nullptr);
+    // Wrap the single-use extension callback into the stage's sharded-plan provider. Capture a copy
+    // of the shared owner so it (and its cached, single invocation) outlives this AST node, which
+    // is destroyed after expansion but before the planner queries distributedPlanLogic().
+    drm->setShardedPlanProvider([owner = _dplOwner](ExpressionContext* expCtx) -> const auto& {
+        return owner.getOrInvoke(expCtx);
+    });
+    return stages;
 }
 
 }  // namespace mongo::extension::host

@@ -30,6 +30,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/host_connector/adapter:host_services_adapter",
         "//src/mongo/db/extension/host_connector/handle:host_handles",
         "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo/db/extension/shared",
         "//src/mongo/db/extension/shared/handle",
         "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
         "//src/mongo/db/pipeline:expression_context_for_test",

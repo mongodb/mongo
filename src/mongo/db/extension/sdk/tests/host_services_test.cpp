@@ -32,6 +32,8 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_shape_opts_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
@@ -355,6 +357,53 @@ TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_NestedSourceSpecWithMe
                                        << BSON("query" << "foo" << "path" << BSON_ARRAY("a" << "b"))
                                        << "returnStoredSource" << true));
     BSONObj stageSpec = makeDrmStageSpec(sourceSpec, "SEARCH_META");
+    auto hostAstNode =
+        extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(stageSpec);
+    ASSERT_EQ(hostAstNode->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+}
+
+// Helpers for DPL callback tests.
+struct SDKDPLCallbackState {
+    bool called = false;
+    bool destroyed = false;
+};
+
+static ::MongoExtensionStatus* sdkTestDPLCallback(void* userData,
+                                                  ::MongoExtensionQueryExecutionContext*,
+                                                  ::MongoExtensionByteBuf** sortPatternOut,
+                                                  ::MongoExtensionByteBuf** mergeOut) {
+    auto* s = static_cast<SDKDPLCallbackState*>(userData);
+    s->called = true;
+    *sortPatternOut = new mongo::extension::ByteBuf(BSON("score" << -1));
+    *mergeOut = nullptr;
+    return &mongo::extension::ExtensionStatusOK::getInstance();
+}
+
+static void sdkTestDPLCallbackDestroy(void* userData) {
+    static_cast<SDKDPLCallbackState*>(userData)->destroyed = true;
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_WithDPLCallback_DestroyCalledOnReset) {
+    SDKDPLCallbackState state;
+    BSONObj stageSpec = makeDrmStageSpec(BSON("$collStats" << BSONObj()), "SEARCH_META");
+    {
+        auto hostAstNode =
+            extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(
+                stageSpec, &sdkTestDPLCallback, &state, &sdkTestDPLCallbackDestroy);
+        // getName() works.
+        ASSERT_EQ(hostAstNode->getName(),
+                  std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+        // Callback NOT invoked at construction — DPL is lazy.
+        ASSERT_FALSE(state.called);
+        // hostAstNode goes out of scope here, firing the destructor which calls dplCallbackDestroy.
+    }
+    ASSERT_TRUE(state.destroyed);
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_NullCallbackDefaultsWork) {
+    // Calling with only the stage spec (defaulted nullptr DPL params) still works.
+    BSONObj stageSpec = makeDrmStageSpec(BSON("$collStats" << BSONObj()), "SEARCH_META");
     auto hostAstNode =
         extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(stageSpec);
     ASSERT_EQ(hostAstNode->getName(),
