@@ -54,6 +54,14 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         return [st.shard0, st.shard1, st.shard2];
     }
 
+    function getMaxTopologyTimeInConfigShards() {
+        const result = st.s
+            .getDB("config")
+            .shards.aggregate([{$group: {_id: null, maxTopologyTime: {$max: "$topologyTime"}}}])
+            .toArray();
+        return result.length > 0 ? result[0].maxTopologyTime : null;
+    }
+
     function checkIndexOnShardUuid(expectedToBePresent) {
         const indexes = st.s.getDB("config").shards.getIndexes();
         if (expectedToBePresent) {
@@ -145,9 +153,15 @@ describe("FCV upgrade/downgrade uuid fields", function () {
         assertIsUUID(configServerIdentityDoc.uuid);
     }
 
-    it("[Dedicated CSRS] Should set consistent uuid values on FCV upgrade", function () {
-        setupForFCVUpgradeTest(false /* clearExistingUuids */);
+    it("[Dedicated CSRS] Should set consistent metadata on FCV upgrade", function () {
+        setupForFCVUpgradeTest(true /* clearExistingUuids */);
+        const topologyTimeBeforeUpgrade = getMaxTopologyTimeInConfigShards();
         assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        const topologyTimeAfterFirstUpgrade = getMaxTopologyTimeInConfigShards();
+        assert(
+            timestampCmp(topologyTimeAfterFirstUpgrade, topologyTimeBeforeUpgrade) > 0,
+            `Expected topologyTime to be bumped on FCV upgrade: ${tojsononeline(topologyTimeBeforeUpgrade)} -> ${tojsononeline(topologyTimeAfterFirstUpgrade)}`,
+        );
 
         const generatedUUIDsOnFirstInvocation = assertConfigShardsHaveUuids();
         assertShardIdentityDocsHaveConsistentUuids();
@@ -156,6 +170,12 @@ describe("FCV upgrade/downgrade uuid fields", function () {
 
         // Repeat the upgrade to verify idempotency.
         assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+
+        const topologyTimeAfterNoopUpgrade = getMaxTopologyTimeInConfigShards();
+        assert(
+            timestampCmp(topologyTimeAfterNoopUpgrade, topologyTimeAfterFirstUpgrade) === 0,
+            `Expected topologyTime to be preserved on no-op FCV upgrade: ${tojsononeline(topologyTimeAfterFirstUpgrade)} -> ${tojsononeline(topologyTimeAfterNoopUpgrade)}`,
+        );
 
         assertConfigShardsHaveUuids(generatedUUIDsOnFirstInvocation);
         assertShardIdentityDocsHaveConsistentUuids();
