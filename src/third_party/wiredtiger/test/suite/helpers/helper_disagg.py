@@ -28,7 +28,8 @@
 #
 
 import wiredtiger
-import functools, os, shutil, wttest
+import functools, json, os, shutil, subprocess, wttest
+from run import wt_builddir
 
 # These routines help run the various page log sources used by disaggregated storage.
 # They are required to manage the generation of disaggregated storage specific configurations.
@@ -68,10 +69,11 @@ def disagg_ignore_expected_output(testcase):
 # Several tests access pages data directly by table id.
 # This function computes the shard id for a given table id, which is needed to
 # find the right database file in kv_home directory.
+# See Storage.NUM_SHARDS in ext/page_log/palite/palite.cpp.
+# This must be kept in sync with that value.
+NUM_SHARDS = 17
+
 def get_shard_id(table_id):
-    # See Storage.NUM_SHARDS in ext/page_log/palite/palite.cpp.
-    # This must be kept in sync with that value.
-    NUM_SHARDS = 17
     return int(table_id) % NUM_SHARDS
 
 # A decorator for a disaggregated test class, that ignores verbose warnings about RTS at shutdown.
@@ -555,3 +557,179 @@ class Oplog(object):
             f' entries - list of (table,k,v)={self._entries},' + \
             f' uris - list of (uri, entlist)={self._uris},' + \
             f' lookup - (table,k) -> list of (ts,value)={self._lookup}'
+
+# DisaggCorruptionMixin provides Python helpers for injecting palite-level page
+# corruption into a running disaggregated-storage test by directly mutating the
+# per-shard pages_NN.db files.
+#
+# Palite stores each saved page image as one row in the `pages` table, keyed by
+# (table_id, page_id, lsn). A single logical page (table_id, page_id) can have
+# many rows: a base image plus successive deltas, forming a delta chain. The
+# corruption helpers below operate on one row of that table at a time, i.e.
+# they damage a single page image at a specific LSN unless noted otherwise.
+#
+# Palite holds an exclusive SQLite lock while WT is open, so writes (and the
+# multi-shard scan that picks a victim row) must happen while the connection
+# is closed. The mutations go through wt_builddir/sqlite3 (not system sqlite3)
+# to avoid version skew with the SQLite statically linked into palite.
+class DisaggCorruptionMixin:
+
+    # Mirrors WT_PAGE_LOG_DISCARDED in src/include/page_log.h. The value is
+    # static-asserted in ext/page_log/palite/palite.cpp.
+    WT_PAGE_LOG_DISCARDED = 0x10000
+
+    # ---- Read helpers ----
+
+    def sqlite_select_json(self, table_id, sql_query):
+        """Read rows from the pages_NN.db for table_id's shard. Palite uses
+        shared SQLite locks for readers, so this is safe whether WT is open
+        or closed. Returns a list of dict rows."""
+        shard = get_shard_id(table_id)
+        db_path = os.path.join(self.home, 'kv_home', f'pages_{shard:02d}.db')
+        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
+        result = subprocess.run(
+            [sqlite_exe, '-json', db_path, sql_query],
+            capture_output=True, text=True, check=True)
+        return json.loads(result.stdout) if result.stdout.strip() else []
+
+    def _scan_shards(self, sql, fail_msg):
+        """Iterate per-shard pages_NN.db with WT closed and return the first
+        non-empty JSON row from any shard, or self.fail() with fail_msg.
+        Reopens WT before returning."""
+        self.close_conn()
+        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
+        try:
+            for shard in range(NUM_SHARDS):
+                db_path = os.path.join(self.home, 'kv_home', f'pages_{shard:02d}.db')
+                if not os.path.exists(db_path):
+                    continue
+                result = subprocess.run(
+                    [sqlite_exe, '-json', db_path, sql],
+                    capture_output=True, text=True, check=True)
+                if result.stdout.strip():
+                    return json.loads(result.stdout)[0]
+        finally:
+            self.reopen_conn()
+        self.fail(fail_msg)
+
+    def _pick_one_row(self, exclude_discarded=False):
+        """Pick one row from the palite pages table across all shards.
+        If exclude_discarded is set, rows already marked
+        WT_PAGE_LOG_DISCARDED are skipped, guaranteeing the returned
+        image is still alive. Returns its (table_id, page_id, lsn)
+        i.e. one page image."""
+        where = (f'WHERE flags & {self.WT_PAGE_LOG_DISCARDED} = 0 '
+                 if exclude_discarded else '')
+        row = self._scan_shards(
+            f'SELECT table_id, page_id, lsn FROM pages {where}'
+            'ORDER BY table_id DESC, page_id ASC, lsn DESC LIMIT 1;',
+            'no rows found in any pages_NN.db')
+        return int(row['table_id']), int(row['page_id']), int(row['lsn'])
+
+    def _pick_multi_lsn_row(self):
+        """Pick one logical page (table_id, page_id) whose delta chain
+        has >= 2 LSNs in the palite pages table. Returns (table_id,
+        page_id)  the per-LSN rows can then be queried separately."""
+        row = self._scan_shards(
+            'SELECT table_id, page_id, COUNT(*) AS n FROM pages '
+            'GROUP BY table_id, page_id HAVING n >= 2 '
+            'ORDER BY table_id DESC LIMIT 1;',
+            'no rows with >= 2 LSNs found in any pages_NN.db')
+        return int(row['table_id']), int(row['page_id'])
+
+    # ---- Write helpers ----
+
+    def _palite_mutate(self, table_id, sql):
+        """Run sql against the pages_NN.db for table_id's shard. Returns the
+        sqlite3 CLI's stdout split into non-empty lines."""
+        shard = get_shard_id(table_id)
+        db_path = os.path.join(self.home, 'kv_home', f'pages_{shard:02d}.db')
+        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
+        result = subprocess.run(
+            [sqlite_exe, '-bail', db_path],
+            input=sql, capture_output=True, text=True, check=True)
+        return [line for line in result.stdout.splitlines() if line != '']
+
+    def corrupt_random_page_image(self):
+        """Pick one page image (one (page_id, lsn) row in the palite
+        pages table) and overwrite the first byte of its stored data
+        with 0xff. Other images in the same delta chain are untouched.
+        Returns the (table_id, page_id, lsn) of the corrupted image."""
+        table_id, page_id, lsn = self._pick_one_row()
+        self.close_conn()
+        sql = (
+            f"UPDATE pages SET page_data = x'ff' || substr(page_data, 2) "
+            f"WHERE table_id={table_id} AND page_id={page_id} AND lsn={lsn};\n"
+            f"SELECT changes();\n"
+        )
+        rows = self._palite_mutate(table_id, sql)
+        self._require_one_change(rows, table_id, page_id, lsn)
+        return table_id, page_id, lsn
+
+    def delete_random_page_image(self):
+        """Pick one page image (one (page_id, lsn) row in the palite
+        pages table) and DELETE it. Other images in the same delta
+        chain are untouched. Returns the (table_id, page_id, lsn) of
+        the deleted image."""
+        table_id, page_id, lsn = self._pick_one_row()
+        self.close_conn()
+        sql = (
+            f"DELETE FROM pages "
+            f"WHERE table_id={table_id} AND page_id={page_id} AND lsn={lsn};\n"
+            f"SELECT changes();\n"
+        )
+        rows = self._palite_mutate(table_id, sql)
+        self._require_one_change(rows, table_id, page_id, lsn)
+        return table_id, page_id, lsn
+
+    def set_random_page_discarded(self):
+        """Pick one not-yet-discarded page image (one (page_id, lsn) row
+        in the palite pages table) and OR WT_PAGE_LOG_DISCARDED into its
+        flags column, marking that single image as a tombstone. Other
+        images in the same delta chain are untouched. Returns the
+        (table_id, page_id, lsn) of the modified image."""
+        table_id, page_id, lsn = self._pick_one_row(exclude_discarded=True)
+        self.close_conn()
+        sql = (
+            f"UPDATE pages SET flags = flags | {self.WT_PAGE_LOG_DISCARDED} "
+            f"WHERE table_id={table_id} AND page_id={page_id} AND lsn={lsn};\n"
+            f"SELECT changes();\n"
+        )
+        rows = self._palite_mutate(table_id, sql)
+        self._require_one_change(rows, table_id, page_id, lsn)
+        return table_id, page_id, lsn
+
+    def truncate_random_delta_chain(self):
+        """Pick a logical page (table_id, page_id) whose delta chain has
+        >= 2 LSNs and DELETE every image except the base (lowest LSN),
+        leaving the base image as the only row for that page. Returns
+        (table_id, page_id, kept_lsn, deleted_lsns)."""
+        table_id, page_id = self._pick_multi_lsn_row()
+        all_lsns = sorted(int(r['lsn']) for r in self.sqlite_select_json(
+            table_id,
+            f'SELECT lsn FROM pages '
+            f'WHERE table_id={table_id} AND page_id={page_id};'))
+        kept_lsn = all_lsns[0]
+        deleted_lsns = all_lsns[1:]
+        self.close_conn()
+        sql = (
+            f"DELETE FROM pages "
+            f"WHERE table_id={table_id} AND page_id={page_id} "
+            f"AND lsn != {kept_lsn};\n"
+            f"SELECT changes();\n"
+        )
+        rows = self._palite_mutate(table_id, sql)
+        affected = int(rows[0])
+        if affected != len(deleted_lsns):
+            raise AssertionError(
+                f"truncate mismatch: expected to delete {len(deleted_lsns)} "
+                f"rows, sqlite reported {affected}")
+        return table_id, page_id, kept_lsn, deleted_lsns
+
+    @staticmethod
+    def _require_one_change(rows, table_id, page_id, lsn):
+        affected = int(rows[0])
+        if affected != 1:
+            raise AssertionError(
+                f"expected 1 affected row, got {affected} for "
+                f"table_id={table_id}, page_id={page_id}, lsn={lsn}")

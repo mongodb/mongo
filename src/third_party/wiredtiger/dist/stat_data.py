@@ -1426,6 +1426,7 @@ conn_dsrc_stats = [
     RecStat('rec_page_delta_internal_key_updated', 'internal page delta keys updated/inserted'),
     RecStat('rec_page_delta_leaf', 'leaf page deltas written'),
     RecStat('rec_page_delta_rejected_build_failed', 'page deltas rejected: build function returned false (disabled, in-memory split, or internal page constraints not met)'),
+    RecStat('rec_page_delta_rejected_delete_threshold', 'page deltas rejected due to too many keys removed from the disk image'),
     RecStat('rec_page_delta_rejected_invalid_page_id', 'page deltas rejected due to invalid page ID'),
     RecStat('rec_page_delta_rejected_max_consecutive_exceeded', 'page deltas rejected due to max consecutive limit'),
     RecStat('rec_page_delta_rejected_multiblock', 'page deltas rejected due to multiblock reconciliation'),

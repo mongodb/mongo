@@ -125,6 +125,12 @@ connection_page_delta_config_common = [
         When enabled, reconciliation may write deltas for leaf pages
         instead of writing entire pages every time''',
         type='boolean', undoc=True),
+    Config('delete_pct', '20', r'''
+        when the number of keys removed from the disk image on a leaf page exceeds this
+        percentage of the total page entries, reconciliation writes a full page instead of
+        a delta to reclaim disk space. A removed key still occupies space as a tombstone in
+        the delta; the same key is simply absent from a full page.''',
+        min='1', max='100', type='int', undoc=True),
     Config('max_consecutive_delta', '32', r'''
         the max consecutive deltas allowed for a single page. The maximum value is set
         at 32 (WT_DELTA_LIMIT). If we need to change that, please change WT_DELTA_LIMIT

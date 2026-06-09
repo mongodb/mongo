@@ -4,7 +4,7 @@
 ##############################################################################################
 
 set -e
-set -x
+# set -x
 
 #############################################################
 # bcopy:
@@ -20,6 +20,52 @@ bcopy()
     test "$1" = "mongodb-4.4" && echo "1"
     # Anything newer than mongodb-8.0 returns false.
     return 0
+}
+
+#############################################################
+# branch_major_version:
+#       arg1: branch name (e.g. mongodb-8.2, develop)
+# Outputs the numeric major version for a mongodb-X.Y branch,
+# or nothing for develop/other non-versioned names.
+#############################################################
+branch_major_version()
+{
+    echo "$1" | sed -n 's/^mongodb-\([0-9]*\)\..*/\1/p'
+}
+
+#############################################################
+# branch_minor_version:
+#       arg1: branch name (e.g. mongodb-8.2, develop)
+# Outputs the numeric minor version for a mongodb-X.Y branch,
+# or nothing for develop/other non-versioned names.
+#############################################################
+branch_minor_version()
+{
+    echo "$1" | sed -n 's/^mongodb-[0-9]*\.\([0-9]*\)$/\1/p'
+}
+
+#############################################################
+# is_minor_release:
+#       arg1: branch name
+# Returns 0 (true) if the branch is a minor release (minor version != 0).
+#############################################################
+is_minor_release()
+{
+    local minor
+    minor=$(branch_minor_version "$1")
+    [ -n "$minor" ] && [ "$minor" -ne 0 ]
+}
+
+#############################################################
+# is_major_release:
+#       arg1: branch name
+# Returns 0 (true) if the branch is a major release (minor version == 0).
+#############################################################
+is_major_release()
+{
+    local minor
+    minor=$(branch_minor_version "$1")
+    [ -n "$minor" ] && [ "$minor" -eq 0 ]
 }
 
 #############################################################
@@ -857,6 +903,7 @@ scopes[patch_version]="patch versions of the same release branch"
 scopes[upgrade_to_latest]="upgrade/downgrade databases to the latest versions of the codebase"
 scopes[wt_standalone]="WiredTiger standalone releases"
 scopes[two_versions]="any two given versions"
+scopes[test_pairs]="verify compatibility pair coverage (no builds or tests run)"
 
 #############################################################
 # Retrieve the build system used by a particular release,
@@ -897,11 +944,220 @@ get_build_system()
 }
 
 #############################################################
+# generate_compat_pairs:
+#       arg*: list of branch names (the NEWER_RELEASE_BRANCHES array)
+#
+# Outputs deduplicated "newer_branch older_branch" pairs based on version
+# relationships rather than simple consecutive ordering.  This ensures that
+# minor releases are tested against all required partners per the Server
+# Release Policy upgrade/downgrade matrix:
+#
+#   Minor X.Y  ->  X.(Y-1) and X.(Y+1) if configured
+#              ->  X.0 (base major of the same series)
+#              ->  (X+1).0 if configured, else develop
+#
+#   Major X.0  ->  (X-1).0 if configured
+#              ->  (X+1).0 if configured, else develop
+#              ->  all configured X.Y (Y>0) minors of the same major
+#              ->  highest configured (X-1).Y (last minor of previous major)
+#
+# Each pair is printed as "newer older" where newer > older in version order.
+#############################################################
+generate_compat_pairs()
+{
+    local branches=("$@")
+
+    # branch_in_array <target> <branch...>
+    branch_in_array()
+    {
+        local target="$1"; shift
+        local b
+        for b; do [ "$b" = "$target" ] && return 0; done
+        return 1
+    }
+
+    declare -A unique_pairs
+
+    # add_pair <b1> <b2>
+    # Collect unique pairs into an associative array.
+    # - Key:   "b1:b2" (b1 < b2 lexicographically)
+    # - Value: "b1 b2" in caller-provided order (not normalized here)
+    add_pair()
+    {
+        local b1="$1" b2="$2"
+        local key
+        # Canonical key: sort the two names so dedup works regardless of call order.
+        if [[ "$b1" < "$b2" ]]; then
+            key="${b1}:${b2}"
+        else
+            key="${b2}:${b1}"
+        fi
+        # Store the pair only once; preserve first-seen caller argument order.
+        if [ -z "${unique_pairs[$key]+x}" ]; then
+            unique_pairs[$key]="${b1} ${b2}"
+        fi
+    }
+
+    local branch
+    for branch in "${branches[@]}"; do
+        local major minor
+        major=$(branch_major_version "$branch")
+        minor=$(branch_minor_version "$branch")
+
+        # "develop" branch has no version numbers; its pairs are generated when other branches
+        # look for their upper adjacent major and fall back to develop.
+        [[ "$branch" == "develop" ]] && continue
+
+        if is_minor_release "$branch"; then
+            # ---- Minor release X.Y (Y > 0) ----
+
+            # Adjacent older minor X.(Y-1)
+            local lo_minor=$(( minor - 1 ))
+            local lo_minor_b="mongodb-${major}.${lo_minor}"
+            branch_in_array "$lo_minor_b" "${branches[@]}" && add_pair "$branch" "$lo_minor_b"
+
+            # Adjacent newer minor X.(Y+1)
+            local hi_minor=$(( minor + 1 ))
+            local hi_minor_b="mongodb-${major}.${hi_minor}"
+            branch_in_array "$hi_minor_b" "${branches[@]}" && add_pair "$branch" "$hi_minor_b"
+
+            # Base major X.0
+            local base_b="mongodb-${major}.0"
+            branch_in_array "$base_b" "${branches[@]}" && add_pair "$branch" "$base_b"
+
+            # Next major (X+1).0 or develop as proxy
+            local next_major=$(( major + 1 ))
+            local next_major_b="mongodb-${next_major}.0"
+            if branch_in_array "$next_major_b" "${branches[@]}"; then
+                add_pair "$branch" "$next_major_b"
+            elif branch_in_array "develop" "${branches[@]}"; then
+                add_pair "$branch" "develop"
+            fi
+
+        elif is_major_release "$branch"; then
+            # ---- Major release X.0 ----
+
+            # Lower adjacent major (X-1).0
+            if [ "$major" -gt 0 ]; then
+                local prev_major=$(( major - 1 ))
+                local prev_major_b="mongodb-${prev_major}.0"
+                branch_in_array "$prev_major_b" "${branches[@]}" && add_pair "$branch" "$prev_major_b"
+            fi
+
+            # Upper adjacent major (X+1).0 or develop as proxy
+            local next_major=$(( major + 1 ))
+            local next_major_b="mongodb-${next_major}.0"
+            if branch_in_array "$next_major_b" "${branches[@]}"; then
+                add_pair "$branch" "$next_major_b"
+            elif branch_in_array "develop" "${branches[@]}"; then
+                add_pair "$branch" "develop"
+            fi
+
+            # All configured minors of the same major X.Y (Y > 0)
+            local b b_major b_minor
+            for b in "${branches[@]}"; do
+                b_major=$(branch_major_version "$b")
+                b_minor=$(branch_minor_version "$b")
+                if [ "$b_major" = "$major" ] && [ -n "$b_minor" ] && [ "$b_minor" -ne 0 ]; then
+                    add_pair "$branch" "$b"
+                fi
+            done
+
+            # Highest configured minor of the previous major (X-1).Y
+            if [ "$major" -gt 0 ]; then
+                local prev_major=$(( major - 1 ))
+                local highest_prev_minor_val=-1
+                local highest_prev_minor_b=""
+                for b in "${branches[@]}"; do
+                    b_major=$(branch_major_version "$b")
+                    b_minor=$(branch_minor_version "$b")
+                    if [ "$b_major" = "$prev_major" ] && [ -n "$b_minor" ] && [ "$b_minor" -ne 0 ]; then
+                        if [ "$b_minor" -gt "$highest_prev_minor_val" ]; then
+                            highest_prev_minor_val="$b_minor"
+                            highest_prev_minor_b="$b"
+                        fi
+                    fi
+                done
+                [ -n "$highest_prev_minor_b" ] && add_pair "$branch" "$highest_prev_minor_b"
+            fi
+        else
+            # Non-versioned or unexpected branch name; ignore here.
+            continue
+        fi
+    done
+
+    # Emit the pairs.
+    local key
+    for key in "${!unique_pairs[@]}"; do
+        echo "${unique_pairs[$key]}"
+    done
+}
+
+#############################################################
+# run_pair_tests:
+#
+# Verify that generate_compat_pairs produces expected outputs
+# for fixed golden vectors and satisfies structural invariants.
+#
+# No builds or actual compatibility tests are performed.
+#############################################################
+run_pair_tests()
+{
+    local errors=0
+    local -A input_set emitted
+    local -a branches
+    local b1 b2 key
+
+    read -r -a branches <<< "${newer_release_branches[*]}"
+    for b1 in "${branches[@]}"; do
+        input_set["$b1"]=1
+    done
+
+    echo "Configured branches: ${branches[*]}"
+    echo ""
+    echo "Generated compatibility pairs:"
+
+    while IFS=' ' read -r b1 b2; do
+        [ -z "$b1" ] && continue
+        echo "  $b1  <->  $b2"
+
+        if [ "$b1" = "$b2" ]; then
+            echo "FAIL: self-pair emitted: $b1 <-> $b2"
+            errors=$(( errors + 1 ))
+        fi
+
+        if [ -z "${input_set[$b1]+x}" ] || [ -z "${input_set[$b2]+x}" ]; then
+            echo "FAIL: emitted pair contains branch outside configured set: $b1 <-> $b2"
+            errors=$(( errors + 1 ))
+        fi
+
+        if [[ "$b1" < "$b2" ]]; then
+            key="${b1}:${b2}"
+        else
+            key="${b2}:${b1}"
+        fi
+        if [ -n "${emitted[$key]+x}" ]; then
+            echo "FAIL: duplicate pair emitted: $b1 <-> $b2"
+            errors=$(( errors + 1 ))
+        fi
+        emitted[$key]=1
+    done < <(generate_compat_pairs "${branches[@]}")
+
+    echo ""
+    if [ "$errors" -eq 0 ]; then
+        echo "PASS: pair list generated with no invariant violations."
+    else
+        echo "FAIL: $errors invariant issue(s) detected while listing pairs."
+        return 1
+    fi
+}
+
+#############################################################
 # usage string
 #############################################################
 usage()
 {
-    echo -e "Usage: \tcompatibility_test_for_releases [-d|-i|-n|-o|-p|-u|-w|-v]"
+    echo -e "Usage: \tcompatibility_test_for_releases [-d|-i|-n|-o|-p|-u|-w|-v|-T]"
     echo -e "\t-d\trun compatibility tests for ${scopes[dirty_restart]}"
     echo -e "\t-i\trun compatibility tests for ${scopes[import]}"
     echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
@@ -910,6 +1166,7 @@ usage()
     echo -e "\t-u\trun compatibility tests for ${scopes[upgrade_to_latest]}"
     echo -e "\t-w\trun compatibility tests for ${scopes[wt_standalone]}"
     echo -e "\t-v <v1> <v2>\trun compatibility tests for ${scopes[two_versions]}"
+    echo -e "\t-T\t${scopes[test_pairs]}"
     exit 1
 }
 
@@ -968,6 +1225,13 @@ case $1 in
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo "Performing compatibility tests for $v1 and $v2"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
+"-T")
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Verifying compatibility pair coverage (${scopes[test_pairs]})"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    run_pair_tests
+    exit $?
 ;;
 *)
     usage
@@ -1154,20 +1418,28 @@ if [ "${wt_standalone}" = true ]; then
     (run_format "$wt2" "row")
 fi
 
-# Verify backward compatibility for supported access methods.
+# Verify backward/forward compatibility and run upgrade/downgrade testing.
 #
-# The branch array includes a list of branches in newer-to-older order.
-# For backport compatibility, the binary of the newer branch should
-# be used to verify the data files generated by the older branch.
-# e.g. (verify_branches mongodb-4.4 mongodb-4.2 "row")
+# Pairs are generated by generate_compat_pairs() using version-aware rules so that
+# minor releases are tested against all required partners per the Server Release Policy:
+#   - minor X.Y  <->  X.(Y±1) if configured, X.0, and (X+1).0 / develop
+#   - major X.0  <->  (X±1).0 / develop, all X.Y minors, highest (X-1).Y minor
+#
+# Each pair is tested in both the backward direction (newer binary reads older data)
+# and the forward direction (older binary reads newer data), plus upgrade/downgrade.
 if [ "$newer" = true ]; then
-    for i in ${!newer_release_branches[@]}; do
-        [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
-        (verify_test_format ${newer_release_branches[$i]} ${newer_release_branches[$((i+1))]} "row" true)
-    done
+    while IFS=' ' read -r newer_b older_b; do
+        (verify_test_format "$newer_b" "$older_b" "row" true)   # backward compatibility
+        (verify_test_format "$older_b" "$newer_b" "row" false)  # forward compatibility
+        (upgrade_downgrade  "$older_b" "$newer_b" "row")        # upgrade/downgrade
+    done < <(generate_compat_pairs "${newer_release_branches[@]}")
+
+    # The checkpoint test runs over the full ordered chain so that checkpoint state
+    # propagates sequentially; keep the consecutive-pair approach for it.
     for i in ${!test_checkpoint_release_branches[@]}; do
         [[ $((i+1)) < ${#test_checkpoint_release_branches[@]} ]] && \
-        (verify_test_checkpoint ${test_checkpoint_release_branches[$i]} ${test_checkpoint_release_branches[$((i+1))]} "row")
+        (verify_test_checkpoint ${test_checkpoint_release_branches[$i]} \
+                                 ${test_checkpoint_release_branches[$((i+1))]} "row")
     done
 fi
 
@@ -1181,27 +1453,6 @@ fi
 if [ "${wt_standalone}" = true ]; then
     (verify_branches develop "$wt1" "row" true)
     (verify_test_format "$wt1" "$wt2" "row" true)
-fi
-
-# Verify forward compatibility for supported access methods.
-#
-# The branch array includes a list of branches in newer-to-older order.
-# For forward compatibility, the binary of the older branch should
-# be used to verify the data files generated by the newer branch.
-# e.g. (verify_branches mongodb-4.2 mongodb-4.4 "row")
-if [ "$newer" = true ]; then
-    for i in ${!newer_release_branches[@]}; do
-        [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
-        (verify_test_format ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row" false)
-    done
-fi
-
-# Upgrade/downgrade testing for supported access methods.
-if [ "$newer" = true ]; then
-    for i in ${!newer_release_branches[@]}; do
-        [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
-        (upgrade_downgrade ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row")
-    done
 fi
 
 exit 0

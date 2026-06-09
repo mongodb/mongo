@@ -342,7 +342,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
       F_ISSET(r, WT_REC_EVICT) && !WT_PAGE_IS_INTERNAL(page) && r->multi_next == 1 &&
       !F_ISSET_ATOMIC_16(page, WT_PAGE_INMEM_SPLIT) && F_ISSET(r, WT_REC_CALL_URGENT) &&
       !r->update_used && r->cache_write_restore_invisible && !r->has_upd_chain_all_aborted &&
-      !r->key_removed_from_disk_image) {
+      r->keys_removed_from_disk_image_count == 0) {
         /*
          * For disaggregated btree, we should have skipped the write if this page has been
          * reconciled before except for internal pages that have built maximum number of consecutive
@@ -773,8 +773,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     /* Track if there is any update chain with its updates all aborted. */
     r->has_upd_chain_all_aborted = false;
 
-    /* Track if any key on the disk image is removed because of its deletion is globally visible. */
-    r->key_removed_from_disk_image = false;
+    r->keys_removed_from_disk_image_count = 0;
 
     /* Track if we write anything that is newer than in the previous reconciliation. */
     r->newer_updates_than_last_rec_used = false;
@@ -2090,13 +2089,43 @@ static int
 __rec_build_delta(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE_HEADER *full_image, bool *build_deltap)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_PAGE_HEADER *header;
+    uint32_t total_keys;
 
     *build_deltap = false;
     if (F_ISSET(r->ref, WT_REF_FLAG_LEAF)) {
         if (WT_BUILD_DELTA_LEAF(session, r)) {
-            WT_RET(__rec_build_delta_leaf(session, full_image, r));
-            *build_deltap = true;
+            conn = S2C(session);
+
+            /* !!!
+             * If too many keys have been removed from the disk image, write a full page instead of
+             * a delta. A key removed from the disk image still occupies space as a tombstone in the
+             * delta; the same key is simply absent from a full page. The count is tracked during
+             * full image construction, which visits every key including those removed in prior
+             * reconciliation cycles that never appear in the supd list.
+             *
+             * Note: the total key count computed below is an approximation, not an exact value.
+             * See the breakdown by page flag below for details.
+             *
+             * The page header entry count tracks individual cells, not key-value pairs:
+             *   - WT_PAGE_EMPTY_V_ALL: no value cells written, entries == key count (exact).
+             *   - WT_PAGE_EMPTY_V_NONE: every key has a value cell, entries / 2 is exact.
+             *   - Neither flag (mixed): entries / 2 underestimates the key count, causing the
+             *     threshold to fire slightly more aggressively than configured.
+             */
+            if (F_ISSET(full_image, WT_PAGE_EMPTY_V_ALL))
+                total_keys = full_image->u.entries + r->keys_removed_from_disk_image_count;
+            else
+                total_keys = full_image->u.entries / 2 + r->keys_removed_from_disk_image_count;
+            if (total_keys > 0 &&
+              r->keys_removed_from_disk_image_count * 100 / total_keys >
+                conn->page_delta.delete_pct)
+                WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_delete_threshold);
+            else {
+                WT_RET(__rec_build_delta_leaf(session, full_image, r));
+                *build_deltap = true;
+            }
         }
     } else if (F_ISSET(r->ref, WT_REF_FLAG_INTERNAL)) {
         /* The internal page delta would have already been built at this point if one exists. */

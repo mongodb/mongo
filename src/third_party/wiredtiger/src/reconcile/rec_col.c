@@ -473,7 +473,7 @@ record_loop:
                  * a later reconciliation.
                  */
                 deleted = true;
-                r->key_removed_from_disk_image = true;
+                ++r->keys_removed_from_disk_image_count;
                 twp = &clear_tw;
             } else if (upd == NULL) {
                 update_no_copy = false; /* Maybe data copy */
@@ -494,7 +494,7 @@ record_loop:
                 deleted = orig_deleted;
                 if (deleted) {
                     twp = &clear_tw;
-                    r->key_removed_from_disk_image = true;
+                    ++r->keys_removed_from_disk_image_count;
                     goto compare;
                 }
                 twp = &vpack->tw;
@@ -597,7 +597,7 @@ record_loop:
                 case WT_UPDATE_TOMBSTONE:
                     deleted = true;
                     twp = &clear_tw;
-                    r->key_removed_from_disk_image = true;
+                    ++r->keys_removed_from_disk_image_count;
                     break;
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));

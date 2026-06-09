@@ -196,9 +196,6 @@ struct __wti_reconcile {
     /* Track if there is any update chain with its updates all aborted. */
     bool has_upd_chain_all_aborted;
 
-    /* Track if any key is removed from the disk image due to its delete is globally visible. */
-    bool key_removed_from_disk_image;
-
     /* Track if we write anything that is newer than the previous reconciliation. */
     bool newer_updates_than_last_rec_used;
 
@@ -277,8 +274,10 @@ struct __wti_reconcile {
      * current min/max of the timestamps. Those values are packaged here rather than passing
      * pointers to stack locations around the code.
      */
-    uint64_t recno;         /* Current record number */
-    uint32_t entries;       /* Current number of entries */
+    uint64_t recno;   /* Current record number */
+    uint32_t entries; /* Current number of entries */
+    /* Keys omitted from the disk image; used to decide whether to write a delta or a full page. */
+    uint32_t keys_removed_from_disk_image_count;
     uint8_t *first_free;    /* Current first free byte */
     size_t space_avail;     /* Remaining space in this chunk */
     size_t min_space_avail; /* Remaining space in this chunk to put a minimum size boundary */

@@ -237,6 +237,8 @@ struct __wt_dhandle_clear_log;
 typedef struct __wt_dhandle_clear_log WT_DHANDLE_CLEAR_LOG;
 struct __wt_disagg_metadata_op;
 typedef struct __wt_disagg_metadata_op WT_DISAGG_METADATA_OP;
+struct __wt_disagg_pending_crypt_key;
+typedef struct __wt_disagg_pending_crypt_key WT_DISAGG_PENDING_CRYPT_KEY;
 struct __wt_disaggregated_checkpoint_track;
 typedef struct __wt_disaggregated_checkpoint_track WT_DISAGGREGATED_CHECKPOINT_TRACK;
 struct __wt_disaggregated_storage;

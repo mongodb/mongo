@@ -1263,6 +1263,7 @@ struct __wt_connection_stats {
     int64_t rec_page_delta_rejected_multiblock;
     int64_t rec_page_delta_rejected_non_single_page;
     int64_t rec_page_delta_rejected_size_threshold;
+    int64_t rec_page_delta_rejected_delete_threshold;
     int64_t rec_page_delta_rejected_zero_entries;
     int64_t rec_page_delta_rejected_build_failed;
     int64_t rec_pages;
@@ -1794,6 +1795,7 @@ struct __wt_dsrc_stats {
     int64_t rec_page_delta_rejected_multiblock;
     int64_t rec_page_delta_rejected_non_single_page;
     int64_t rec_page_delta_rejected_size_threshold;
+    int64_t rec_page_delta_rejected_delete_threshold;
     int64_t rec_page_delta_rejected_zero_entries;
     int64_t rec_page_delta_rejected_build_failed;
     int64_t rec_pages;

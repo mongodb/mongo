@@ -199,6 +199,16 @@ struct __wt_disagg_metadata_op {
     TAILQ_ENTRY(__wt_disagg_metadata_op) q; /* Linked list of entries. */
 };
 
+/*
+ * WT_DISAGG_PENDING_CRYPT_KEY --
+ *      A pushed key waiting to be persisted at the next checkpoint.
+ */
+struct __wt_disagg_pending_crypt_key {
+    WT_ITEM keys;
+    uint64_t timestamp;
+    TAILQ_ENTRY(__wt_disagg_pending_crypt_key) q;
+};
+
 #define WT_DISAGG_LSN_NONE 0 /* The LSN is not set. */
 
 /*
@@ -219,6 +229,7 @@ struct __wt_page_delta_config {
     wt_shared uint64_t max_leaf_delta_count;     /* The maximum number of leaf deltas. */
 
     u_int delta_pct;             /* Delta page percent (of full page size) */
+    u_int delete_pct;            /* Max delete fraction (%) before forcing full page */
     u_int max_consecutive_delta; /* Max number of consecutive deltas */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_INTERNAL_PAGE_DELTA 0x1u
@@ -284,8 +295,13 @@ struct __wt_disaggregated_storage {
     WT_PAGE_LOG_HANDLE *page_log_meta;         /* The page log for the metadata. */
     WT_PAGE_LOG_HANDLE *page_log_key_provider; /* The page log for the key provider. */
 
-    /* Most recently pushed key; written to the turtle page at the next checkpoint. */
-    WT_ITEM active_crypt_key;
+    /*
+     * Keys pushed since the last checkpoint, drained at the next checkpoint. The lock serializes
+     * pushes from user threads against the checkpoint drain.
+     */
+    TAILQ_HEAD(__wt_disagg_pending_crypt_key_qh, __wt_disagg_pending_crypt_key)
+    pending_crypt_key_qh;
+    WT_SPINLOCK pending_crypt_key_lock;
 
     uint64_t num_meta_put;               /* The number metadata puts since connection open. */
     uint64_t num_meta_put_at_ckpt_begin; /* The number metadata puts at checkpoint begin. */

@@ -57,9 +57,6 @@ struct __wt_shared_dsk_item {
     uint8_t addr[];
 };
 
-/* Maximum number of shared disk cache hash locks. */
-#define WT_SHARED_DSK_CACHE_MAX_LOCKS 8192
-
 struct __wt_shared_dsk_cache {
     bool enabled;
 

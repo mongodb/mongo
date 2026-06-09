@@ -1,7 +1,37 @@
 #!/usr/bin/env bash
 ##############################################################################################
-# This is the version list extracted from compatibility_test_for_releases
-# The reason to extract this list out is to reuse it for python framework test
+# Version list used by the compatibility test suite.
+#
+# This file is the single source of truth for which release branches are included in each
+# compatibility test type. It is sourced by compatibility_test_for_releases.sh and read by
+# the Python test framework (common/compatibility_config.py).
+#
+# HOW TO ADD A NEW RELEASE BRANCH (minor or major)
+# ------------------------------------------------
+# When a new release branch is created (e.g. mongodb-8.3 or mongodb-9.0), add it to each of
+# the arrays below. All arrays are in newer-to-older order; insert the new branch immediately
+# after "develop" (or after the most recent minor of the same major series for minor releases).
+#
+#   SUITE_RELEASE_BRANCHES                            -- Python suite tests
+#   IMPORT_RELEASE_BRANCHES                           -- import compatibility (-i)
+#   NEWER_RELEASE_BRANCHES                            -- forward/backward/upgrade/downgrade (-n)
+#   PATCH_VERSION_UPGRADE_DOWNGRADE_RELEASE_BRANCHES  -- patch-version test (-p)
+#   TEST_CHECKPOINT_RELEASE_BRANCHES                  -- checkpoint recovery (part of -n)
+#   UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES  -- upgrade-to-latest (-u) and dirty-restart (-d)
+#
+# Do NOT add new releases to OLDER_RELEASE_BRANCHES or
+# COMPATIBLE_UPGRADE_DOWNGRADE_RELEASE_BRANCHES (those are intentionally limited to old
+# near-EOL branches; see comments below).
+#
+# HOW TO REMOVE AN EOL RELEASE BRANCH
+# -----------------------------------
+# Remove the branch from every array it appears in. If it is the oldest entry in
+# NEWER_RELEASE_BRANCHES, consider moving it to OLDER_RELEASE_BRANCHES temporarily to
+# maintain the overlap (last element of NEWER equals first element of OLDER) until the
+# next-oldest branch takes over, then drop it from OLDER_RELEASE_BRANCHES as well.
+#
+# After changing NEWER_RELEASE_BRANCHES, run the self-test to verify pair coverage is still correct:
+#   ./compatibility_test_for_releases.sh -T
 ##############################################################################################
 
 # Currently this is a temporary setup for python testsuite

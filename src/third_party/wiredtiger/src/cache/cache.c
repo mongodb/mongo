@@ -76,9 +76,8 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_cache_config(session, cfg, false));
 
     /*
-     * Initialize the shared disk hash table only on disaggregated nodes. Size the hash table at
-     * 0.2% of cache size divided by ~100B per entry (cache size / 500 / 100), with a minimum of 512
-     * buckets.
+     * Initialize the shared disk hash table only on disagg nodes.
+     *
      * FIXME-WT-14721: Replace this config lookup with the standard disaggregated check once the
      * disaggregated configuration is available here.
      */
@@ -86,8 +85,13 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
     S2C(session)->cache->shared_dsk_cache.enabled = (cval.len != 0);
     S2C(session)->cache->shared_dsk_cache.enabled = false;
     if (S2C(session)->cache->shared_dsk_cache.enabled) {
-        /* FIXME-WT-17066: We should pick a hash size wisely. */
-        hash_size = (u_int)WT_MAX(S2C(session)->cache_size / 500 / 100, 512);
+        /*
+         * Best-effort sizing: budget 0.2% of the cache and assume one item per bucket, so dividing
+         * that budget by the per-bucket cost gives the count, with a floor of a thousand buckets.
+         */
+        hash_size = (u_int)WT_MAX(S2C(session)->cache_size / 500 /
+            (sizeof(WT_SHARED_DSK_ITEM) + sizeof(*S2C(session)->cache->shared_dsk_cache.hash)),
+          WT_THOUSAND);
         WT_RET(__wti_shared_dsk_cache_init(session, hash_size));
         WT_STAT_CONN_SET(session, cache_shared_dsk_hash_size, hash_size);
     }
