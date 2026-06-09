@@ -496,7 +496,8 @@ public:
         const BSONObj& query,
         const BSONObj& sort,
         boost::optional<long long> limit,
-        const boost::optional<BSONObj>& hint = boost::none);
+        const boost::optional<BSONObj>& hint = boost::none,
+        const boost::optional<BSONObj>& projection = boost::none);
 
     /**
      * Returns false if the error is a retriable error and/or causes a replset monitor update. These
@@ -579,7 +580,8 @@ private:
         const BSONObj& query,
         const BSONObj& sort,
         boost::optional<long long> limit,
-        const boost::optional<BSONObj>& hint = boost::none) = 0;
+        const boost::optional<BSONObj>& hint = boost::none,
+        const boost::optional<BSONObj>& projection = boost::none) = 0;
 
     // TODO(SERVER-104141): Change return type to Status
     virtual RetryStrategy::Result<std::monostate> _runAggregation(

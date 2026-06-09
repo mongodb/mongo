@@ -151,7 +151,8 @@ private:
         const BSONObj& query,
         const BSONObj& sort,
         boost::optional<long long> limit,
-        const boost::optional<BSONObj>& hint = boost::none) final {
+        const boost::optional<BSONObj>& hint = boost::none,
+        const boost::optional<BSONObj>& projection = boost::none) final {
         lastReadPref = readPref;
         return Shard::QueryResponse{std::vector<BSONObj>{}, repl::OpTime::max()};
     }

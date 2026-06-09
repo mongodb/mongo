@@ -337,7 +337,8 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit,
-    const boost::optional<BSONObj>& hint) {
+    const boost::optional<BSONObj>& hint,
+    const boost::optional<BSONObj>& projection) {
 
     invariant(isConfig());
 
@@ -370,6 +371,10 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig
                                    : boost::none);
         if (hint) {
             findCommand.setHint(*hint);
+        }
+
+        if (projection) {
+            findCommand.setProjection(*projection);
         }
 
         if (maxTimeMS < Milliseconds::max()) {

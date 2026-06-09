@@ -119,7 +119,8 @@ RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit,
-    const boost::optional<BSONObj>& hint) {
+    const boost::optional<BSONObj>& hint,
+    const boost::optional<BSONObj>& projection) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     boost::optional<ScopeGuard<std::function<void()>>> readSourceGuard;
 
@@ -188,6 +189,9 @@ RetryStrategy::Result<Shard::QueryResponse> RSLocalClient::queryOnce(
     }
     if (hint) {
         findRequest.setHint(*hint);
+    }
+    if (projection) {
+        findRequest.setProjection(*projection);
     }
     if (limit) {
         findRequest.setLimit(*limit);

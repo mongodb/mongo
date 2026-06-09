@@ -128,9 +128,18 @@ RetryStrategy::Result<Shard::QueryResponse> ConfigShardWrapper::_exhaustiveFindO
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit,
-    const boost::optional<BSONObj>& hint) {
-    return _configShard->_exhaustiveFindOnConfig(
-        opCtx, readPref, targetingMetadata, readConcernLevel, nss, query, sort, limit, hint);
+    const boost::optional<BSONObj>& hint,
+    const boost::optional<BSONObj>& projection) {
+    return _configShard->_exhaustiveFindOnConfig(opCtx,
+                                                 readPref,
+                                                 targetingMetadata,
+                                                 readConcernLevel,
+                                                 nss,
+                                                 query,
+                                                 sort,
+                                                 limit,
+                                                 hint,
+                                                 projection);
 }
 
 ReadPreferenceSetting ConfigShardWrapper::_attachConfigTimeToMinClusterTime(

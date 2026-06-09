@@ -518,7 +518,8 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     const boost::optional<long long> limit,
-    const boost::optional<BSONObj>& hint) {
+    const boost::optional<BSONObj>& hint,
+    const boost::optional<BSONObj>& projection) {
     // Do not allow exhaustive finds to be run against regular shards.
     invariant(isConfig());
     Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
@@ -534,7 +535,8 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
                                            query,
                                            sort,
                                            limit,
-                                           hint);
+                                           hint,
+                                           projection);
         });
 }
 
