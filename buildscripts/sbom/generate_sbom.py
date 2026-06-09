@@ -807,7 +807,7 @@ def main() -> None:
                         import_script_path,
                     )
             else:
-                logger.debug(
+                logger.warning(
                     "VERSION IMPORT SCRIPT: %s: Import script not found! '%s'",
                     component_key,
                     import_script_path,

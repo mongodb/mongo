@@ -31,6 +31,11 @@ class TestSbom(unittest.TestCase):
             error_manager.print_errors()
             self.fail(f"Could not find error message matching: {message}")
 
+    def assert_message_in_warnings(self, error_manager: sbom_linter.ErrorManager, message: str):
+        if not error_manager.find_message_in_warnings(message):
+            error_manager.print_errors()
+            self.fail(f"Could not find warning message matching: {message}")
+
     def test_valid_sbom(self):
         test_file = os.path.join(self.input_dir, "valid_sbom.json")
         third_party_libs = {"librdkafka", "protobuf"}
@@ -43,7 +48,8 @@ class TestSbom(unittest.TestCase):
         test_file = os.path.join(self.input_dir, "valid_sbom.json")
         third_party_libs = {"librdkafka", "protobuf", "extra_dep"}
         error_manager = sbom_linter.lint_sbom(test_file, test_file, third_party_libs, False)
-        self.assert_message_in_errors(error_manager, sbom_linter.UNDEFINED_THIRD_PARTY_ERROR)
+        self.assert_message_in_warnings(error_manager, sbom_linter.UNDEFINED_THIRD_PARTY_ERROR)
+        self.assertTrue(error_manager.zero_error())
 
     def test_missing_purl_or_cpe(self):
         test_file = os.path.join(self.input_dir, "sbom_missing_purl.json")
@@ -93,9 +99,10 @@ class TestSbom(unittest.TestCase):
         test_file = os.path.join(self.input_dir, "sbom_script_file_missing.json")
         third_party_libs = {"librdkafka"}
         error_manager = sbom_linter.lint_sbom(test_file, test_file, third_party_libs, False)
-        self.assert_message_in_errors(
+        self.assert_message_in_warnings(
             error_manager, sbom_linter.COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR
         )
+        self.assertTrue(error_manager.zero_error())
 
     def test_pedigree_version_match(self):
         test_file = os.path.join(self.input_dir, "sbom_pedigree_version_match.json")

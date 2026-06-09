@@ -42,12 +42,16 @@ class ErrorManager:
         self.input_file: str = input_file
         self.component_name: str = ""
         self.errors: list[str] = []
+        self.warnings: list[str] = []
 
     def update_component_attribute(self, component_name: str) -> None:
         self.component_name = component_name
 
     def append(self, message: str) -> None:
         self.errors.append(message)
+
+    def append_warning(self, message: str) -> None:
+        self.warnings.append(message)
 
     def append_full_error_message(self, message: str) -> None:
         if self.component_name == "":
@@ -57,7 +61,17 @@ class ErrorManager:
                 f"Input-file:{self.input_file} Component:{self.component_name} Error: {message}"
             )
 
+    def append_full_warning_message(self, message: str) -> None:
+        if self.component_name == "":
+            self.warnings.append(f"Input-file:{self.input_file} Warning: {message}")
+        else:
+            self.warnings.append(
+                f"Input-file:{self.input_file} Component:{self.component_name} Warning: {message}"
+            )
+
     def print_errors(self) -> None:
+        if self.warnings:
+            print("\n".join(self.warnings), file=sys.stderr)
         if self.errors:
             print("\n".join(self.errors), file=sys.stderr)
 
@@ -68,6 +82,14 @@ class ErrorManager:
         message_found = False
         for error in self.errors:
             if message in error:
+                message_found = True
+                break
+        return message_found
+
+    def find_message_in_warnings(self, message: str) -> bool:
+        message_found = False
+        for warning in self.warnings:
+            if message in warning:
                 message_found = True
                 break
         return message_found
@@ -91,13 +113,14 @@ def local_schema_registry():
 # There is an "end of line" delimiter at the end of the line which needs to be stripped.
 def get_script_version(
     script_path: str, script_version_key: str, error_manager: ErrorManager
-) -> str:
+) -> str | None:
     result = ""
     try:
         file = open(script_path, "r")
     except OSError:
-        error_manager.append_full_error_message(COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR)
-        return result
+        # buildscripts/sbom/generate_sbom.py warns when an import script path listed in component properties does not exist.
+        error_manager.append_full_warning_message(COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR)
+        return None
 
     with file:
         for line in file:
@@ -212,7 +235,8 @@ def validate_location(component: dict, third_party_libs: set, error_manager: Err
                 location = occurrence["location"]
 
                 if not os.path.exists(location) and not SKIP_FILE_CHECKING:
-                    error_manager.append_full_error_message("location does not exist in repo.")
+                    # buildscripts/sbom/generate_sbom.py also warns when a component's evidence location folder does not exist.
+                    error_manager.append_full_warning_message("location does not exist in repo.")
 
                 if location.startswith(THIRD_PARTY_LOCATION_PREFIX):
                     lib = location.removeprefix(THIRD_PARTY_LOCATION_PREFIX)
@@ -249,9 +273,10 @@ def lint_sbom(
         validate_component(component, third_party_libs, error_manager)
 
     if third_party_libs:
-        error_manager.append(UNDEFINED_THIRD_PARTY_ERROR)
+        # buildscripts/sbom/generate_sbom.py warns when src/third_party folders are not matched to any SBOM component.
+        error_manager.append_warning(UNDEFINED_THIRD_PARTY_ERROR)
         for lib in third_party_libs:
-            error_manager.append(f"    {lib}")
+            error_manager.append_warning(f"    {lib}")
 
     formatted_sbom = json.dumps(sbom, indent=2) + "\n"
     if sbom_text not in (formatted_sbom, formatted_sbom.rstrip("\n")):
