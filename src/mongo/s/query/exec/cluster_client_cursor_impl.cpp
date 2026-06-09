@@ -113,7 +113,6 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
-      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().getQueryStatsInfo().willNeverExhaust),
       _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
@@ -142,7 +141,6 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
-      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().getQueryStatsInfo().willNeverExhaust),
       _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
@@ -205,7 +203,7 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
         query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
                                                           _queryStatsKeyHash,
                                                           std::move(_queryStatsKey),
-                                                          _queryStatsWillNeverExhaust,
+                                                          _isChangeStreamQuery,
                                                           _firstResponseExecutionTime,
                                                           _metrics);
 
@@ -330,10 +328,6 @@ boost::optional<query_shape::QueryShapeHash> ClusterClientCursorImpl::getQuerySh
 
 boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() const {
     return _queryStatsKeyHash;
-}
-
-bool ClusterClientCursorImpl::getQueryStatsWillNeverExhaust() const {
-    return _queryStatsWillNeverExhaust;
 }
 
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {

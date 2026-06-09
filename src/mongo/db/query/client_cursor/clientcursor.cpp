@@ -150,8 +150,6 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _queryShapeHash(CurOp::get(operationUsingCursor)->debug().getQueryShapeHash()),
       _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().key)),
-      _queryStatsWillNeverExhaust(
-          CurOp::get(operationUsingCursor)->debug().getQueryStatsInfo().willNeverExhaust),
       _isChangeStreamQuery(CurOp::get(operationUsingCursor)->debug().isChangeStreamQuery),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
@@ -209,7 +207,7 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
                                                       _queryStatsKeyHash,
                                                       std::move(_queryStatsKey),
-                                                      _queryStatsWillNeverExhaust,
+                                                      _isChangeStreamQuery,
                                                       _firstResponseExecutionTime,
                                                       _metrics);
 }

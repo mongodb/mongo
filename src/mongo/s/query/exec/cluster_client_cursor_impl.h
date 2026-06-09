@@ -154,8 +154,6 @@ public:
 
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 
-    bool getQueryStatsWillNeverExhaust() const final;
-
     bool shouldOmitDiagnosticInformation() const final;
 
     std::unique_ptr<query_stats::Key> takeKey() final;
@@ -238,8 +236,6 @@ private:
 
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
-
-    bool _queryStatsWillNeverExhaust = false;
 
     bool _isChangeStreamQuery = false;
 

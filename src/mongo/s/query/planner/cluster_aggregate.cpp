@@ -608,19 +608,14 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
 
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
-        query_stats::registerRequest(
-            opCtx,
-            nsStruct.executionNss,
-            [&]() {
-                uassertStatusOKWithContext(deferredShape->getStatus(),
-                                           "Failed to compute query shape");
-                return std::make_unique<query_stats::AggKey>(
-                    expCtx,
-                    request,
-                    std::move(deferredShape->getValue()),
-                    std::move(liteParsedPipeline.getInvolvedNamespaces()));
-            },
-            hasChangeStream);
+        query_stats::registerRequest(opCtx, nsStruct.executionNss, [&]() {
+            uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
+            return std::make_unique<query_stats::AggKey>(
+                expCtx,
+                request,
+                std::move(deferredShape->getValue()),
+                std::move(liteParsedPipeline.getInvolvedNamespaces()));
+        });
     }
 
     if (wasDesugaredHere) {

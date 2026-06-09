@@ -185,8 +185,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
  */
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                     bool willNeverExhaust = false);
+                     const std::function<std::unique_ptr<Key>(void)>& makeKey);
 
 
 /**
@@ -301,7 +300,7 @@ void writeQueryStats(OperationContext* opCtx,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics = {},
-                     bool willNeverExhaust = false);
+                     bool isChangeStreamQuery = false);
 
 /**
  * Called from ClientCursor::dispose/ClusterClientCursorImpl::kill to set up and writeQueryStats()
@@ -310,7 +309,7 @@ void writeQueryStats(OperationContext* opCtx,
 void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
                                           boost::optional<size_t> queryStatsKeyHash,
                                           std::unique_ptr<Key> key,
-                                          bool willNeverExhaust,
+                                          bool isChangeStreamQuery,
                                           boost::optional<Microseconds> firstResponseExecutionTime,
                                           OpDebug::AdditiveMetrics metrics);
 

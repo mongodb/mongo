@@ -63,8 +63,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
 
     // For a change stream query that never ends, we want to collect query stats on the initial
     // query and each getMore. Here we record the initial query.
-    if (cursor->getQueryStatsWillNeverExhaust()) {
-
+    if (cursor->isChangeStreamCursor()) {
         auto snapshot = query_stats::captureMetrics(
             opCtx,
             query_stats::microsecondsToUint64(opDebug.getAdditiveMetrics().executionTime),
@@ -75,7 +74,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
                                      cursor->takeKey(),
                                      snapshot,
                                      {} /* supplementalMetrics */,
-                                     cursor->getQueryStatsWillNeverExhaust());
+                                     cursor->isChangeStreamCursor());
     }
 }
 
@@ -87,8 +86,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
 
     // For a change stream query that never ends, we want to update query stats for every getMore on
     // the cursor.
-    if (cursor->getQueryStatsWillNeverExhaust()) {
-
+    if (cursor->isChangeStreamCursor()) {
         auto snapshot = query_stats::captureMetrics(
             opCtx,
             query_stats::microsecondsToUint64(opDebug.getAdditiveMetrics().executionTime),
@@ -99,7 +97,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
                                      nullptr,
                                      snapshot,
                                      {} /* supplementalMetrics */,
-                                     cursor->getQueryStatsWillNeverExhaust());
+                                     cursor->isChangeStreamCursor());
     }
 }
 

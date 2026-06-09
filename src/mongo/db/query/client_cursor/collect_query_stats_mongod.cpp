@@ -41,7 +41,7 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
 
     // For a change stream query, we want to collect and update query stats on the initial query
     // and for every getMore.
-    if (pinnedCursor->getQueryStatsWillNeverExhaust()) {
+    if (pinnedCursor->isChangeStreamQuery()) {
         auto snapshot = query_stats::captureMetrics(
             opCtx,
             query_stats::microsecondsToUint64(opDebug.getAdditiveMetrics().executionTime),
@@ -52,7 +52,7 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
                                      pinnedCursor->takeKey(),
                                      snapshot,
                                      {} /* supplementalMetrics */,
-                                     pinnedCursor->getQueryStatsWillNeverExhaust());
+                                     pinnedCursor->isChangeStreamQuery());
     }
 }
 

@@ -561,8 +561,6 @@ public:
         // view running an aggregation pipeline. If true, stats should not be registered at the
         // current point in execution.
         bool disableForSubqueryExecution = false;
-        // True if the request was a change stream request.
-        bool willNeverExhaust = false;
         // Sometimes we need to request metrics as part of a higher-level operation without
         // actually caring about the metrics for this specific operation. In those cases, we
         // use metricsRequested to indicate we should request metrics from other nodes.

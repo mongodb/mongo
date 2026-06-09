@@ -141,8 +141,6 @@ public:
 
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 
-    bool getQueryStatsWillNeverExhaust() const final;
-
     /**
      * Returns false unless the mock cursor has been fully iterated.
      */

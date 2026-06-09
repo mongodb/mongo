@@ -250,8 +250,6 @@ public:
 
     virtual boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const = 0;
 
-    virtual bool getQueryStatsWillNeverExhaust() const = 0;
-
     /**
      * Returns the number of batches returned by this cursor.
      */

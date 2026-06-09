@@ -278,9 +278,8 @@ Query stats also behaves a bit differently for change stream queries. For change
 like normal collections, we will still collect query stats on creation. However, an important
 difference is that we will actually treat each `getMore` as its own query, and collect and update
 query stats for each one rather than accumulating them on the cursor and recording once execution
-completes. We have a flag to determine whether the collection has a change stream,
-[\_queryStatsWillNeverExhaust][query stats will never exhaust], and decide based on that whether to
-take the change stream approach.
+completes. We have a flag to determine whether the collection has a change stream and decide based
+on that whether to take the change stream approach.
 
 ## Metric Retrieval
 

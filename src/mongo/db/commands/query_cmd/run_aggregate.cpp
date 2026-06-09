@@ -984,18 +984,14 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
     NamespaceStringSet pipelineInvolvedNamespaces(aggExState.getInvolvedNamespaces());
 
     // Register query stats with the pre-optimized pipeline.
-    query_stats::registerRequest(
-        aggExState.getOpCtx(),
-        aggExState.getOriginalNss(),
-        [&]() {
-            uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
-            return std::make_unique<query_stats::AggKey>(expCtx,
-                                                         userRequest,
-                                                         std::move(deferredShape->getValue()),
-                                                         std::move(pipelineInvolvedNamespaces),
-                                                         collectionType);
-        },
-        aggExState.hasChangeStream());
+    query_stats::registerRequest(aggExState.getOpCtx(), aggExState.getOriginalNss(), [&]() {
+        uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
+        return std::make_unique<query_stats::AggKey>(expCtx,
+                                                     userRequest,
+                                                     std::move(deferredShape->getValue()),
+                                                     std::move(pipelineInvolvedNamespaces),
+                                                     collectionType);
+    });
 
     const auto& includeMetricsOption = aggReq.getIncludeMetrics();
     if (aggReq.getIncludeQueryStatsMetrics().value_or(false) ||

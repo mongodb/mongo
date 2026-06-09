@@ -191,10 +191,6 @@ public:
         return _rawData;
     }
 
-    bool getQueryStatsWillNeverExhaust() const {
-        return _queryStatsWillNeverExhaust;
-    }
-
     bool isChangeStreamQuery() const {
         return _isChangeStreamQuery;
     }
@@ -527,9 +523,6 @@ private:
 
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
-
-    // Flag for query stats on if the current cursor is used for a tailable or change stream query.
-    bool _queryStatsWillNeverExhaust{false};
 
     // Flag if the current cursor is used for a change stream query.
     bool _isChangeStreamQuery{false};

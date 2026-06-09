@@ -390,8 +390,7 @@ void registerRequestImpl(const OperationContext* opCtx,
                          RateLimiter& rateLimiter,
                          const NamespaceString& collection,
                          const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                         OpDebug::QueryStatsInfo& queryStatsInfo,
-                         bool willNeverExhaust = false) {
+                         OpDebug::QueryStatsInfo& queryStatsInfo) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         LOGV2_DEBUG(8473000,
                     5,
@@ -439,7 +438,6 @@ void registerRequestImpl(const OperationContext* opCtx,
         return;
     }
 
-    queryStatsInfo.willNeverExhaust = willNeverExhaust;
     // There are a few cases where a query shape can be larger than the original query. For example,
     // {$exists: false} in the input query serializes to {$not: {$exists: true}. In rare cases where
     // an input query has thousands of clauses, the cumulative bloat that shapification adds results
@@ -493,12 +491,10 @@ void registerRequestImpl(const OperationContext* opCtx,
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                     bool willNeverExhaust) {
+                     const std::function<std::unique_ptr<Key>(void)>& makeKey) {
     auto& opDebug = CurOp::get(opCtx)->debug();
     RateLimiter& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
-    registerRequestImpl(
-        opCtx, rateLimiter, collection, makeKey, opDebug.getQueryStatsInfo(), willNeverExhaust);
+    registerRequestImpl(opCtx, rateLimiter, collection, makeKey, opDebug.getQueryStatsInfo());
 }
 
 void registerWriteRequest(OperationContext* opCtx,
@@ -598,11 +594,11 @@ void writeQueryStats(OperationContext* opCtx,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
-                     bool willNeverExhaust) {
+                     bool isChangeStreamQuery) {
     // Generally we expect a 'key' to write query stats. However, for a change stream query, we
     // expect it has no 'key' after its first writeQueryStats(), but it must have a
     // 'queryStatsKeyHash' for its entry to be updated.
-    if (!key && !(willNeverExhaust && queryStatsKeyHash)) {
+    if (!key && !(isChangeStreamQuery && queryStatsKeyHash)) {
         return;
     }
 
@@ -635,7 +631,7 @@ void writeQueryStats(OperationContext* opCtx,
 
     // It is possible a cursor that lives forever has no key associated with it and its entry may
     // have been evicted.
-    if (willNeverExhaust && !key) {
+    if (isChangeStreamQuery && !key) {
         return;
     }
 
@@ -651,7 +647,7 @@ void writeQueryStats(OperationContext* opCtx,
 void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
                                           boost::optional<size_t> queryStatsKeyHash,
                                           std::unique_ptr<Key> key,
-                                          bool willNeverExhaust,
+                                          bool isChangeStreamQuery,
                                           boost::optional<Microseconds> firstResponseExecutionTime,
                                           OpDebug::AdditiveMetrics metrics) {
     // It is discouraged but technically possible for a user to enable queryStats on the mongods of
@@ -671,7 +667,7 @@ void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
             opCtx, query_stats::microsecondsToUint64(firstResponseExecutionTime), metrics);
 
         query_stats::writeQueryStats(opCtx, queryStatsKeyHash, std::move(key), snapshot);
-    } else if (willNeverExhaust && opCtx) {
+    } else if (isChangeStreamQuery && opCtx) {
         // Since we already recorded information about the possible getMores associated with a
         // cursor that never ends, the only information left to record is about the kill/dispose
         // cursor operation. This operation is not timed and does not have any metrics associated
@@ -680,7 +676,7 @@ void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
             opCtx, query_stats::microsecondsToUint64(boost::none), OpDebug::AdditiveMetrics());
 
         query_stats::writeQueryStats(
-            opCtx, queryStatsKeyHash, nullptr, snapshot, {}, willNeverExhaust);
+            opCtx, queryStatsKeyHash, nullptr, snapshot, {}, isChangeStreamQuery);
     }
 }
 
