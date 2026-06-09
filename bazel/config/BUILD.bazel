@@ -2550,7 +2550,7 @@ bool_flag(
 )
 
 config_setting(
-    name = "bolt_profile_use_enabled",
+    name = "bolt_profile_use_enabled_aarch64",
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:aarch64",
@@ -2559,6 +2559,26 @@ config_setting(
         "//bazel/config:bolt_profile_use": "True",
         "//bazel/config:compiler_type": "clang",
     },
+)
+
+config_setting(
+    name = "bolt_profile_use_enabled_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    flag_values = {
+        "//bazel/config:bolt_profile_use": "True",
+        "//bazel/config:compiler_type": "clang",
+    },
+)
+
+selects.config_setting_group(
+    name = "bolt_profile_use_enabled",
+    match_any = [
+        ":bolt_profile_use_enabled_aarch64",
+        ":bolt_profile_use_enabled_x86_64",
+    ],
 )
 
 # --------------------------------------

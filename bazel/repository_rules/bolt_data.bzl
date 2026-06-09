@@ -129,8 +129,9 @@ setup_bolt_data = repository_rule(
     environ = ["bolt_profile_url", "bolt_binary_url", "bolt_binary_name", "PATH"],
     attrs = {
         # There is a bug where the repo rule does not properly evaluate these labels so we have to list the full path to the binaries
-        "_merge_fdata_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt/bin/merge-fdata", executable = True, cfg = "host"),
-        "_perf2bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt/bin/perf2bolt", executable = True, cfg = "host"),
-        "_perf_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt/bin/perf", executable = True, cfg = "host"),
+        "_merge_fdata_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bin/merge-fdata", executable = True, cfg = "host"),
+        "_perf2bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bin/perf2bolt", executable = True, cfg = "host"),
+        # perf ships separately from the llvm-bolt toolchain.
+        "_perf_binary": attr.label(allow_single_file = True, default = "@perf_binaries//:bin/perf", executable = True, cfg = "host"),
     },
 )

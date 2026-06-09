@@ -1,4 +1,4 @@
-load("//bazel/repository_rules:pgo_data.bzl", "get_all_files")
+load("//bazel/repository_rules:pgo_data.bzl", "get_all_files", "llvm_profdata_toolchain")
 load(
     "//bazel/repository_rules:profiling_data.bzl",
     "DEFAULT_CLANG_CSPGO_DATA_CHECKSUM",
@@ -6,10 +6,6 @@ load(
     "DEFAULT_CLANG_PGO_DATA_CHECKSUM",
     "DEFAULT_CLANG_PGO_DATA_URL",
 )
-load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl", "TOOLCHAIN_MAP_V5")
-
-LLVM_PROFDATA_URL = TOOLCHAIN_MAP_V5["amazon_linux_2023_aarch64"]["url"]
-LLVM_PROFDATA_CHECKSUM = TOOLCHAIN_MAP_V5["amazon_linux_2023_aarch64"]["sha"]
 
 # This is used so we can tell when the build created new cspgo files vs. using ones from stored url
 CREATED_FILEGROUP = """
@@ -94,7 +90,8 @@ def _setup_cspgo_data(repository_ctx):
             if len(merge_inputs) > 0:
                 print("Merging cspgo + pgo inputs with llvm-profdata:")
                 print(merge_inputs)
-                repository_ctx.download_and_extract(LLVM_PROFDATA_URL, "llvm-profdata", sha256 = LLVM_PROFDATA_CHECKSUM)
+                llvm_profdata = llvm_profdata_toolchain(repository_ctx)
+                repository_ctx.download_and_extract(llvm_profdata["url"], "llvm-profdata", sha256 = llvm_profdata["sha"])
                 llvm_path = repository_ctx.path("./llvm-profdata/v5/bin/llvm-profdata")
                 arguments = [llvm_path, "merge", "-output=" + cspgo_profdata_filename] + merge_inputs
                 result = repository_ctx.execute(arguments)

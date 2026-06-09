@@ -25,42 +25,16 @@ http_archive(
     ] * 5,
 )
 
-# TODO(SERVER-107519): Get these binaries from an actual pipeline build and not locally produced binaries
-http_archive(
-    name = "bolt_binaries",
-    build_file_content = """
-package(default_visibility = ["//visibility:public"])
+# Downloads the llvm-bolt toolchain (arm64 or amd64) matching the host architecture.
+setup_bolt_binaries = use_repo_rule("//bazel/repository_rules:bolt_binaries.bzl", "setup_bolt_binaries")
 
-filegroup(
-    name = "merge-fdata",
-    srcs = ["bolt/bin/merge-fdata"],
-)
+setup_bolt_binaries(name = "bolt_binaries")
 
-filegroup(
-    name = "bolt",
-    srcs = ["bolt/bin/llvm-bolt"],
-)
+# Downloads the perf tool (arm64 or amd64) matching the host architecture. perf is
+# shipped separately from the llvm-bolt toolchain and is used by the bolt training pipeline.
+setup_perf_binaries = use_repo_rule("//bazel/repository_rules:perf_binaries.bzl", "setup_perf_binaries")
 
-filegroup(
-    name = "perf2bolt",
-    srcs = ["bolt/bin/perf2bolt"],
-)
-
-filegroup(
-    name = "perf",
-    srcs = ["bolt/bin/perf"],
-)
-
-filegroup(
-    name = "libbolt_rt_instr",
-    srcs = ["bolt/lib/libbolt_rt_instr.a"],
-)
-    """,
-    sha256 = "7de026eb0f82d1d113ce323d70cd35070b3d40cfea0c8f55c303c111a63feda3",
-    urls = [
-        "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/bolt_perf_rseqbugfix2.tar.gz",
-    ] * 5,
-)
+setup_perf_binaries(name = "perf_binaries")
 
 spidermonkey_wasi_repo = use_repo_rule(
     "//src/mongo/scripting/mozjs/wasm:spidermonkey_wasi_repo.bzl",
