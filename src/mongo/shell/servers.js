@@ -1523,6 +1523,7 @@ MongoRunner.awaitConnection = function (
         function () {
             try {
                 conn = new Mongo("127.0.0.1:" + port);
+                conn.pid = pid;
                 // Verify we connected to the process we actually started, not a stale
                 // process that already occupied the port (e.g. from a previous test that
                 // didn't shut down cleanly). If the new process failed to bind it exits
@@ -1541,7 +1542,6 @@ MongoRunner.awaitConnection = function (
                     serverExitCodeMap[port] = MongoRunner.EXIT_NET_ERROR;
                     throw new MongoRunner.StopError(MongoRunner.EXIT_NET_ERROR);
                 }
-                conn.pid = pid;
                 return true;
             } catch (e) {
                 if (e instanceof MongoRunner.StopError) {
