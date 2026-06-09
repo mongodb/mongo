@@ -36,6 +36,9 @@ filters:
   - "*fcv*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "rollback_set_multikey_metadata.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "*record_ids*":
     approvers:
       - 10gen/server-collection-write-path
