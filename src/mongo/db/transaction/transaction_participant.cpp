@@ -902,6 +902,17 @@ bool TransactionParticipant::Participant::_shouldRestartTransactionOnReuseActive
             "txnNumber"_attr = o().activeTxnNumberAndRetryCounter.getTxnNumber());
         return true;
     } else if (o().txnState.isInSet(TransactionState::kAbortedWithoutPrepare)) {
+        // Only startTransaction (kStart) may restart an aborted transaction in place. A
+        // startOrContinueTransaction (sub-router) must not: it would silently drop the prior
+        // attempt's writes, and could resurrect a participant that coordinateCommitTransaction
+        // recovery already aborted. NoSuchTransaction carries TransientTransactionError, so the
+        // whole transaction retries at a new txnNumber.
+        uassert(ErrorCodes::NoSuchTransaction,
+                str::stream() << "Cannot restart transaction "
+                              << o().activeTxnNumberAndRetryCounter.getTxnNumber() << " on session "
+                              << _sessionId()
+                              << " because it was aborted and only startTransaction may restart it",
+                action == TransactionActions::kStart);
         LOGV2_DEBUG(
             11362501,
             3,
