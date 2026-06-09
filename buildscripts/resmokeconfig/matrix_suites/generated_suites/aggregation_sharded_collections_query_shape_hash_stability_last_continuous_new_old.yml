@@ -90,7 +90,6 @@ selector:
     - query_intensive_pbt
     - multiversion_incompatible
     - requires_2_or_more_shards
-    - requires_fcv_90
   roots:
     - jstests/aggregation/**/*.js
 test_kind: js_test

@@ -130,7 +130,6 @@
     exclude_with_any_tags:
       - multiversion_incompatible
       - requires_2_or_more_shards
-      - requires_fcv_90
 
 - name: multiversion_core_excludes
   value:
