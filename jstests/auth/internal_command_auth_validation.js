@@ -800,6 +800,12 @@ const internalCommandsMap = {
             _shardsvrReshardRecipientCriticalSectionStarted: UUID(),
         },
     },
+    _shardsvrReshardCleanupStaleChunks: {
+        testname: "_shardsvrReshardCleanupStaleChunks",
+        command: {
+            _shardsvrReshardCleanupStaleChunks: UUID(),
+        },
+    },
     _shardsvrRefineCollectionShardKey: {
         testname: "_shardsvrRefineCollectionShardKey",
         command: {_shardsvrRefineCollectionShardKey: "test.x", newShardKey: {}},

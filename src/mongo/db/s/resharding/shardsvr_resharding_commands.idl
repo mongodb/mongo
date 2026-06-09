@@ -224,3 +224,15 @@ commands:
         namespace: type
         reply_type: OkReply
         api_version: ""
+
+    _shardsvrReshardCleanupStaleChunks:
+        description:
+            "Internal command meant to clean up stale chunk information from the authoritative
+            shard catalog"
+        command_name: _shardsvrReshardCleanupStaleChunks
+        cpp_name: ShardsvrReshardCleanupStaleChunks
+        type: uuid
+        strict: false
+        namespace: type
+        reply_type: OkReply
+        api_version: ""

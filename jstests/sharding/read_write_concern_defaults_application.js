@@ -211,6 +211,7 @@ let testCases = {
     _shardsvrReshardRecipientInitialize: {skip: "internal command"},
     _shardsvrReshardRecipientClone: {skip: "internal command"},
     _shardsvrReshardRecipientCriticalSectionStarted: {skip: "internal command"},
+    _shardsvrReshardCleanupStaleChunks: {skip: "internal command"},
     _shardsvrResolveView: {skip: "internal command"},
     _shardsvrRunSearchIndexCommand: {skip: "internal command"},
     _shardsvrSetAllowChunkOperations: {skip: "internal command"},

@@ -121,5 +121,15 @@ void commitCreateCollection(OperationContext* opCtx,
                             bool isDbPrimaryShard);
 
 void commitDropCollection(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid);
+
+void commitRenameOfTemporaryCollection(OperationContext* opCtx,
+                                       const NamespaceString& tempReshardingNss,
+                                       const UUID& tempReshardingUUID,
+                                       const NamespaceString& sourceNss,
+                                       const UUID& sourceUUID,
+                                       bool isUpgrading,
+                                       bool isDbPrimaryShard);
+
+void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid);
 }  // namespace MONGO_MOD_PUBLIC shard_catalog_commit_for_resharding
 }  // namespace mongo

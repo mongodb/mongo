@@ -77,6 +77,13 @@ void tellAllParticipantsToJoinMigrations(
     CancellationToken stepdownToken,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
+void tellAllParticipantsToCleanupStaleChunks(
+    OperationContext* opCtx,
+    const OperationSessionInfo& osi,
+    const ReshardingCoordinatorDocument& doc,
+    CancellationToken stepdownToken,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
 void tellAllParticipantsToCommit(OperationContext* opCtx,
                                  const OperationSessionInfo& osi,
                                  const ReshardingCoordinatorDocument& doc,

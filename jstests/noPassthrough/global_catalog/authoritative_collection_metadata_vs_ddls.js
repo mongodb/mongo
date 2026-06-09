@@ -14,8 +14,11 @@ import {
     getTimeseriesBucketsColl,
     getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 describe("Authoritative collection metadata vs DDLs", function () {
     const kShardCatalogCollNs = "shard.catalog.collections";
@@ -26,6 +29,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
     function uniqueDbName(suffix) {
         return `auth_coll_meta_${suffix}_${testCounter++}`;
+    }
+
+    function getPrimaryShardId(ns) {
+        const dbName = ns.substring(0, ns.indexOf("."));
+        return st.getPrimaryShardIdForDatabase(dbName);
     }
 
     function getGlobalCatalogCollMetadata(ns) {
@@ -55,6 +63,10 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
     function forEachNodeOnAllShards(fn) {
         [st.rs0, st.rs1].forEach((rs) => rs.nodes.forEach(fn));
+    }
+
+    function forSomeNodeOnShards(fn) {
+        return [st.rs0, st.rs1].some((rs) => rs.nodes.some(fn));
     }
 
     function assertShardCatalogOnNode(
@@ -151,12 +163,17 @@ describe("Authoritative collection metadata vs DDLs", function () {
         }
     }
 
-    function assertInMemoryMetadataSharded(node, ns, expectedKey) {
+    function assertInMemoryMetadataSharded(node, ns, expectedKey, isUnsplittable = false) {
         const label = node.host;
         const res = getInMemoryCollectionMetadata(node, ns);
+        assert(res.global !== "UNKNOWN");
         assert(res.metadata, `${label}: expected in-memory metadata to be present`);
-        assert.neq(res.metadata, {}, `${label}: expected in-memory metadata to be present`);
-        assert.eq(tojson(expectedKey), tojson(res.metadata.keyPattern), `${label}: in-memory shard key mismatch`);
+        if (isUnsplittable) {
+            assert.eq(res.metadata, {}, `${label}: expected in-memory metadata to be of an unsplittable collection`);
+        } else {
+            assert.neq(res.metadata, {}, `${label}: expected in-memory metadata to be present`);
+            assert.eq(tojson(expectedKey), tojson(res.metadata.keyPattern), `${label}: in-memory shard key mismatch`);
+        }
     }
 
     function dropCollectionAndAssertCleanup(db, collName) {
@@ -222,9 +239,73 @@ describe("Authoritative collection metadata vs DDLs", function () {
             });
         });
     }
+    // The temporary resharding collection lives in the same database as the source collection and
+    // is named `system.resharding.<source collection UUID>`.
+    function tempReshardingNss(ns, sourceUuid) {
+        const dbName = ns.substring(0, ns.indexOf("."));
+        return `${dbName}.system.resharding.${extractUUIDFromObject(sourceUuid)}`;
+    }
+
+    // Shared assertions for the family of resharding-backed DDLs (reshardCollection, moveCollection,
+    // unshardCollection, rewriteCollection) once the operation has committed successfully:
+    //   * the resharded collection keeps its namespace but is reissued a new UUID,
+    //   * the shard catalog on every chunk-owning shard matches the global catalog for the new UUID,
+    //   * no node retains shard catalog chunks for the pre-resharding (original) UUID,
+    //   * no node holds shard catalog or in-memory knowledge of the temporary resharding collection.
+    function assertReshardingFinalState(ns, {originalUuid, expectedKey, isUnsplittable}) {
+        const tempNs = tempReshardingNss(ns, originalUuid);
+
+        st.awaitReplicationOnShards();
+
+        const globalMeta = getGlobalCatalogCollMetadata(ns);
+        assert.neq(null, globalMeta, `${ns}: missing in global catalog after resharding`);
+        assert.neq(originalUuid.toString(), globalMeta.uuid.toString(), "resharding must reissue the collection UUID");
+        assert.eq(tojson(expectedKey), tojson(globalMeta.key), `${ns}: unexpected shard key after resharding`);
+        const newUuid = globalMeta.uuid;
+
+        forEachNodeOnAllShards((node) => {
+            // No leftover chunks for the pre-resharding UUID.
+            assert.eq(
+                0,
+                getShardCatalogChunks(node, originalUuid).length,
+                `${node.host}: stale chunks for the pre-resharding uuid still present`,
+            );
+            // No knowledge of the temporary resharding collection.
+            assert.eq(
+                null,
+                getShardCatalogCollMetadata(node, tempNs),
+                `${node.host}: unexpected shard catalog entry for the temporary resharding collection`,
+            );
+            assertInMemoryMetadataNotSharded(node, tempNs);
+        });
+
+        // Sanity: the resharded collection owns at least one chunk somewhere.
+        assert.gt(getAllGlobalCatalogChunks(newUuid).length, 0, `${ns}: expected chunks after resharding`);
+
+        const primaryShard = getPrimaryShardId(ns);
+        // Every shard that owns chunks for the new UUID must carry a matching shard catalog entry.
+        [
+            {rs: st.rs0, shardName: st.shard0.shardName},
+            {rs: st.rs1, shardName: st.shard1.shardName},
+            {rs: st.rs2, shardName: st.shard2.shardName},
+        ].forEach(({rs, shardName}) => {
+            const shardGlobalChunks = getGlobalCatalogChunks(newUuid, shardName);
+            if (shardGlobalChunks.length === 0 && shardName !== primaryShard) {
+                return;
+            }
+            rs.nodes.forEach((node) => {
+                assertShardCatalogOnNode(node, ns, {
+                    expectedUuid: newUuid,
+                    expectedKey,
+                    expectedChunks: shardGlobalChunks,
+                });
+            });
+            assertInMemoryMetadataSharded(rs.getPrimary(), ns, expectedKey, isUnsplittable);
+        });
+    }
 
     before(function () {
-        st = new ShardingTest({shards: 2, rs: {nodes: 3}});
+        st = new ShardingTest({shards: 3, rs: {nodes: 3}});
     });
 
     after(function () {
@@ -559,6 +640,8 @@ describe("Authoritative collection metadata vs DDLs", function () {
         });
     });
 
+    const kUnsplittableShardKey = {_id: 1};
+
     describe("dropDatabase", function () {
         it("cleans up shard catalog for all tracked collections in the database", function () {
             const db = setupDb("dropdb");
@@ -643,8 +726,6 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 });
             });
         }
-
-        const kUnsplittableShardKey = {_id: 1};
 
         it("updates shard catalog when data shard is the DB primary", function () {
             const db = setupDb("capped_primary");
@@ -1096,6 +1177,251 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 assertInMemoryMetadataSharded(rs.getPrimary(), dstNs, srcKey);
                 assertInMemoryMetadataNotSharded(rs.getPrimary(), srcNs);
             });
+        });
+    });
+
+    describe("reshardCollection", function () {
+        it("updates the shard catalog with the new shard key and drops the previous state", function () {
+            const db = setupDb("reshard");
+            const ns = `${db.getName()}.coll`;
+
+            // Sharded on {x: 1} with chunks spread across both shards.
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(
+                db.coll.insert([
+                    {x: -1, y: -1},
+                    {x: 1, y: 1},
+                ]),
+            );
+
+            const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
+
+            const newKey = {y: 1};
+            assert.commandWorked(db.adminCommand({reshardCollection: ns, key: newKey, numInitialChunks: 2}));
+
+            assertReshardingFinalState(ns, {originalUuid, expectedKey: newKey, isUnsplittable: false});
+        });
+
+        it("updates the shard catalog with the new shard key and drops the previous state even in non-owning primary shard", function () {
+            const db = setupDb("reshard_primary");
+            const ns = `${db.getName()}.coll`;
+
+            // Sharded on {x: 1} with chunks spread across both shards.
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: -1}, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard2.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(
+                db.coll.insert([
+                    {x: -1, y: -1},
+                    {x: 1, y: 1},
+                ]),
+            );
+
+            const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
+            // Make sure that the primary holds no chunks.
+            const primaryChunks = getGlobalCatalogChunks(originalUuid, st.shard0.shardName).filter(
+                (x) => x.shardId === st.shard0.shardName,
+            );
+            assert.eq(primaryChunks, []);
+
+            const newKey = {y: 1};
+            assert.commandWorked(
+                db.adminCommand({
+                    reshardCollection: ns,
+                    key: newKey,
+                    _presetReshardedChunks: [
+                        {min: {y: MinKey}, max: {y: 0}, recipientShardId: st.shard1.shardName},
+                        {min: {y: 0}, max: {y: MaxKey}, recipientShardId: st.shard2.shardName},
+                    ],
+                }),
+            );
+
+            assertReshardingFinalState(ns, {originalUuid, expectedKey: newKey, isUnsplittable: false});
+        });
+
+        // TODO SERVER-127443: Re-enable this test once stop/resume migrations properly use the authoritative enum in the coordinator rather than the feature flags.
+        it.skip("abort cleans up the temporary resharding collection and leaves the source intact", function () {
+            const db = setupDb("reshard_abort");
+            const ns = `${db.getName()}.coll`;
+
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            // TODO SERVER-128550: Uncomment these lines such that the test exercises a more interesting layout once chunk migration is authoritative.
+            // assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            // assert.commandWorked(
+            //     db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+            // );
+            assert.commandWorked(
+                db.coll.insert([
+                    {x: -1, y: -1},
+                    {x: 1, y: 1},
+                ]),
+            );
+
+            const sourceMeta = getGlobalCatalogCollMetadata(ns);
+            const sourceUuid = sourceMeta.uuid;
+            const sourceKey = sourceMeta.key;
+            const tempNs = tempReshardingNss(ns, sourceUuid);
+
+            // Pause the coordinator just before it blocks writes. By this point the recipients have
+            // created the temporary resharding collection and committed its metadata to the shard
+            // catalog, so we can observe it before aborting. The failpoint releases automatically
+            // once the operation is canceled by the abort.
+            const fp = configureFailPoint(st.configRS.getPrimary(), "reshardingPauseCoordinatorBeforeBlockingWrites");
+
+            const awaitReshard = startParallelShell(
+                funWithArgs(
+                    function (ns, newKey) {
+                        assert.commandFailedWithCode(
+                            db.adminCommand({reshardCollection: ns, key: newKey, numInitialChunks: 2}),
+                            ErrorCodes.ReshardCollectionAborted,
+                        );
+                    },
+                    ns,
+                    {y: 1},
+                ),
+                st.s.port,
+            );
+
+            fp.wait();
+
+            // The temporary resharding collection is tracked in the global catalog and its metadata
+            // is durably committed to the shard catalog on at least one recipient.
+            const tempGlobalMeta = getGlobalCatalogCollMetadata(tempNs);
+            assert.neq(null, tempGlobalMeta, `${tempNs}: temporary resharding collection missing from global catalog`);
+            const tempUuid = tempGlobalMeta.uuid;
+
+            assert.soon(() => {
+                return forSomeNodeOnShards((node) => {
+                    return getShardCatalogCollMetadata(node, tempNs) !== null;
+                });
+            });
+
+            assert.commandWorked(db.adminCommand({abortReshardCollection: ns}));
+            fp.off();
+            awaitReshard();
+
+            st.awaitReplicationOnShards();
+
+            // The temporary resharding collection metadata is fully cleaned up everywhere.
+            assert.eq(
+                null,
+                getGlobalCatalogCollMetadata(tempNs),
+                `${tempNs}: temporary resharding collection still in global catalog after abort`,
+            );
+            forEachNodeOnAllShards((node) => {
+                assertShardCatalogAbsentOnNode(node, tempNs, tempUuid);
+                assertInMemoryMetadataNotSharded(node, tempNs);
+            });
+
+            // The source collection metadata is intact: same UUID, same key, original chunk layout.
+            const finalMeta = getGlobalCatalogCollMetadata(ns);
+            assert.neq(null, finalMeta, `${ns}: source collection missing from global catalog after abort`);
+            assert.eq(sourceUuid.toString(), finalMeta.uuid.toString(), "source UUID changed despite the abort");
+            assert.eq(tojson(sourceKey), tojson(finalMeta.key), "source shard key changed despite the abort");
+
+            [
+                {rs: st.rs0, shardName: st.shard0.shardName},
+                {rs: st.rs1, shardName: st.shard1.shardName},
+            ].forEach(({rs, shardName}) => {
+                const globalCatalogCollPrimaryShard = getPrimaryShardId(ns);
+                const shardGlobalChunks = getGlobalCatalogChunks(sourceUuid, shardName);
+                if (shardGlobalChunks.length === 0 && shardName !== globalCatalogCollPrimaryShard) {
+                    rs.nodes.forEach((node) => {
+                        assertShardCatalogAbsentOnNode(node, ns, sourceUuid);
+                    });
+                    assertInMemoryMetadataNotSharded(rs.getPrimary(), ns);
+                } else {
+                    rs.nodes.forEach((node) => {
+                        assertShardCatalogOnNode(node, ns, {
+                            expectedUuid: sourceUuid,
+                            expectedKey: sourceKey,
+                            expectedChunks: shardGlobalChunks,
+                        });
+                    });
+                    assertInMemoryMetadataSharded(rs.getPrimary(), ns, sourceKey);
+                }
+            });
+        });
+    });
+
+    describe("moveCollection", function () {
+        it("updates the shard catalog on the destination shard and drops the previous state", function () {
+            const db = setupDb("move_collection");
+            const ns = `${db.getName()}.coll`;
+
+            // Track the unsharded collection on shard1 first so there is a previous tracked state.
+            assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+
+            const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
+
+            // Move it back to shard0.
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}));
+
+            assertReshardingFinalState(ns, {originalUuid, expectedKey: kUnsplittableShardKey, isUnsplittable: true});
+
+            // The destination shard (shard0) is the only data shard and must own the single chunk.
+            const newUuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(1, getGlobalCatalogChunks(newUuid, st.shard0.shardName).length);
+            assert.eq(0, getGlobalCatalogChunks(newUuid, st.shard1.shardName).length);
+        });
+    });
+
+    describe("unshardCollection", function () {
+        it("updates the shard catalog with an unsplittable collection and drops the previous state", function () {
+            const db = setupDb("unshard_collection");
+            const ns = `${db.getName()}.coll`;
+
+            // Sharded on {x: 1} with chunks spread across both shards.
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
+
+            assert.commandWorked(db.adminCommand({unshardCollection: ns, toShard: st.shard0.shardName}));
+
+            // The collection is now unsplittable ({_id: 1}) living on shard0 alone.
+            assertReshardingFinalState(ns, {originalUuid, expectedKey: kUnsplittableShardKey, isUnsplittable: true});
+
+            const newUuid = getGlobalCatalogCollMetadata(ns).uuid;
+            assert.eq(1, getAllGlobalCatalogChunks(newUuid).length, `${ns}: expected a single chunk after unshard`);
+            assert.eq(1, getGlobalCatalogChunks(newUuid, st.shard0.shardName).length);
+        });
+    });
+
+    describe("rewriteCollection", function () {
+        it("updates the shard catalog while preserving the shard key and drops the previous state", function () {
+            const db = setupDb("rewrite_collection");
+            const ns = `${db.getName()}.coll`;
+
+            // Sharded on {x: 1} with chunks spread across both shards.
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            const originalUuid = getGlobalCatalogCollMetadata(ns).uuid;
+            const originalKey = getGlobalCatalogCollMetadata(ns).key;
+
+            // rewriteCollection re-runs resharding with the same shard key.
+            assert.commandWorked(db.adminCommand({rewriteCollection: ns, numInitialChunks: 2}));
+
+            assertReshardingFinalState(ns, {originalUuid, expectedKey: originalKey});
         });
     });
 });

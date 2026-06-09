@@ -622,6 +622,50 @@ void commitCreateCollection(OperationContext* opCtx,
 void commitDropCollection(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
     return shard_catalog_commit::commitDropCollectionLocally(opCtx, nss, uuid);
 }
+
+void commitRenameOfTemporaryCollection(OperationContext* opCtx,
+                                       const NamespaceString& tempReshardingNss,
+                                       const UUID& tempReshardingUUID,
+                                       const NamespaceString& sourceNss,
+                                       const UUID& sourceUUID,
+                                       bool isUpgrading,
+                                       bool isDbPrimaryShard) {
+    return shard_catalog_commit::commitRenameOfCollectionMetadata(opCtx,
+                                                                  tempReshardingNss,
+                                                                  tempReshardingUUID,
+                                                                  sourceNss,
+                                                                  sourceUUID,
+                                                                  boost::none,
+                                                                  isUpgrading,
+                                                                  isDbPrimaryShard);
+}
+
+namespace {
+void ensureCollectionDoesNotExist(OperationContext* opCtx, const UUID& uuid) {
+    try {
+        auto catalogClient = Grid::get(opCtx)->catalogClient();
+        const auto _ = catalogClient->getCollection(opCtx, uuid);
+        tasserted(ErrorCodes::IllegalOperation,
+                  "Collection entry must not exist in the global catalog to drop stale chunks");
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // This is actually the expected path.
+    }
+    // TODO SERVER-128550: Uncomment the following code once chunk migrations are authoritative.
+    // Otherwise the migration off of the shard today leaves the collection entry intact.
+    // DBDirectClient client{opCtx};
+    // const auto collCount = client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+    //                                     BSON(CollectionType::kUuidFieldName << uuid));
+    // tassert(ErrorCodes::IllegalOperation,
+    //         "Collection entry must not exist in the shard catalog to drop stale chunks",
+    //         collCount == 0);
+}
+}  // namespace
+
+void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid) {
+    ensureCollectionDoesNotExist(opCtx, uuid);
+    return shard_catalog_commit::commitDropOfStaleChunksForRename(opCtx, uuid);
+}
+
 }  // namespace shard_catalog_commit_for_resharding
 
 }  // namespace mongo

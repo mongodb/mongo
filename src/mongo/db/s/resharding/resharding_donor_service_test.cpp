@@ -121,7 +121,7 @@ public:
     }
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
-    getOnReleaseCriticalSectionCustomAction() {
+    getOnReleaseCriticalSectionCustomAction(bool mustClearMetadata) {
         return std::make_unique<ShardingRecoveryService::NoCustomAction>();
     }
 
@@ -184,8 +184,8 @@ public:
     }
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
-    getOnReleaseCriticalSectionCustomAction() override {
-        return _impl->getOnReleaseCriticalSectionCustomAction();
+    getOnReleaseCriticalSectionCustomAction(bool mustClearMetadata) override {
+        return _impl->getOnReleaseCriticalSectionCustomAction(mustClearMetadata);
     }
 
     void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {

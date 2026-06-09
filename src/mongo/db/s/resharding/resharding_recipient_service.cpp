@@ -550,8 +550,27 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     if (!_isAlsoDonor) {
                         auto opCtx = _makeOperationContext(factory);
 
-                        _externalState->clearFilteringMetadataOnTempReshardingCollection(
-                            opCtx.get(), _metadata.getTempReshardingNss());
+                        bool mustClearFilteringMetadata =
+                            !feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                                resharding::getVersionContextOrDefault(
+                                    _metadata.getForwardableOpMetadata()),
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+                        if (mustClearFilteringMetadata) {
+                            _externalState->clearFilteringMetadataOnTempReshardingCollection(
+                                opCtx.get(), _metadata.getTempReshardingNss());
+                        }
+
+                        auto customAction =
+                            [&]() -> std::unique_ptr<
+                                      ShardingRecoveryService::BeforeReleasingCustomAction> {
+                            if (mustClearFilteringMetadata) {
+                                return std::make_unique<
+                                    ShardingRecoveryService::FilteringMetadataClearer>();
+                            } else {
+                                return std::make_unique<ShardingRecoveryService::NoCustomAction>();
+                            }
+                        }();
 
                         ShardingRecoveryService::get(opCtx.get())
                             ->releaseRecoverableCriticalSection(
@@ -559,7 +578,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                 _metadata.getSourceNss(),
                                 _critSecReason,
                                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                                ShardingRecoveryService::FilteringMetadataClearer());
+                                *customAction);
                     }
                 })
                 .then([this, executor, factory] {
@@ -1540,6 +1559,29 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
         resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
+
+        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                resharding::getVersionContextOrDefault(_metadata.getForwardableOpMetadata()),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // TODO SERVER-127215: Mark this as not upgrading once rename recovers from disk once it
+            // finishes.
+            //
+            // Force the rename to act as if it is upgrading in order to force a recovery at the
+            // end. Ideally this should be false since:
+            // 1. Resharding cannot commit during an FCV upgrade
+            // 2. The shard already contains the metadata for both "from" and "to" collections and
+            //    thus can assume it's living in a fully authoritative world.
+            bool isUpgrading = true;
+
+            shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
+                opCtx.get(),
+                _metadata.getTempReshardingNss(),
+                _metadata.getReshardingUUID(),
+                _metadata.getSourceNss(),
+                _metadata.getSourceUUID(),
+                isUpgrading,
+                _metadata.getPrimaryShardId() == ShardingState::get(opCtx.get())->shardId());
+        }
     }
 }
 

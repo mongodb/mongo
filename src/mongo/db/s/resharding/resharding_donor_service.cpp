@@ -219,8 +219,12 @@ public:
     }
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
-    getOnReleaseCriticalSectionCustomAction() override {
-        return std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+    getOnReleaseCriticalSectionCustomAction(bool mustClearFilteringMetadata) override {
+        if (!mustClearFilteringMetadata) {
+            return std::make_unique<ShardingRecoveryService::NoCustomAction>();
+        } else {
+            return std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+        }
     }
 
     void abortUnpreparedTransactionIfNecessary(OperationContext* opCtx) override {
@@ -479,17 +483,22 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
             {
                 auto opCtx = _makeOperationContext(factory);
 
+                const bool mustClearMetadata = !feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                    resharding::getVersionContextOrDefault(_forwardableOpMetadata),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
                 // Clear filtering metadata for the temp resharding namespace;
                 // We force a refresh to make sure that the placement information is updated
                 // in cache after abort decision before the donor state document is deleted.
-                {
+                if (mustClearMetadata) {
                     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
                         opCtx.get(), _metadata.getTempReshardingNss());
                     scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx.get());
                 }
 
                 const auto onReleaseCriticalSectionAction =
-                    _externalState->getOnReleaseCriticalSectionCustomAction();
+                    _externalState->getOnReleaseCriticalSectionCustomAction(mustClearMetadata);
+
                 ShardingRecoveryService::get(opCtx.get())
                     ->releaseRecoverableCriticalSection(
                         opCtx.get(),
@@ -502,13 +511,15 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                     resharding::getCurrentTime());
 
-                // We force a refresh to make sure that the placement information is updated
-                // in cache after abort decision before the donor state document is deleted.
-                std::initializer_list<NamespaceString> namespacesToRefresh{
-                    _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
-                for (const auto& nss : namespacesToRefresh) {
-                    _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
-                    _externalState->waitForCollectionFlush(opCtx.get(), nss);
+                if (mustClearMetadata) {
+                    // We force a refresh to make sure that the placement information is updated
+                    // in cache after abort decision before the donor state document is deleted.
+                    std::initializer_list<NamespaceString> namespacesToRefresh{
+                        _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
+                    for (const auto& nss : namespacesToRefresh) {
+                        _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
+                        _externalState->waitForCollectionFlush(opCtx.get(), nss);
+                    }
                 }
             }
 
@@ -968,6 +979,29 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
         resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
+
+        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                resharding::getVersionContextOrDefault(_metadata.getForwardableOpMetadata()),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // TODO SERVER-127215: Mark this as not upgrading once rename recovers from disk once it
+            // finishes.
+            //
+            // Force the rename to act as if it is upgrading in order to force a recovery at the
+            // end. Ideally this should be false since:
+            // 1. Resharding cannot commit during an FCV upgrade
+            // 2. The shard already contains the metadata for both "from" and "to" collections and
+            //    thus can assume it's living in a fully authoritative world.
+            bool isUpgrading = true;
+
+            shard_catalog_commit_for_resharding::commitRenameOfTemporaryCollection(
+                opCtx.get(),
+                _metadata.getTempReshardingNss(),
+                _metadata.getReshardingUUID(),
+                _metadata.getSourceNss(),
+                _metadata.getSourceUUID(),
+                isUpgrading,
+                _metadata.getPrimaryShardId() == ShardingState::get(opCtx.get())->shardId());
+        }
     } else {
         auto opCtx = _makeOperationContext(factory);
         // Allow bypassing user write blocking. The check has already been performed on the
@@ -982,6 +1016,10 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             shard_catalog_commit_for_resharding::commitDropCollection(
                 opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
+            // Make sure to also clear out the state of the temporary resharding as it now no longer
+            // exists since it got renamed to the final namespace.
+            shard_catalog_commit_for_resharding::commitDropCollection(
+                opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
         }
     }
 

@@ -2075,6 +2075,20 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                                                   _ctHolder->getStepdownToken(),
                                                   executor,
                                                   allShardIds);
+
+                // Additionally, ensure that no more stale chunks are present on the authoritative
+                // shard catalog. At this point there are no users of the old chunks anymore, so
+                // this can be done outside of a critical section.
+                if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                        resharding::getVersionContextOrDefault(_forwardableOpMetadata),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    resharding::tellAllParticipantsToCleanupStaleChunks(
+                        opCtx.get(),
+                        _getNewSession(opCtx.get()),
+                        coordinatorDoc,
+                        _ctHolder->getStepdownToken(),
+                        executor);
+                }
             }
 
             reshardingPauseCoordinatorBeforeRemovingStateDoc.pauseWhileSetAndNotCanceled(
