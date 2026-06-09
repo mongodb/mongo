@@ -214,7 +214,7 @@ value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
     auto fieldView = viewFromStack(1);
     // Move the incoming accumulator state from the stack. Given that we are now the owner of the
     // state we are free to do any in-place update as we see fit.
-    auto [tagAgg, valAgg] = moveOwnedFromStack(0);
+    auto [tagAgg, valAgg] = moveRawOwnedFromStack(0);
 
     value::ValueGuard guard{tagAgg, valAgg};
     // Create a new object if it does not exist yet.

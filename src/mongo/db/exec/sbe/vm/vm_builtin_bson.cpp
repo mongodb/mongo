@@ -61,10 +61,10 @@ value::TagValueMaybeOwned ByteCode::builtinFillType(ArityType arity) {
 
     if (static_cast<bool>(getBSONTypeMask(input.tag) & typeMask)) {
         // Return the fill value.
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(2));
+        return moveMaybeOwnedFromStack(2);
     } else {
         // Return the input value.
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
 }
 

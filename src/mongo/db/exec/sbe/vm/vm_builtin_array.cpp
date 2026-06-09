@@ -62,7 +62,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArray(ArityType arity) {
     if (arity) {
         arr->reserve(arity);
         for (ArityType idx = 0; idx < arity; ++idx) {
-            arr->push_back_raw(moveOwnedFromStack(idx));
+            arr->push_back(moveOwnedFromStack(idx));
         }
     }
 
@@ -117,7 +117,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinAddToArray(ArityType arity) {
     auto aggView = viewFromStack(0);
-    auto field = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
+    auto field = moveOwnedFromStack(1);
 
     // Create a new array if it does not exist yet.
     value::TagValueMaybeOwned agg;
@@ -132,7 +132,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArray(ArityType arity) {
     auto arr = value::getArrayView(agg.value());
 
     // Push back the value. Note that array will ignore Nothing.
-    arr->push_back_raw(field.releaseToRaw());
+    arr->push_back(std::move(field));
 
     return agg;
 }
@@ -203,8 +203,8 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
 // The value being accumulated is an SBE array that contains an integer and the accumulated array,
 // where the integer is the total size in bytes of the elements in the array.
 value::TagValueMaybeOwned ByteCode::builtinAddToArrayCapped(ArityType arity) {
-    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
-    auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(1));
+    auto accumulatorState = moveOwnedFromStack(0);
+    auto newElem = moveMaybeOwnedFromStack(1);
 
     auto sizeCap = viewFromStack(2);
 
@@ -320,8 +320,8 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinConcatArraysCapped(ArityType arity) {
-    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
-    auto newArrayElements = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
+    auto accumulatorState = moveOwnedFromStack(0);
+    auto newArrayElements = moveOwnedFromStack(1);
 
     auto sizeCap = viewFromStack(2);
 

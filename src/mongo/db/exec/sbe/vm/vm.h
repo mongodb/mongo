@@ -1221,7 +1221,17 @@ private:
      * call moveFromStack() instead.
      */
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    std::pair<value::TypeTags, value::Value> moveOwnedFromStack(size_t offset) {
+    value::TagValueMaybeOwned moveMaybeOwnedFromStack(size_t offset) {
+        return value::TagValueMaybeOwned::fromRaw(moveFromStack(offset));
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
+    value::TagValueOwned moveOwnedFromStack(size_t offset) {
+        return moveMaybeOwnedFromStack(offset).moveToOwned();
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
+    std::pair<value::TypeTags, value::Value> moveRawOwnedFromStack(size_t offset) {
         auto [owned, tag, val] = moveFromStack(offset);
         if (!owned) {
             std::tie(tag, val) = value::copyValue(tag, val);
@@ -1361,7 +1371,7 @@ struct ByteCode::InvokeLambdaFunctor {
         bytecode.pushStack(false, tag, val);
         bytecode.runLambdaInternal(code, lamPos);
         // Move the result off the stack, make sure it's owned, and return it.
-        auto result = bytecode.moveOwnedFromStack(0);
+        auto result = bytecode.moveRawOwnedFromStack(0);
         bytecode.popStack();
         return result;
     }

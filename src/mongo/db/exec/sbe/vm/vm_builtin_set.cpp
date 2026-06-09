@@ -36,7 +36,7 @@ namespace sbe {
 namespace vm {
 value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
-    auto [tagField, valField] = moveOwnedFromStack(1);
+    auto [tagField, valField] = moveRawOwnedFromStack(1);
     value::ValueGuard guardField{tagField, valField};
 
     // Create a new array is it does not exist yet.
@@ -62,8 +62,8 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAddToSetCapped(ArityType arity) {
-    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
-    auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(1));
+    auto accumulatorState = moveOwnedFromStack(0);
+    auto newElem = moveMaybeOwnedFromStack(1);
 
     auto sizeCap = viewFromStack(2);
 
@@ -81,7 +81,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSetCapped(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto collView = viewFromStack(1);
-    auto [tagField, valField] = moveOwnedFromStack(2);
+    auto [tagField, valField] = moveRawOwnedFromStack(2);
     value::ValueGuard guardField{tagField, valField};
 
     // If the collator is Nothing or if it's some unexpected type, don't push back the value
@@ -115,11 +115,11 @@ value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCollAddToSetCapped(ArityType arity) {
-    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto accumulatorState = moveOwnedFromStack(0);
 
     auto collatorView = viewFromStack(1);
 
-    auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(2));
+    auto newElem = moveMaybeOwnedFromStack(2);
 
     auto sizeCap = viewFromStack(3);
 
@@ -136,8 +136,8 @@ value::TagValueMaybeOwned ByteCode::builtinCollAddToSetCapped(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSetUnionCapped(ArityType arity) {
-    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
-    auto newSetMembers = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
+    auto accumulatorState = moveOwnedFromStack(0);
+    auto newSetMembers = moveOwnedFromStack(1);
 
     auto sizeCap = viewFromStack(2);
 
@@ -153,11 +153,11 @@ value::TagValueMaybeOwned ByteCode::builtinSetUnionCapped(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCollSetUnionCapped(ArityType arity) {
-    auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto accumulatorState = moveOwnedFromStack(0);
 
     auto collatorView = viewFromStack(1);
 
-    auto newSetMembers = value::TagValueOwned::fromRaw(moveOwnedFromStack(2));
+    auto newSetMembers = moveOwnedFromStack(2);
 
     auto sizeCap = viewFromStack(3);
 
@@ -519,7 +519,7 @@ value::TagValueMaybeOwned ByteCode::builtinSetIsSubset(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinSetToArray(ArityType arity) {
     tassert(11080010, "Unexpected arity value", arity == 1);
 
-    auto input = value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+    auto input = moveMaybeOwnedFromStack(0);
 
     if (input.tag() != value::TypeTags::ArraySet && input.tag() != value::TypeTags::ArrayMultiSet) {
         // passthrough if its not a set

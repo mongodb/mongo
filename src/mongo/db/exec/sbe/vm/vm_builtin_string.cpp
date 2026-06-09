@@ -96,7 +96,7 @@ value::TagValueMaybeOwned ByteCode::builtinReplaceOne(ArityType arity) {
     // this path; the found path lets popAndReleaseStack clean up slot 0.
     size_t startIndex = input.find(find);
     if (startIndex == std::string::npos) {
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
 
     StringBuilder output;
@@ -238,7 +238,7 @@ value::TagValueMaybeOwned ByteCode::builtinToLower(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCoerceToString(ArityType arity) {
-    auto operand = value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+    auto operand = moveMaybeOwnedFromStack(0);
 
     if (value::isString(operand.tag())) {
         return operand;

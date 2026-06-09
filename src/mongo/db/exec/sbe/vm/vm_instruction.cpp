@@ -1111,7 +1111,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
         popStack();
 
-        auto [accTag, accVal] = moveOwnedFromStack(0);
+        auto [accTag, accVal] = moveRawOwnedFromStack(0);
 
         auto [owned, tag, val] = aggSum(accTag, accVal, fieldTag, fieldVal);
 
@@ -1119,7 +1119,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
     }
     DISPATCH();
     INSTRUCTION(aggCount) {
-        auto [accTag, accVal] = moveOwnedFromStack(0);
+        auto [accTag, accVal] = moveRawOwnedFromStack(0);
 
         auto [owned, tag, val] = aggCount(accTag, accVal);
 

@@ -238,7 +238,7 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockFillEmpty(ArityType arity) 
     tassert(11079921, "Unexpected arity value", arity == 2);
     auto fill = viewFromStack(1);
     if (fill.tag == value::TypeTags::Nothing) {
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
 
     auto block = viewFromStack(0);
@@ -250,7 +250,7 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockFillEmpty(ArityType arity) 
     auto out = valueBlockIn->fillEmpty(fill.tag, fill.value);
     if (!out) {
         // Input block was dense so we can just return it unmodified.
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
 
     return value::TagValueMaybeOwned(
@@ -266,7 +266,7 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockFillEmptyBlock(ArityType ar
     tassert(11079920, "Unexpected arity value", arity == 2);
     auto fill = viewFromStack(1);
     if (fill.tag == value::TypeTags::Nothing) {
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
     auto block = viewFromStack(0);
     tassert(8141618,
@@ -277,7 +277,7 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockFillEmptyBlock(ArityType ar
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(block.value);
 
     if (valueBlockIn->tryDense().get_value_or(false)) {
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
 
     auto extractedFill = fillBlockIn->extract();
@@ -335,7 +335,7 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockFillType(ArityType arity) {
     if (!out) {
         // Input block didn't have any non-Nothing values that matched the type mask so we can
         // return it unmodified.
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
 
     return value::TagValueMaybeOwned(
@@ -468,7 +468,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggMin(ArityType arity) {
 
     // Move the incoming accumulator state from the stack. We now own and have exclusive access
     // to the accumulator state and can make in-place modifications if desired.
-    auto acc = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto acc = moveOwnedFromStack(0);
 
     return valueBlockAggMinMaxImpl<true /* less */>(std::move(acc), input, bitset);
 }
@@ -486,7 +486,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggMax(ArityType arity) {
 
     // Move the incoming accumulator state from the stack. We now own and have exclusive access
     // to the accumulator state and can make in-place modifications if desired.
-    auto acc = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto acc = moveOwnedFromStack(0);
 
     return valueBlockAggMinMaxImpl<false /* less */>(std::move(acc), input, bitset);
 }
@@ -500,7 +500,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggCount(ArityType arity) {
 
     // Move the incoming accumulator state from the stack. We now own and have exclusive access
     // to the accumulator state and can make in-place modifications if desired.
-    auto acc = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto acc = moveOwnedFromStack(0);
 
     auto bitsetView = viewFromStack(1);
     tassert(8625706,
@@ -537,7 +537,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggSum(ArityType arity) {
 
     // Move the incoming accumulator state from the stack. We now own and have exclusive access
     // to the accumulator state and can make in-place modifications if desired.
-    value::TagValueOwned acc = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    value::TagValueOwned acc = moveOwnedFromStack(0);
 
     auto input = viewFromStack(2);
     tassert(8625707,
@@ -609,9 +609,9 @@ value::TagValueOwned ByteCode::builtinValueBlockAggDoubleDoubleSum(ArityType ari
             bitsetView.tag == value::TypeTags::valueBlock);
     value::ValueBlock* inputBitset = value::bitcastTo<value::ValueBlock*>(bitsetView.value);
 
-    // Input-output: running accumulator result. moveOwnedFromStack() takes ownership by our local
-    // copy so we can do in-place updates to it.
-    auto accTagValue = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    // Input-output: running accumulator result. moveOwnedFromStack() takes ownership so our local
+    // copy can do in-place updates to it.
+    auto accTagValue = moveOwnedFromStack(0);
 
     // Initialize the accumulator if this is the first use of it.
     if (accTagValue.tag() == value::TypeTags::Nothing) {
@@ -1277,7 +1277,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggTopBottomNImpl(ArityType arit
     const size_t valuesBlocksStartOffset = keysBlocksStartOffset + numKeysBlocks;
     const size_t numValuesBlocks = ValueIsDecomposedArray ? arity - valuesBlocksStartOffset : 1;
 
-    auto state = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
+    auto state = moveOwnedFromStack(0);
 
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetView.value);
     auto ss = value::getSortSpecView(sortSpec.value);
@@ -2277,9 +2277,9 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockLogicalOperation(ArityType 
         }
 
         if (outputLeft(leftMonoBlock->getTag(), leftMonoBlock->getValue())) {
-            return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+            return moveMaybeOwnedFromStack(0);
         } else {
-            return value::TagValueMaybeOwned::fromRaw(moveFromStack(1));
+            return moveMaybeOwnedFromStack(1);
         }
     }
 
@@ -2327,7 +2327,7 @@ value::TagValueOwned ByteCode::builtinValueBlockNewFill(ArityType arity) {
             countTag == value::TypeTags::NumberInt32);
 
     // Take ownership of the value, we are transferring it to the block.
-    auto [leftTag, leftVal] = moveOwnedFromStack(0);
+    auto [leftTag, leftVal] = moveRawOwnedFromStack(0);
     auto blockOut =
         std::make_unique<value::MonoBlock>(value::bitcastTo<int32_t>(countVal), leftTag, leftVal);
     return value::TagValueOwned(value::TypeTags::valueBlock,
@@ -2410,7 +2410,7 @@ value::TagValueMaybeOwned ByteCode::builtinCellFoldValues_F(ArityType arity) {
 
     if (isEmptyPositionInfo && valueBlock->allTrue().has_value()) {
         // The block is made of all boolean values, return the input unchanged.
-        return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+        return moveMaybeOwnedFromStack(0);
     }
 
     auto valsExtracted = valueBlock->extract();
@@ -2487,7 +2487,7 @@ value::TagValueMaybeOwned ByteCode::builtinCellFoldValues_P(ArityType arity) {
     const auto& positionInfo = cellBlock->filterPositionInfo();
     uassert(7953901, "Only top-level cell values are supported", emptyPositionInfo(positionInfo));
     // Return the input unchanged.
-    return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+    return moveMaybeOwnedFromStack(0);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCellBlockGetFlatValuesBlock(ArityType arity) {
@@ -2658,7 +2658,7 @@ value::TagValueMaybeOwned ByteCode::builtinValueBlockGetSortKey(ArityType arity)
         std::unique_ptr<value::ValueBlock> filledBlock = block->fillEmpty(value::TypeTags::Null, 0);
         if (!filledBlock) {
             // The block was already dense.
-            return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+            return moveMaybeOwnedFromStack(0);
         }
         return value::TagValueMaybeOwned(
             true,

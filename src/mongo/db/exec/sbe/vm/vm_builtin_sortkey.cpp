@@ -62,8 +62,8 @@ value::TagValueMaybeOwned ByteCode::builtinGenerateCheapSortKey(ArityType arity)
     }
 
     // We "move" the object argument into the sort spec.
-    auto sortKeyComponentVector = sortSpec->generateSortKeyComponentVector(
-        value::TagValueMaybeOwned::fromRaw(moveFromStack(1)), collator);
+    auto sortKeyComponentVector =
+        sortSpec->generateSortKeyComponentVector(moveMaybeOwnedFromStack(1), collator);
 
     return {false,
             value::TypeTags::sortKeyComponentVector,
@@ -215,7 +215,7 @@ value::TagValueMaybeOwned ByteCode::builtinGetSortKey(ArityType arity) {
     // is Nothing or another simple type, treat it as the return value.
     if (!value::isArray(inputTag)) {
         if (inputTag != value::TypeTags::Nothing) {
-            return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
+            return moveMaybeOwnedFromStack(0);
         } else {
             return value::TagValueMaybeOwned::null();
         }
