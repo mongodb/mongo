@@ -11,19 +11,22 @@
  *     assumes_balancer_off,
  * ]
  */
+import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
+
 export const $config = (function () {
-    let data = {originalParamValues: {}};
+    let data = {};
+    let originalFrameworkControl;
 
     function getCollectionName(collName) {
         return "find_flip_sbe_enabled_" + collName;
     }
 
     function setup(db, collName, cluster) {
-        cluster.executeOnMongodNodes((db) => {
-            const originalParamValue = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
-            assert.commandWorked(originalParamValue);
-            assert(originalParamValue.hasOwnProperty("internalQueryFrameworkControl"));
-            this.originalParamValues[db.getMongo().host] = originalParamValue.internalQueryFrameworkControl;
+        originalFrameworkControl = setParameterOnAllNodes({
+            cluster: cluster,
+            paramName: "internalQueryFrameworkControl",
+            newValue: "trySbeEngine",
+            onMongos: false,
         });
 
         const coll = db.getCollection(getCollectionName(collName));
@@ -125,14 +128,11 @@ export const $config = (function () {
     };
 
     function teardown(db, collName, cluster) {
-        // Restore the original state of the internalQueryFrameworkControl parameter.
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(
-                db.adminCommand({
-                    setParameter: 1,
-                    internalQueryFrameworkControl: this.originalParamValues[db.getMongo().host],
-                }),
-            );
+        setParameterOnAllNodes({
+            cluster: cluster,
+            paramName: "internalQueryFrameworkControl",
+            newValue: originalFrameworkControl,
+            onMongos: false,
         });
     }
 

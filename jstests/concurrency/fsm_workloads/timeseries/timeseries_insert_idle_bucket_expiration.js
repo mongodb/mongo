@@ -9,6 +9,7 @@
  * ]
  */
 
+import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 export const $config = (function () {
@@ -45,12 +46,15 @@ export const $config = (function () {
         },
     };
 
+    let originalIdleBucketExpiryThreshold;
+
     const setup = function (db, collNameSuffix, cluster) {
         let collName = getCollectionName(collNameSuffix);
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, timeseriesIdleBucketExpiryMemoryUsageThreshold: 1024}),
-            );
+        originalIdleBucketExpiryThreshold = setParameterOnAllNodes({
+            cluster: cluster,
+            paramName: "timeseriesIdleBucketExpiryMemoryUsageThreshold",
+            newValue: 1024,
+            onMongos: false,
         });
 
         assert.commandWorked(
@@ -66,13 +70,11 @@ export const $config = (function () {
         }
         jsTestLog(db.runCommand({collStats: collName}).timeseries);
 
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(
-                db.adminCommand({
-                    setParameter: 1,
-                    timeseriesIdleBucketExpiryMemoryUsageThreshold: 1024 * 1024 * 100,
-                }),
-            );
+        setParameterOnAllNodes({
+            cluster: cluster,
+            paramName: "timeseriesIdleBucketExpiryMemoryUsageThreshold",
+            newValue: originalIdleBucketExpiryThreshold,
+            onMongos: false,
         });
     };
 
