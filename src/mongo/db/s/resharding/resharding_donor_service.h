@@ -364,8 +364,7 @@ private:
      * Creates a new span with the resharding UUID set as an attribute.
      */
     otel::traces::Span _startSpan(std::shared_ptr<otel::TelemetryContext> telemetryCtx,
-                                  const std::string& spanName,
-                                  bool keepSpan = false);
+                                  otel::traces::SpanName spanName);
 
     // The primary-only service instance corresponding to the donor instance. Not owned.
     const ReshardingDonorService* const _donorService;

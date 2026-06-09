@@ -629,8 +629,7 @@ private:
      * Creates a new span with the resharding UUID set as an attribute.
      */
     otel::traces::Span _startSpan(std::shared_ptr<otel::TelemetryContext> telemetryCtx,
-                                  const std::string& spanName,
-                                  bool keepSpan = false);
+                                  otel::traces::SpanName spanName);
 
     // OperationSessionPersistence functions.
     boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override;

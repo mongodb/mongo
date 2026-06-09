@@ -86,6 +86,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/span/span.h"
+#include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_map.h"
@@ -135,6 +136,7 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
+using otel::traces::SpanNames;
 using resharding::ensureFulfilledPromise;
 
 Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceString& sourceNss) {
@@ -327,38 +329,38 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                 .then([this, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        "ReshardingDonorService::_"
-                        "onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData");
+                        SpanNames::
+                            kReshardingDonorOnPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData);
                     _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(
                         factory);
                 })
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        "ReshardingDonorService::_"
-                        "awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries");
+                        SpanNames::
+                            kReshardingDonorAwaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries);
                     return _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
                         executor, factory);
                 })
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span =
                         _startSpan(telemetryCtx,
-                                   "ReshardingDonorService::_createAndStartChangeStreamsMonitor");
+                                   SpanNames::kReshardingDonorCreateAndStartChangeStreamsMonitor);
                     return _createAndStartChangeStreamsMonitor(executor, factory);
                 })
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        "ReshardingDonorService::_"
-                        "awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites");
+                        SpanNames::
+                            kReshardingDonorAwaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites);
                     return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
                         executor, factory);
                 })
                 .then([this, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span =
-                        _startSpan(telemetryCtx,
-                                   "ReshardingDonorService::_"
-                                   "writeTransactionOplogEntryThenTransitionToBlockingWrites");
+                    auto span = _startSpan(
+                        telemetryCtx,
+                        SpanNames::
+                            kReshardingDonorWriteTransactionOplogEntryThenTransitionToBlockingWrites);
                     _writeTransactionOplogEntryThenTransitionToBlockingWrites(factory);
                 });
         })
@@ -592,7 +594,7 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     auto telemetryCtx = _metadata.getTelemetryContext()
         ? otel::traces::TelemetryContextSerializer::fromBSON(*_metadata.getTelemetryContext())
         : otel::traces::Span::createTelemetryContext();
-    auto span = _startSpan(telemetryCtx, "ReshardingDonorService::DonorStateMachine::run");
+    auto span = _startSpan(telemetryCtx, otel::traces::SpanNames::kReshardingDonorStateMachineRun);
 
     _initCancelState(stepdownToken);
     _markKilledExecutor->startup();
@@ -604,12 +606,12 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     return ExecutorFuture(**executor)
         .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
             auto span = _startSpan(telemetryCtx,
-                                   "ReshardingDonorService::_runUntilBlockingWritesOrErrored");
+                                   SpanNames::kReshardingDonorRunUntilBlockingWritesOrErrored);
             return _runUntilBlockingWritesOrErrored(executor, telemetryCtx);
         })
         .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
             auto span = _startSpan(telemetryCtx,
-                                   "ReshardingDonorService::_notifyCoordinatorAndAwaitDecision");
+                                   SpanNames::kReshardingDonorNotifyCoordinatorAndAwaitDecision);
             return _notifyCoordinatorAndAwaitDecision(executor);
         })
         .onCompletion([this, executor](Status status) {
@@ -1556,10 +1558,8 @@ void ReshardingDonorService::DonorStateMachine::_initCancelState(
 }
 
 otel::traces::Span ReshardingDonorService::DonorStateMachine::_startSpan(
-    std::shared_ptr<otel::TelemetryContext> telemetryCtx,
-    const std::string& spanName,
-    bool keepSpan) {
-    auto span = otel::traces::Span::start(telemetryCtx, spanName, keepSpan);
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx, otel::traces::SpanName spanName) {
+    auto span = otel::traces::Span::start(telemetryCtx, spanName);
     TRACING_SPAN_ATTR(span, "reshardingUUID", _metadata.getReshardingUUID().toString());
     return span;
 }

@@ -37,6 +37,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/otel/traces/span/span.h"
+#include "mongo/otel/traces/span/span_names.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/scopeguard.h"
@@ -328,7 +329,7 @@ public:
 
     otel::traces::Span makeSpanForCollector() {
         auto telemetryCtx = otel::traces::Span::createTelemetryContext();
-        return otel::traces::Span::start(telemetryCtx, "deltaCollector");
+        return otel::traces::Span::start(telemetryCtx, otel::traces::SpanNames::kTest1);
     }
 
 private:
