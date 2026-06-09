@@ -10,11 +10,16 @@ import {
 } from "jstests/libs/query/sbe_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
+const frameworkControl = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}));
+// Force classic overrides other knobs.
+const forceClassicEngineSet = frameworkControl.internalQueryFrameworkControl === "forceClassicEngine";
+
 const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
-const isSbeEqLookupUnwind = checkSbeEqLookupUnwindEnabled(db);
-const isSbeTransformStagesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
+const isSbeEqLookupUnwind = checkSbeEqLookupUnwindEnabled(db) && !forceClassicEngineSet;
+const isSbeTransformStagesEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") && !forceClassicEngineSet;
 
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;

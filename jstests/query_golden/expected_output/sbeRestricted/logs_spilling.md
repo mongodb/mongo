@@ -344,7 +344,17 @@
 ```
 ### Slow query spilling stats
 ```json
-{ }
+{
+	"hashLookupSpilledBytes" : "X",
+	"hashLookupSpilledDataStorageSize" : "X",
+	"hashLookupSpilledRecords" : 6,
+	"hashLookupSpills" : 6,
+	"usedDisk" : true
+}
+```
+### Slow query spill storage stats
+```json
+{ "timeWaitingMicros" : "X" }
 ```
 
 ## 14. SetWindowFields

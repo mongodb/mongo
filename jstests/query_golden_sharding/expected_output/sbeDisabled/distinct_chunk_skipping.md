@@ -662,230 +662,256 @@
 ### Summarized explain
 ```json
 {
-	"distinct_chunk_skipping-rs0" : {
-		"rejectedPlans" : [
-			[
-				{
-					"stage" : "PROJECTION_COVERED",
-					"transformBy" : {
-						"_id" : 0,
-						"a" : 1
-					}
-				},
-				{
-					"direction" : "forward",
-					"indexBounds" : {
-						"a" : [
-							"[\"shard0\", {})"
-						],
-						"b" : [
-							"[MinKey, MaxKey]"
-						],
-						"c" : [
-							"[1.0, 1.0]"
-						]
-					},
-					"indexName" : "a_1_b_1_c_1",
-					"isFetching" : false,
-					"isMultiKey" : false,
-					"isPartial" : false,
-					"isShardFiltering" : true,
-					"isSparse" : false,
-					"isUnique" : false,
-					"keyPattern" : {
-						"a" : 1,
-						"b" : 1,
-						"c" : 1
-					},
-					"multiKeyPaths" : {
-						"a" : [ ],
-						"b" : [ ],
-						"c" : [ ]
-					},
-					"stage" : "DISTINCT_SCAN"
-				}
-			],
-			[
-				{
-					"direction" : "forward",
-					"indexBounds" : {
-						"a" : [
-							"[\"shard0\", {})"
-						],
-						"c" : [
-							"[1.0, 1.0]"
-						]
-					},
-					"indexName" : "a_1_c_1",
-					"isFetching" : true,
-					"isMultiKey" : false,
-					"isPartial" : false,
-					"isShardFiltering" : true,
-					"isSparse" : false,
-					"isUnique" : false,
-					"keyPattern" : {
-						"a" : 1,
-						"c" : 1
-					},
-					"multiKeyPaths" : {
-						"a" : [ ],
-						"c" : [ ]
-					},
-					"stage" : "DISTINCT_SCAN"
-				}
-			]
-		],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"filter" : {
-					"a" : {
-						"$gte" : "shard0"
-					}
-				},
-				"nss" : "test.distinct_chunk_skipping",
-				"stage" : "FETCH"
-			},
-			{
-				"direction" : "forward",
-				"indexBounds" : {
-					"c" : [
-						"[1.0, 1.0]"
+	"distinct_chunk_skipping-rs0" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[\"shard0\", {})"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[1.0, 1.0]"
+								]
+							},
+							"indexName" : "a_1_b_1_c_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : true,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"c" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"c" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[\"shard0\", {})"
+								],
+								"c" : [
+									"[1.0, 1.0]"
+								]
+							},
+							"indexName" : "a_1_c_1",
+							"isFetching" : true,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : true,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"c" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"c" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
 					]
-				},
-				"indexName" : "c_1",
-				"isMultiKey" : false,
-				"isPartial" : false,
-				"isSparse" : false,
-				"isUnique" : false,
-				"keyPattern" : {
-					"c" : 1
-				},
-				"multiKeyPaths" : {
-					"c" : [ ]
-				},
-				"nss" : "test.distinct_chunk_skipping",
-				"stage" : "IXSCAN"
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"filter" : {
+							"a" : {
+								"$gte" : "shard0"
+							}
+						},
+						"nss" : "test.distinct_chunk_skipping",
+						"stage" : "FETCH"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"c" : [
+								"[1.0, 1.0]"
+							]
+						},
+						"indexName" : "c_1",
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"c" : 1
+						},
+						"multiKeyPaths" : {
+							"c" : [ ]
+						},
+						"nss" : "test.distinct_chunk_skipping",
+						"stage" : "IXSCAN"
+					}
+				]
 			}
-		]
-	},
-	"distinct_chunk_skipping-rs1" : {
-		"rejectedPlans" : [
-			[
-				{
-					"stage" : "PROJECTION_COVERED",
-					"transformBy" : {
-						"_id" : 0,
-						"a" : 1
-					}
-				},
-				{
-					"direction" : "forward",
-					"indexBounds" : {
-						"a" : [
-							"[\"shard0\", {})"
-						],
-						"b" : [
-							"[MinKey, MaxKey]"
-						],
-						"c" : [
-							"[1.0, 1.0]"
-						]
-					},
-					"indexName" : "a_1_b_1_c_1",
-					"isFetching" : false,
-					"isMultiKey" : false,
-					"isPartial" : false,
-					"isShardFiltering" : true,
-					"isSparse" : false,
-					"isUnique" : false,
-					"keyPattern" : {
-						"a" : 1,
-						"b" : 1,
-						"c" : 1
-					},
-					"multiKeyPaths" : {
-						"a" : [ ],
-						"b" : [ ],
-						"c" : [ ]
-					},
-					"stage" : "DISTINCT_SCAN"
-				}
-			],
-			[
-				{
-					"direction" : "forward",
-					"indexBounds" : {
-						"a" : [
-							"[\"shard0\", {})"
-						],
-						"c" : [
-							"[1.0, 1.0]"
-						]
-					},
-					"indexName" : "a_1_c_1",
-					"isFetching" : true,
-					"isMultiKey" : false,
-					"isPartial" : false,
-					"isShardFiltering" : true,
-					"isSparse" : false,
-					"isUnique" : false,
-					"keyPattern" : {
-						"a" : 1,
-						"c" : 1
-					},
-					"multiKeyPaths" : {
-						"a" : [ ],
-						"c" : [ ]
-					},
-					"stage" : "DISTINCT_SCAN"
-				}
-			]
-		],
-		"winningPlan" : [
-			{
-				"stage" : "GROUP"
-			},
-			{
-				"stage" : "SHARDING_FILTER"
-			},
-			{
-				"filter" : {
-					"a" : {
-						"$gte" : "shard0"
-					}
-				},
-				"nss" : "test.distinct_chunk_skipping",
-				"stage" : "FETCH"
-			},
-			{
-				"direction" : "forward",
-				"indexBounds" : {
-					"c" : [
-						"[1.0, 1.0]"
+		},
+		{
+			"$group" : {
+				"_id" : "$a"
+			}
+		}
+	],
+	"distinct_chunk_skipping-rs1" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[\"shard0\", {})"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[1.0, 1.0]"
+								]
+							},
+							"indexName" : "a_1_b_1_c_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : true,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"c" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"c" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[\"shard0\", {})"
+								],
+								"c" : [
+									"[1.0, 1.0]"
+								]
+							},
+							"indexName" : "a_1_c_1",
+							"isFetching" : true,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : true,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"c" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"c" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
 					]
-				},
-				"indexName" : "c_1",
-				"isMultiKey" : false,
-				"isPartial" : false,
-				"isSparse" : false,
-				"isUnique" : false,
-				"keyPattern" : {
-					"c" : 1
-				},
-				"multiKeyPaths" : {
-					"c" : [ ]
-				},
-				"nss" : "test.distinct_chunk_skipping",
-				"stage" : "IXSCAN"
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_SIMPLE",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1
+						}
+					},
+					{
+						"stage" : "SHARDING_FILTER"
+					},
+					{
+						"filter" : {
+							"a" : {
+								"$gte" : "shard0"
+							}
+						},
+						"nss" : "test.distinct_chunk_skipping",
+						"stage" : "FETCH"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"c" : [
+								"[1.0, 1.0]"
+							]
+						},
+						"indexName" : "c_1",
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"c" : 1
+						},
+						"multiKeyPaths" : {
+							"c" : [ ]
+						},
+						"nss" : "test.distinct_chunk_skipping",
+						"stage" : "IXSCAN"
+					}
+				]
 			}
-		]
-	},
+		},
+		{
+			"$group" : {
+				"_id" : "$a"
+			}
+		}
+	],
 	"mergeType" : "router",
 	"mergerPart" : [
 		{

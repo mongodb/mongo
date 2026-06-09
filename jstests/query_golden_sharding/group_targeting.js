@@ -3,6 +3,8 @@
  * useful to see in which cases a $group can be pushed down to the shards.
  *
  * @tags: [
+ *   # TODO SERVER-128587 remove this tag
+ *   featureFlagGetExecutorDeferredEngineChoice,
  *   featureFlagShardFilteringDistinctScan,
  *   requires_fcv_82
  * ]

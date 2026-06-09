@@ -1917,6 +1917,7 @@
 					}
 				},
 				{
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -1940,6 +1941,7 @@
 					"multiKeyPaths" : {
 						"shardKey" : [ ]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]
@@ -1997,6 +1999,7 @@
 					}
 				},
 				{
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -2020,6 +2023,7 @@
 					"multiKeyPaths" : {
 						"shardKey" : [ ]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]
@@ -2387,6 +2391,7 @@
 					}
 				},
 				{
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -2410,6 +2415,7 @@
 					"multiKeyPaths" : {
 						"shardKey" : [ ]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]
@@ -2467,6 +2473,7 @@
 					}
 				},
 				{
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -2490,6 +2497,7 @@
 					"multiKeyPaths" : {
 						"shardKey" : [ ]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]
@@ -2671,6 +2679,7 @@
 					}
 				},
 				{
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -2694,6 +2703,7 @@
 					"multiKeyPaths" : {
 						"shardKey" : [ ]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]
@@ -2753,6 +2763,7 @@
 					}
 				},
 				{
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "FETCH"
 				},
 				{
@@ -2776,6 +2787,7 @@
 					"multiKeyPaths" : {
 						"shardKey" : [ ]
 					},
+					"nss" : "test.distinct_scan_multi_chunk",
 					"stage" : "IXSCAN"
 				}
 			]

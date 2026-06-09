@@ -5,6 +5,8 @@
  * TODO SERVER-101494: replace resource_intensive label and replace with a smaller burn_in job count.
  *
  * @tags: [
+ *   # TODO SERVER-128587 remove this tag
+ *   featureFlagGetExecutorDeferredEngineChoice,
  *   featureFlagShardFilteringDistinctScan,
  *   requires_fcv_82,
  *   resource_intensive,

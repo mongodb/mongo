@@ -32,7 +32,10 @@
 
 rollout:
   featureFlagExtractFieldPathsSbeStage: {}
+  featureFlagGetExecutorDeferredEngineChoice: {}
   featureFlagSbeAccumulators: {}
+  featureFlagSbeEqLookupUnwind: {}
+  featureFlagSbeNonLeadingMatch: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagUnifiedWriteExecutor: {}
 
