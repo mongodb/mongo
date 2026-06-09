@@ -520,6 +520,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:user_cache_invalidator",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
         "//src/mongo/db/global_catalog/ddl:notify_sharding_event_idl",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager",
         "//src/mongo/db/global_catalog/metadata_consistency_validation:metadata_consistency_types_idl",

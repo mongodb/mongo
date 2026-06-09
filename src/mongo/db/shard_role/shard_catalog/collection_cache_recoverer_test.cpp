@@ -127,6 +127,38 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDisk) {
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), shardVersionExpected);
 }
 
+TEST_F(RecovererFixture, CacheRecovererRecoversAllChunksRegardlessOfDiskInsertionOrder) {
+    OperationContext* opCtx = operationContext();
+    int numChunks = 20;
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, ShardId("0"));
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        DBDirectClient client(opCtx);
+        client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace, collType.toBSON());
+    }
+
+    // Insert the chunks in reverse 'lastmod' order on disk. The recovery aggregation must still
+    // return the full, version-ordered routing table independently of the on-disk insertion order.
+    for (auto it = chunks.rbegin(); it != chunks.rend(); ++it) {
+        DBDirectClient client(opCtx);
+        client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, it->toConfigBSON());
+    }
+
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
+
+    auto roundId = recoverer.start(operationContext(), getExecutor());
+    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+
+    ASSERT_TRUE(collMetadata);
+    ASSERT_TRUE(collMetadata->isSharded());
+    ASSERT_EQ(collMetadata->getChunkManager()->numChunks(), numChunks);
+    ASSERT_EQ(collMetadata->getCollPlacementVersion(), chunks.back().getVersion());
+}
+
 TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskAnUntrackedCollection) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;

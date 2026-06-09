@@ -29,12 +29,18 @@
 
 #include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/sharding_catalog_client_impl.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
-#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -49,45 +55,49 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
         repl::ReadConcernArgs{LogicalTime{timestampToReadAt.getTimestamp()},
                               repl::ReadConcernLevel::kSnapshotReadConcern};
 
-    // TODO SERVER-121199: This disk recovery should be using the same aggregation that we use on
-    // the CSRS to refresh the chunks. Right now it's fully restoring everything from disk. The sort
-    // that happens afterwards should also go away as a result.
+    // TODO (SERVER-128431): Investigate if we can avoid the full refresh by passing the current sv.
+    auto aggRequest =
+        makeCollectionAndChunksAggregation(opCtx,
+                                           NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                                           NamespaceString::kConfigShardCatalogChunksNamespace,
+                                           nss,
+                                           ChunkVersion::UNTRACKED());
 
-    PersistentTaskStore<CollectionType> collStore{
-        NamespaceString::kConfigShardCatalogCollectionsNamespace};
+    std::vector<BSONObj> aggResult;
+    {
+        DBDirectClient client{opCtx};
+        auto cursor = uassertStatusOKWithContext(
+            DBClientCursor::fromAggregationRequest(
+                &client, aggRequest, false /* secondaryOk */, true /* useExhaust */),
+            "Failed to establish a cursor while recovering the collection metadata from the shard "
+            "catalog");
+        while (cursor->more()) {
+            aggResult.emplace_back(cursor->nextSafe().getOwned());
+        }
+    }
+
+    // No collection document means the collection is untracked, as the presence of an entry implies
+    // that the collection is tracked on the sharding catalog.
     boost::optional<CollectionType> coll;
-    collStore.forEach(opCtx,
-                      BSON(CollectionType::kNssFieldName << nss.toStringForResourceId()),
-                      [&](const CollectionType& parsedColl) {
-                          coll = parsedColl;
-                          return false;
-                      });
-
-    // No collection entry means the collection is untracked as having an entry present implies that
-    // the collection is tracked on the sharding catalog.
+    for (const auto& elem : aggResult) {
+        if (!elem.getField("chunks")) {
+            coll.emplace(elem);
+            break;
+        }
+    }
     if (!coll) {
         return CollectionMetadata::UNTRACKED();
     }
 
     std::vector<ChunkType> chunks;
-    PersistentTaskStore<ChunkType> chunkStore{NamespaceString::kConfigShardCatalogChunksNamespace};
-    chunkStore.forEach(
-        opCtx, BSON(ChunkType::collectionUUID() << coll->getUuid()), [&](const ChunkType& chunk) {
-            auto& inserted = chunks.emplace_back(std::move(chunk));
-            const auto& version = inserted.getVersion();
-            auto fixedVersion = ChunkVersion{{coll->getEpoch(), coll->getTimestamp()},
-                                             {version.majorVersion(), version.minorVersion()}};
-            inserted.setVersion(std::move(fixedVersion));
-            return true;
-        });
+    chunks.reserve(aggResult.size());
+    for (const auto& elem : aggResult) {
+        if (const auto chunkElem = elem.getField("chunks")) {
+            chunks.emplace_back(uassertStatusOK(ChunkType::parseFromConfigBSON(
+                chunkElem.Obj(), coll->getEpoch(), coll->getTimestamp())));
+        }
+    }
 
-    // At this point we can just sort it based on the lastmod version since we know the
-    // timestamp/uuid is fixed across all chunks for that collection. This is necessary as
-    // per the requirements of the routing table and could potentially go away if we used a
-    // different data structure in order to support the delta oplog entries.
-    std::sort(chunks.begin(), chunks.end(), [](const ChunkType& left, const ChunkType& right) {
-        return left.getVersion().toLong() < right.getVersion().toLong();
-    });
     auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
         if (auto collation = coll->getDefaultCollation(); !collation.isEmpty()) {
             // The collation should have been validated upon collection creation

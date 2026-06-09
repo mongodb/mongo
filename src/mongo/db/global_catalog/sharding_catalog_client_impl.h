@@ -81,6 +81,21 @@ class TaskExecutor;
 }  // namespace executor
 
 /**
+ * Builds the aggregation that joins a "collections" namespace with its "chunks" namespace in order
+ * to retrieve the routing table of 'nss'.
+ *
+ * When 'sinceVersion' shares the collection's epoch the aggregation only returns the chunks that
+ * changed since that version (incremental refresh). Otherwise it returns all of the collection's
+ * chunks (full refresh); pass ChunkVersion::UNTRACKED() to always force a full refresh.
+ */
+MONGO_MOD_PARENT_PRIVATE AggregateCommandRequest
+makeCollectionAndChunksAggregation(OperationContext* opCtx,
+                                   const NamespaceString& collectionsNss,
+                                   const NamespaceString& chunksNss,
+                                   const NamespaceString& nss,
+                                   const ChunkVersion& sinceVersion);
+
+/**
  * Implements the catalog client for reading from replica set config servers.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT ShardingCatalogClientImpl final : public ShardingCatalogClient {

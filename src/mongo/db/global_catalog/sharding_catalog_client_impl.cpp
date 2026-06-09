@@ -167,18 +167,59 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setStatus(status);
 }
 
+/**
+ * Returns keys for the given purpose and have an expiresAt value greater than newerThanThis on the
+ * given shard.
+ */
+template <typename KeyDocumentType>
+StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
+                                                     std::shared_ptr<Shard> shard,
+                                                     const NamespaceString& nss,
+                                                     StringData purpose,
+                                                     const LogicalTime& newerThanThis,
+                                                     repl::ReadConcernLevel readConcernLevel) {
+    BSONObjBuilder queryBuilder;
+    queryBuilder.append("purpose", purpose);
+    queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
+
+    auto findStatus = shard->exhaustiveFindOnConfig(opCtx,
+                                                    getConfigReadPreference(opCtx),
+                                                    readConcernLevel,
+                                                    nss,
+                                                    queryBuilder.obj(),
+                                                    BSON("expiresAt" << 1),
+                                                    boost::none);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+    const auto& objs = findStatus.getValue().docs;
+
+    std::vector<KeyDocumentType> keyDocs;
+    keyDocs.reserve(objs.size());
+    for (auto&& obj : objs) {
+        try {
+            keyDocs.push_back(KeyDocumentType::parse(obj, IDLParserContext("keyDoc")));
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }
+    return keyDocs;
+}
+
+}  // namespace
+
 AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
+                                                           const NamespaceString& collectionsNss,
+                                                           const NamespaceString& chunksNss,
                                                            const NamespaceString& nss,
                                                            const ChunkVersion& sinceVersion) {
     ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kConfigsvrCollectionsNamespace] = {
-        NamespaceString::kConfigsvrCollectionsNamespace, std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace] = {
-        NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
+    resolvedNamespaces[collectionsNss] = {collectionsNss, std::vector<BSONObj>()};
+    resolvedNamespaces[chunksNss] = {chunksNss, std::vector<BSONObj>()};
 
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
-                      .ns(NamespaceString::kConfigsvrCollectionsNamespace)
+                      .ns(collectionsNss)
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .build();
     using Doc = Document;
@@ -305,7 +346,7 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
 
         const auto lookupPipeline = [&]() {
             return Doc{
-                {"from", NamespaceString::kConfigsvrChunksNamespace.coll()},
+                {"from", chunksNss.coll()},
                 {"as", chunksLookupOutputFieldName},
                 {"let", letExpr},
                 {"pipeline",
@@ -319,7 +360,7 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
         }();
 
         return Doc{
-            {"coll", NamespaceString::kConfigsvrCollectionsNamespace.coll()},
+            {"coll", collectionsNss.coll()},
             {"pipeline",
              Arr{Value{Doc{{"$match",
                             Doc{{CollectionType::kNssFieldName,
@@ -353,50 +394,8 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
 
     auto pipeline = Pipeline::create(std::move(stages), expCtx);
     auto serializedPipeline = pipeline->serializeToBson();
-    return AggregateCommandRequest(NamespaceString::kConfigsvrCollectionsNamespace,
-                                   std::move(serializedPipeline));
+    return AggregateCommandRequest(collectionsNss, std::move(serializedPipeline));
 }
-
-/**
- * Returns keys for the given purpose and have an expiresAt value greater than newerThanThis on the
- * given shard.
- */
-template <typename KeyDocumentType>
-StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
-                                                     std::shared_ptr<Shard> shard,
-                                                     const NamespaceString& nss,
-                                                     StringData purpose,
-                                                     const LogicalTime& newerThanThis,
-                                                     repl::ReadConcernLevel readConcernLevel) {
-    BSONObjBuilder queryBuilder;
-    queryBuilder.append("purpose", purpose);
-    queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
-
-    auto findStatus = shard->exhaustiveFindOnConfig(opCtx,
-                                                    getConfigReadPreference(opCtx),
-                                                    readConcernLevel,
-                                                    nss,
-                                                    queryBuilder.obj(),
-                                                    BSON("expiresAt" << 1),
-                                                    boost::none);
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
-    const auto& objs = findStatus.getValue().docs;
-
-    std::vector<KeyDocumentType> keyDocs;
-    keyDocs.reserve(objs.size());
-    for (auto&& obj : objs) {
-        try {
-            keyDocs.push_back(KeyDocumentType::parse(obj, IDLParserContext("keyDoc")));
-        } catch (...) {
-            return exceptionToStatus();
-        }
-    }
-    return keyDocs;
-}
-
-}  // namespace
 
 ShardingCatalogClientImpl::ShardingCatalogClientImpl(std::shared_ptr<Shard> overrideConfigShard)
     : _overrideConfigShard(std::move(overrideConfigShard)) {}
@@ -881,7 +880,12 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
                                    "https://dochub.mongodb.org/core/mongos-config-only-mode/");
     }
 
-    auto aggRequest = makeCollectionAndChunksAggregation(opCtx, nss, sinceVersion);
+    auto aggRequest =
+        makeCollectionAndChunksAggregation(opCtx,
+                                           NamespaceString::kConfigsvrCollectionsNamespace,
+                                           NamespaceString::kConfigsvrChunksNamespace,
+                                           nss,
+                                           sinceVersion);
 
     std::vector<BSONObj> aggResult = runCatalogAggregation(
         opCtx, aggRequest, readConcern, Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
