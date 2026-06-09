@@ -274,6 +274,41 @@ describe("$function error handling", () => {
     });
 });
 
+describe("$function BSON argument lifetime", () => {
+    it("rejects retained argument access across invocations", () => {
+        coll.drop();
+        assert.commandWorked(coll.insert({_id: 1, x: "first"}));
+        assert.commandWorked(coll.insert({_id: 2, x: "second"}));
+        assert.commandFailedWithCode(
+            db.runCommand({
+                aggregate: coll.getName(),
+                pipeline: [
+                    {$sort: {_id: 1}},
+                    {
+                        $project: {
+                            result: {
+                                $function: {
+                                    body: function (arg) {
+                                        if (typeof globalThis.savedArg === "undefined") {
+                                            globalThis.savedArg = arg;
+                                            return "saved";
+                                        }
+                                        return globalThis.savedArg.x;
+                                    },
+                                    args: ["$$ROOT"],
+                                    lang: "js",
+                                },
+                            },
+                        },
+                    },
+                ],
+                cursor: {},
+            }),
+            ErrorCodes.BadValue,
+        );
+    });
+});
+
 describe("$function BSON type handling", () => {
     it("Date argument supports method calls", () => {
         coll.drop();
