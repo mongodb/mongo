@@ -112,6 +112,26 @@ const kShardLocalNonDeprioritizableCommands = [
             writeConcern: {w: "majority"},
         }),
     },
+    {
+        name: "SSCCL collection cache refresh",
+        description:
+            "Collection routing info refresh via ShardServerCatalogCacheLoader (reads from config server, persists to config.cache.collections/chunks).",
+        db: "admin",
+        command: () => ({
+            _flushRoutingTableCacheUpdates: "testDB.testColl",
+            syncFromConfig: true,
+        }),
+    },
+    {
+        name: "SSCCL database cache refresh",
+        description:
+            "Database routing info refresh via ShardServerCatalogCacheLoader (reads from config server, persists to config.cache.databases).",
+        db: "admin",
+        command: () => ({
+            _flushDatabaseCacheUpdates: "testDB",
+            syncFromConfig: true,
+        }),
+    },
     // Add more commands here as they get NonDeprioritizable protection:
     // {
     //     name: "Example command",
@@ -155,6 +175,12 @@ function runShardLocalTests() {
         "CreateViewlessTimeseriesCollections",
     );
 
+    // TODO SERVER-128263: test collection filtering metadata recovery
+    const authoritativeShardsCRUDEnabled = FeatureFlagUtil.isPresentAndEnabled(
+        st.s.getDB("admin"),
+        "AuthoritativeShardsCRUD",
+    );
+
     /// TODO (SERVER-116499): Remove the following timeseries collections once 9.0 becomes last LTS.
     // Create both untracked and tracked timeseries collections to be used in the timeseries upgrade/downgrade commit test cases.
     const testDB = st.s.getDB("testDB");
@@ -190,6 +216,13 @@ function runShardLocalTests() {
                 );
                 continue;
             }
+            // _flushDatabaseCacheUpdates is deprecated and rejected when AuthoritativeShardsCRUD
+            // is enabled, because shards no longer rely on config.cache.databases in that mode.
+            if (authoritativeShardsCRUDEnabled && testCase.name === "SSCCL database cache refresh") {
+                jsTest.log.info("Skipping 'SSCCL database cache refresh' because AuthoritativeShardsCRUD is enabled");
+                continue;
+            }
+
             testCommandIsNonDeprioritizable(st.shard0, testCase);
         }
     } finally {
