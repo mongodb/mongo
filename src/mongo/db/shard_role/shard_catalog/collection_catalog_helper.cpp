@@ -242,6 +242,10 @@ boost::optional<bool> getConfigDebugDump(const VersionContext& vCtx, const Names
         "shards"_sd,
         "tags"_sd,
         "version"_sd,
+        // Authoritative shard-local catalog collections (config.shard.catalog.*).
+        "shard.catalog.databases"_sd,
+        "shard.catalog.collections"_sd,
+        "shard.catalog.chunks"_sd,
     };
 
     if (!nss.isConfigDB()) {

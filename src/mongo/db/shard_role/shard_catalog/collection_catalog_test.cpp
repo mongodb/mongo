@@ -3954,6 +3954,34 @@ TEST(GetConfigDebugDumpTest, ConfigDatabase) {
     ASSERT_TRUE(*resultListed);
 };
 
+TEST(GetConfigDebugDumpTest, AuthoritativeShardCatalogCollections) {
+    // The authoritative shard-local catalog collections (config.shard.catalog.*) hold authoritative
+    // metadata that must be captured in a debug dump.
+    for (const auto& coll :
+         {"shard.catalog.databases", "shard.catalog.collections", "shard.catalog.chunks"}) {
+        const auto result = catalog::getConfigDebugDump(
+            kNoVersionContext, NamespaceString::createNamespaceString_forTest("config", coll));
+        ASSERT_TRUE(result) << "Unexpected boost::none for config." << coll;
+        ASSERT_TRUE(*result) << "Expected config." << coll << " to be included in the debug dump";
+    }
+
+    // The non-authoritative shard caches are rebuilt and must never be included in a debug dump.
+    for (const auto& coll : {"cache.collections", "cache.databases"}) {
+        const auto result = catalog::getConfigDebugDump(
+            kNoVersionContext, NamespaceString::createNamespaceString_forTest("config", coll));
+        ASSERT_TRUE(result) << "Unexpected boost::none for config." << coll;
+        ASSERT_FALSE(*result) << "Expected config." << coll
+                              << " to be excluded from the debug dump";
+    }
+
+    // config.placementHistory is derived/reconstructable and is deliberately excluded.
+    const auto placementHistory = catalog::getConfigDebugDump(
+        kNoVersionContext,
+        NamespaceString::createNamespaceString_forTest("config", "placementHistory"));
+    ASSERT_TRUE(placementHistory);
+    ASSERT_FALSE(*placementHistory);
+};
+
 // TODO (SERVER-95599): remove once 9.0 becomes last LTS.
 TEST(GetConfigDebugDumpTest, FeatureFlagDisabled) {
     // With the feature flag disabled, it should always return boost::none.
