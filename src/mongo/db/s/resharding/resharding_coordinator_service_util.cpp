@@ -680,10 +680,22 @@ void writeDecisionPersistedState(OperationContext* opCtx,
             // UUID.
             updateQueryAnalyzerMetadata(opCtx, coordinatorDoc, txnNumber);
 
-            // Delete all of the config.tags entries for the user collection namespace.
-            const auto removeTagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
-                coordinatorDoc.getSourceNss(), SerializationContext::stateDefault())));
+            // Delete all of the config.tags entries for the source collection namespace.
+            const auto& sourceNss = coordinatorDoc.getSourceNss();
+            const auto removeTagsQuery = BSON(TagsType::ns(
+                NamespaceStringUtil::serialize(sourceNss, SerializationContext::stateDefault())));
             removeTagsDocs(opCtx, removeTagsQuery, txnNumber);
+
+            // reshardCollection operates on the bucket namespace for viewful timeseries
+            // collections, while updateZoneKeyRange and sh.addTagRange() store zones under the
+            // user-facing namespace. Clean up any tags under the user-facing namespace to prevent
+            // orphaned zone docs.
+            if (sourceNss.isTimeseriesBucketsCollection()) {
+                const auto viewNss = sourceNss.getTimeseriesViewNamespace();
+                const auto removeViewNsTagsQuery = BSON(TagsType::ns(
+                    NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault())));
+                removeTagsDocs(opCtx, removeViewNsTagsQuery, txnNumber);
+            }
 
             // Update all of the config.tags entries for the temporary resharding namespace
             // to refer to the user collection namespace.

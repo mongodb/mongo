@@ -87,8 +87,7 @@ assert.docEq({"meta.y": MinKey}, tags[0].min);
 assert.docEq({"meta.y": 0}, tags[0].max);
 assert.eq(existingZoneName, tags[0].tag);
 
-// TODO (SERVER-127450): Re-enable once orphaned config.tags cleanup for mixed-version
-// timeseries resharding is fixed.
-// assert.eq(0, configDB.tags.find({ns: {$ne: configNs}}).itcount(), "stale orphaned tags found");
+// Assert no stale tags were left under a different namespace.
+assert.eq(0, configDB.tags.find({ns: {$ne: configNs}}).itcount(), "stale orphaned tags found");
 
 st.stop();
