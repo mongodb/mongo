@@ -716,7 +716,7 @@ void ReshardingCoordinatorExternalStateImpl::stopMigrations(
                                       nss,
                                       expectedCollectionUUID,
                                       osiGenerator,
-                                      convert(authoritativeMetadataLevel),
+                                      AuthoritativeMetadataAccessLevelEnum::kNone,
                                       ShardId{dbPrimaryShard});
 }
 
@@ -735,7 +735,7 @@ void ReshardingCoordinatorExternalStateImpl::resumeMigrations(
                                         nss,
                                         expectedCollectionUUID,
                                         osiGenerator,
-                                        convert(authoritativeMetadataLevel),
+                                        AuthoritativeMetadataAccessLevelEnum::kNone,
                                         ShardId{dbPrimaryShard});
 }
 
