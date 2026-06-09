@@ -31,6 +31,8 @@
 
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/change_streams/control_events.h"
 #include "mongo/s/change_streams/shard_targeter_helper.h"
@@ -129,7 +131,10 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
         return ShardTargeterDecision::kSwitchToV1;
     }
 
-    const auto& shards = placement.getShards();
+    const auto& shardRefs = placement.getShards();
+    // TODO(SERVER-127411): once change-stream routing is UUID-aware via ShardHandle, remove this
+    // conversion and route directly by ShardRef.
+    const std::vector<ShardId> shards(shardRefs.begin(), shardRefs.end());
 
     LOGV2_DEBUG(10922912,
                 3,

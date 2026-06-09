@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
 #include "mongo/s/change_streams/control_events.h"
 #include "mongo/stdx/unordered_set.h"
@@ -167,7 +168,7 @@ TEST_F(
     Timestamp clusterTime(77, 0);
     DatabaseCreatedControlEvent event;
     event.clusterTime = clusterTime;
-    std::vector<ShardId> shards = {ShardId("shardA"), ShardId("shardB")};
+    std::vector<ShardRef> shards = {ShardRef("shardA"), ShardRef("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -187,8 +188,8 @@ TEST_F(
     AllDatabasesEventHandlerStrictModeFixture,
     Given_MoveChunkControlEventWithPlacementNotAvailable_When_HandleEventIsCalled_Then_ReturnSwitchToV1) {
     Timestamp clusterTime(20, 1);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
 
     for (bool allCollectionChunksMigratedFromDonor : {true, false}) {
         MoveChunkControlEvent event{
@@ -242,14 +243,14 @@ TEST_F(
     AllDatabasesEventHandlerStrictModeFixture,
     Given_MoveChunkControlEventWithShardsAndPlacementOnBothShards_When_HandleEventIsCalled_Then_CursorsAreUpdated) {
     Timestamp clusterTime(101, 3);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MoveChunkControlEvent event{
         clusterTime, shardA, shardB, false /* allCollectionChunksMigratedFromDonor */};
 
     readerCtx().currentlyTargetedShards = {shardA};
 
-    std::vector<ShardId> shards = {shardA, shardB};
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -269,14 +270,14 @@ TEST_F(
     AllDatabasesEventHandlerStrictModeFixture,
     Given_MoveChunkControlEventWithShardsAndPlacementOnTheNewShard_When_HandleEventIsCalled_Then_CursorsAreUpdated) {
     Timestamp clusterTime(101, 3);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MoveChunkControlEvent event{
         clusterTime, shardA, shardB, true /* allCollectionChunksMigratedFromDonor */};
 
     readerCtx().currentlyTargetedShards = {shardA};
 
-    std::vector<ShardId> shards = {shardB};
+    std::vector<ShardRef> shards = {shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -298,8 +299,8 @@ TEST_F(
     AllDatabasesEventHandlerStrictModeFixture,
     Given_MoveChunkControlEventAndPlacementDidNotChange_When_HandleEventIsCalled_Then_CursorsRemainSame) {
     Timestamp clusterTime(101, 3);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MoveChunkControlEvent event{
         clusterTime, shardA, shardB, true /* allCollectionChunksMigratedFromDonor */};
 
@@ -307,7 +308,7 @@ TEST_F(
 
     // Simulate that both shards are still part of the placement, as the database can have multiple
     // collections.
-    std::vector<ShardId> shards = {shardA, shardB};
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -351,13 +352,13 @@ DEATH_TEST_REGEX_F(
 TEST_F(AllDatabasesEventHandlerStrictModeFixture,
        Given_MovePrimaryControlEventWithShards_When_HandleEventIsCalled_Then_CursorsAreUpdated) {
     Timestamp clusterTime(60, 10);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MovePrimaryControlEvent event{clusterTime, shardA, shardB};
 
     readerCtx().currentlyTargetedShards = {shardA};
 
-    std::vector<ShardId> shards = {shardB};
+    std::vector<ShardRef> shards = {shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -428,14 +429,14 @@ TEST_F(
     AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
     Given_MoveChunkControlEventToShardNotYetOpened_When_HandleEventIsCalled_Then_OpensCursorOnToShard) {
     Timestamp clusterTime(101, 3);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MoveChunkControlEvent event{
         clusterTime, shardA, shardB, false /* allCollectionChunksMigratedFromDonor */};
 
     readerCtx().currentlyTargetedShards = {shardA};
 
-    std::vector<ShardId> shards = {shardB};
+    std::vector<ShardRef> shards = {shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -457,14 +458,14 @@ TEST_F(
     AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
     Given_MoveChunkControlEventAllChunksMigrated_When_HandleEventIsCalled_Then_ClosesCursorOnFromShard) {
     Timestamp clusterTime(102, 3);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MoveChunkControlEvent event{
         clusterTime, shardA, shardB, true /* allCollectionChunksMigratedFromDonor */};
 
     readerCtx().currentlyTargetedShards = {shardA, shardB};
 
-    std::vector<ShardId> shards = {shardB};
+    std::vector<ShardRef> shards = {shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -513,13 +514,13 @@ DEATH_TEST_REGEX_F(
 TEST_F(AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
        Given_MovePrimaryControlEventWithShards_When_HandleEventIsCalled_Then_CursorsAreUpdated) {
     Timestamp clusterTime(60, 10);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MovePrimaryControlEvent event{clusterTime, shardA, shardB};
 
     readerCtx().currentlyTargetedShards = {shardA};
 
-    std::vector<ShardId> shards = {shardB};
+    std::vector<ShardRef> shards = {shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -545,13 +546,13 @@ TEST_F(
     Timestamp clusterTime(60, 10);
     NamespacePlacementChangedControlEvent event{clusterTime, makeTestNss()};
 
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
-    ShardId shardC("shardC");
-    ShardId shardD("shardD");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
+    ShardRef shardC("shardC");
+    ShardRef shardD("shardD");
     readerCtx().currentlyTargetedShards = {shardA, shardD};
 
-    std::vector<ShardId> shards = {shardA, shardB, shardC};
+    std::vector<ShardRef> shards = {shardA, shardB, shardC};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
         {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
@@ -591,14 +592,14 @@ TEST_F(AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
        HandleEventInDegradedMode_WhenDatabaseCreated_AndAllCursorsAlreadyOpen) {
     readerCtx().setDegradedMode(true);
 
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     readerCtx().currentlyTargetedShards = {shardA, shardB};
 
     Timestamp clusterTime(77, 0);
     DatabaseCreatedControlEvent event;
     event.clusterTime = clusterTime;
-    std::vector<ShardId> shards = {shardA, shardB};
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -619,11 +620,11 @@ TEST_F(
     readerCtx().setDegradedMode(true);
 
     Timestamp clusterTime(20, 1);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
-    ShardId shardC("shardC");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
+    ShardRef shardC("shardC");
 
-    std::vector<ShardId> shards = {shardA, shardB};
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -645,13 +646,13 @@ TEST_F(
     When_HandleEventInDegradedModeIsCalledForDatabaseCreatedWithNewShard_Then_DoesNotUpdateCursors) {
     readerCtx().setDegradedMode(true);
 
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     Timestamp clusterTime(77, 0);
     MoveChunkControlEvent event{
         clusterTime, shardA, shardB, false /* allCollectionChunksMigratedFromDonor */};
 
-    std::vector<ShardId> shards = {shardA, shardB};
+    std::vector<ShardRef> shards = {shardA, shardB};
 
     readerCtx().setDegradedMode(true);
     readerCtx().currentlyTargetedShards = {shardA};
@@ -674,7 +675,7 @@ TEST_F(
     Timestamp clusterTime(77, 0);
     DatabaseCreatedControlEvent event;
     event.clusterTime = clusterTime;
-    std::vector<ShardId> shards = {ShardId("shardA"), ShardId("shardB")};
+    std::vector<ShardRef> shards = {ShardRef("shardA"), ShardRef("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -693,11 +694,11 @@ TEST_F(AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
     Timestamp clusterTime(77, 0);
     MovePrimaryControlEvent event({clusterTime});
 
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
 
     readerCtx().currentlyTargetedShards = {shardA};
-    std::vector<ShardId> shards = {shardA, shardB};
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -714,9 +715,9 @@ TEST_F(AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
        When_HandleEventInDegradedModeIsCalledForMovePrimary_Then_DoesNotModifyCursors) {
     readerCtx().setDegradedMode(true);
     Timestamp clusterTime(101, 3);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
-    std::vector<ShardId> shards = {shardA, shardB};
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
     readerCtx().currentlyTargetedShards = {shardA, shardB};
 
@@ -734,12 +735,12 @@ TEST_F(AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
 TEST_F(AllDatabasesEventHandlerIgnoreRemovedShardsModeFixture,
        When_HandleEventInDegradedModeIsCalledForMoveChunk_Then_DoesNotModifyCursors) {
     Timestamp clusterTime(101, 3);
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
     MoveChunkControlEvent event{
         clusterTime, shardA, shardB, false /* allCollectionChunksMigratedFromDonor */};
 
-    std::vector<ShardId> shards = {shardA, shardB};
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     readerCtx().setDegradedMode(true);
@@ -760,9 +761,9 @@ TEST_F(
     When_HandleEventInDegradedModeIsCalledForNamespacePlacementChangedWithNonEmptyNamespace_Then_DoesNotModifyCursors) {
     Timestamp clusterTime(60, 10);
     NamespacePlacementChangedControlEvent event{clusterTime, makeTestNss()};
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
-    std::vector<ShardId> shards = {shardA, shardB};
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -787,9 +788,9 @@ TEST_F(
 
     NamespacePlacementChangedControlEvent event{clusterTime,
                                                 NamespaceString::createNamespaceString_forTest("")};
-    ShardId shardA("shardA");
-    ShardId shardB("shardB");
-    std::vector<ShardId> shards = {shardA, shardB};
+    ShardRef shardA("shardA");
+    ShardRef shardB("shardB");
+    std::vector<ShardRef> shards = {shardA, shardB};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{

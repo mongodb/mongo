@@ -70,4 +70,12 @@ void ShardRef::serialize(StringData fieldName, BSONObjBuilder* builder) const {
           _ref);
 }
 
+void ShardRef::serialize(BSONArrayBuilder* builder) const {
+    visit(OverloadedVisitor{
+              [&](const ShardId& ref) { builder->append(ref.toString()); },
+              [&](const UUID& ref) { ref.appendToArrayBuilder(builder); },
+          },
+          _ref);
+}
+
 }  // namespace mongo

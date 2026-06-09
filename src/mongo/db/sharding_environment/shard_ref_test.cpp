@@ -167,5 +167,52 @@ TEST(ShardRef, EqualityWithShardId) {
     ASSERT_TRUE(id != uuidRef);
 }
 
+TEST(ShardRef, OrderingStringVsString) {
+    ShardRef a{std::string{"aaa"}};
+    ShardRef b{std::string{"bbb"}};
+
+    ASSERT_TRUE(a < b);
+    ASSERT_FALSE(b < a);
+    ASSERT_FALSE(a < a);
+
+    ASSERT_TRUE(b > a);
+    ASSERT_FALSE(a > b);
+
+    ASSERT_TRUE(a <= b);
+    ASSERT_TRUE(a <= a);
+    ASSERT_FALSE(b <= a);
+
+    ASSERT_TRUE(b >= a);
+    ASSERT_TRUE(a >= a);
+    ASSERT_FALSE(a >= b);
+}
+
+TEST(ShardRef, OrderingUUIDvsUUID) {
+    // Generate two distinct UUIDs and verify strict ordering is consistent.
+    UUID uuid1 = UUID::gen();
+    UUID uuid2 = UUID::gen();
+    ShardRef a{uuid1};
+    ShardRef b{uuid2};
+
+    // Exactly one of a<b or b<a must hold (strict weak ordering), and neither a<a nor b<b.
+    ASSERT_TRUE((a < b) != (b < a));
+    ASSERT_FALSE(a < a);
+    ASSERT_FALSE(b < b);
+}
+
+TEST(ShardRef, UsableInSort) {
+    // Verify that ShardRef is sortable (required by IDL comparison operators on
+    // NamespacePlacementType which has generate_comparison_operators: true).
+    std::vector<ShardRef> refs{
+        ShardRef{std::string{"zzz"}},
+        ShardRef{std::string{"aaa"}},
+        ShardRef{std::string{"mmm"}},
+    };
+    std::sort(refs.begin(), refs.end());
+    ASSERT_EQUALS(refs[0].getString(), std::string{"aaa"});
+    ASSERT_EQUALS(refs[1].getString(), std::string{"mmm"});
+    ASSERT_EQUALS(refs[2].getString(), std::string{"zzz"});
+}
+
 }  // namespace
 }  // namespace mongo

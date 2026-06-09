@@ -63,6 +63,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -318,7 +319,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             uassertStatusOK(updateDatabaseEntryResponse.toStatus());
 
             NamespacePlacementType placementInfo(
-                NamespaceString(dbName), validAfter, std::vector<mongo::ShardId>{toShardId});
+                NamespaceString(dbName), validAfter, std::vector<mongo::ShardRef>{toShardId});
 
             write_ops::InsertCommandRequest insertPlacementHistoryOp(
                 NamespaceString::kConfigsvrPlacementHistoryNamespace);
@@ -401,7 +402,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
                     NamespacePlacementType placementInfo(
                         NamespaceString(db.getDbName()),
                         db.getVersion().getTimestamp(),
-                        std::vector<mongo::ShardId>{db.getPrimary()});
+                        std::vector<mongo::ShardRef>{db.getPrimary()});
                     write_ops::InsertCommandRequest insertPlacementHistoryOp(
                         NamespaceString::kConfigsvrPlacementHistoryNamespace);
                     insertPlacementHistoryOp.setDocuments({placementInfo.toBSON()});

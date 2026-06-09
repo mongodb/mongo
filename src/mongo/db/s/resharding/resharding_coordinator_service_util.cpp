@@ -270,7 +270,7 @@ void writeToConfigPlacementHistoryForOriginalNss(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const Timestamp& newCollectionTimestamp,
-    const std::vector<ShardId>& reshardedCollectionPlacement,
+    const std::vector<ShardRef>& reshardedCollectionPlacement,
     TxnNumber txnNumber) {
     tassert(12567200,
             "New placement data on the collection being resharded can only be persisted at "
@@ -646,7 +646,7 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 const std::vector<ShardId>& reshardedCollectionPlacement) {
+                                 const std::vector<ShardRef>& reshardedCollectionPlacement) {
 
     // No need to bump originalNss version because its epoch will be changed.
     executeMetadataChangesInTxn(

@@ -63,6 +63,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/remove_shard_exception.h"
@@ -738,7 +739,7 @@ public:
      * into config.placementHistory, given the passed in initialization time and default placement.
      */
     static write_ops::InsertCommandRequest buildInsertReqForPlacementHistoryOperationalBoundaries(
-        const Timestamp& initializationTime, const std::vector<ShardId>& defaultPlacement);
+        const Timestamp& initializationTime, const std::vector<ShardRef>& defaultPlacement);
 
     /**
      * Schedules an asynchronous unset of the addOrRemoveShardInProgress cluster parameter, in case

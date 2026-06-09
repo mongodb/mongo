@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/change_stream_reader_context_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/s/change_streams/change_stream_db_absent_state_event_handler.h"
 #include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
@@ -173,7 +174,7 @@ TEST_F(
     CollectionChangeStreamShardTargeterImplStrictModeFixture,
     Given_ActiveShardsInPlacement_When_Initialize_Then_OpensDataShardCursorsAndEventHandlerSetToDbPresent) {
     Timestamp clusterTime(13, 5);
-    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
+    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -259,7 +260,7 @@ DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsMod
 DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_OpenCursorAtBeforeAtClusterTime_When_StartChangeStreamSegment_Then_Throws,
                    "Tripwire assertion.*10922901") {
-    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
+    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
 
     Timestamp clusterTime(20, 1);
     HistoricalPlacement placement;
@@ -276,7 +277,7 @@ DEATH_TEST_REGEX_F(
     CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
     Given_NextPlacementChangedAtBeforeOpenCursorAt_When_StartChangeStreamSegment_Then_Throws,
     "Tripwire assertion.*10922902") {
-    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
+    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
 
     Timestamp clusterTime(20, 1);
     HistoricalPlacement placement;
@@ -340,7 +341,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
 
 TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
        Given_PlacementWithShards_When_StartChangeStreamSegment_Then_OpensCursorOnDataShards) {
-    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
+    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     Timestamp clusterTime(20, 1);
@@ -364,7 +365,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
 TEST_F(
     CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_PlacementWithShardsAndUnboundedSegmentInFuture_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
-    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardC")};
+    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardC")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     Timestamp clusterTime(20, 1);
@@ -390,7 +391,7 @@ TEST_F(
 TEST_F(
     CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_PlacementWithShardsAndBoundedSegment_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
-    std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardC")};
+    std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardC")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
     Timestamp clusterTime(20, 1);
@@ -440,7 +441,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     // Simulate receiving a 'DatabaseCreated' event. This should close the cursor on the config
     // server and open the cursors on the data shards.
     {
-        std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
+        std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB")};
         stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
         Timestamp clusterTime = Timestamp(21, 10);
         HistoricalPlacement placement;
@@ -469,7 +470,7 @@ TEST_F(
     Given_MultipleChangeStreamSegments_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
     // First invocation of 'startChangeStreamSegment()' opens cursors on three shards.
     {
-        std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB"), ShardId("shardC")};
+        std::vector<ShardRef> shards{ShardRef("shardA"), ShardRef("shardB"), ShardRef("shardC")};
         stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
 
         Timestamp clusterTime(20, 1);
@@ -499,7 +500,7 @@ TEST_F(
 
     // Second invocation of 'startChangeStreamSegment()' opens cursors on different shards.
     {
-        std::vector<ShardId> shards = {ShardId("shardC"), ShardId("shardD"), ShardId("shardE")};
+        std::vector<ShardRef> shards = {ShardRef("shardC"), ShardRef("shardD"), ShardRef("shardE")};
         stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
         std::vector<ShardId> shardsToOpen{ShardId("shardD"), ShardId("shardE")};
         stdx::unordered_set<ShardId> shardsToOpenSet(shardsToOpen.begin(), shardsToOpen.end());

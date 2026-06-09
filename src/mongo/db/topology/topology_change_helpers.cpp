@@ -1763,19 +1763,16 @@ void addShardInTransaction(OperationContext* opCtx,
 
         if (!databasesInNewShard.empty()) {
             std::vector<BSONObj> databaseEntries;
-            std::transform(
-                databasesInNewShard.begin(),
-                databasesInNewShard.end(),
-                std::back_inserter(databaseEntries),
-                [&](const DatabaseName& dbName) {
-                    const auto& shardUuid = newShard.getUuid();
-                    ShardRef shardRef = shardUuid ? ShardRef{*shardUuid}
-                                                  : ShardRef{std::string{newShard.getName()}};
-                    return DatabaseType(dbName,
-                                        std::move(shardRef),
-                                        DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
-                        .toBSON();
-                });
+            std::transform(databasesInNewShard.begin(),
+                           databasesInNewShard.end(),
+                           std::back_inserter(databaseEntries),
+                           [&](const DatabaseName& dbName) {
+                               return DatabaseType(
+                                          dbName,
+                                          newShard.getHandle().toShardRef(),
+                                          DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
+                                   .toBSON();
+                           });
             write_ops::InsertCommandRequest insertDatabaseEntries(
                 NamespaceString::kConfigDatabasesNamespace, std::move(databaseEntries));
             auto dbMetadataInsertionResponse = txnClient.runCRUDOpSync(insertDatabaseEntries, {});
@@ -1789,7 +1786,7 @@ void addShardInTransaction(OperationContext* opCtx,
                            [&](const DatabaseName& dbName) {
                                return NamespacePlacementType(NamespaceString(dbName),
                                                              newShard.getTopologyTime(),
-                                                             {ShardId(newShard.getName())})
+                                                             {newShard.getHandle().toShardRef()})
                                    .toBSON();
                            });
             write_ops::InsertCommandRequest insertPlacementEntries(
@@ -1801,7 +1798,7 @@ void addShardInTransaction(OperationContext* opCtx,
         if (insertPlacementHistoryInitMetadata) {
             auto insertRequest =
                 ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-                    newShard.getTopologyTime(), {newShard.getName()});
+                    newShard.getTopologyTime(), {newShard.getHandle().toShardRef()});
             auto insertResponse = txnClient.runCRUDOpSync(insertRequest, {});
             uassertStatusOK(insertResponse.toStatus());
         }

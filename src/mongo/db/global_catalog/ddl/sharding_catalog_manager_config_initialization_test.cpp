@@ -71,6 +71,7 @@
 #include "mongo/db/sharding_environment/config_server_op_observer.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -413,26 +414,32 @@ TEST_F(ConfigInitializationTest, InitializePlacementHistory) {
 
     NamespaceString coll1Name =
         NamespaceString::createNamespaceString_forTest("dbWithCollections_1_2", "coll1");
-    std::vector<ShardId> expectedColl1Placement{ShardId("shard1"), ShardId("shard4")};
-    const auto [coll1, coll1Chunks] =
-        createCollectionAndChunksMetadata(operationContext(), coll1Name, 2, expectedColl1Placement);
+    std::vector<ShardId> expectedColl1PlacementIds{ShardId("shard1"), ShardId("shard4")};
+    std::vector<ShardRef> expectedColl1Placement(expectedColl1PlacementIds.begin(),
+                                                 expectedColl1PlacementIds.end());
+    const auto [coll1, coll1Chunks] = createCollectionAndChunksMetadata(
+        operationContext(), coll1Name, 2, expectedColl1PlacementIds);
 
     NamespaceString coll2Name =
         NamespaceString::createNamespaceString_forTest("dbWithCollections_1_2", "coll2");
-    std::vector<ShardId> expectedColl2Placement{
+    std::vector<ShardId> expectedColl2PlacementIds{
         ShardId("shard1"), ShardId("shard2"), ShardId("shard3"), ShardId("shard4")};
-    const auto [coll2, coll2Chunks] =
-        createCollectionAndChunksMetadata(operationContext(), coll2Name, 8, expectedColl2Placement);
+    std::vector<ShardRef> expectedColl2Placement(expectedColl2PlacementIds.begin(),
+                                                 expectedColl2PlacementIds.end());
+    const auto [coll2, coll2Chunks] = createCollectionAndChunksMetadata(
+        operationContext(), coll2Name, 8, expectedColl2PlacementIds);
 
     NamespaceString corruptedCollName = NamespaceString::createNamespaceString_forTest(
         "dbWithCorruptedCollection", "corruptedColl");
-    std::vector<ShardId> expectedCorruptedCollPlacement{
+    std::vector<ShardId> expectedCorruptedCollPlacementIds{
         ShardId("shard1"), ShardId("shard2"), ShardId("shard3")};
+    std::vector<ShardRef> expectedCorruptedCollPlacement(expectedCorruptedCollPlacementIds.begin(),
+                                                         expectedCorruptedCollPlacementIds.end());
     const auto [corruptedColl, corruptedCollChunks] =
         createCollectionAndChunksMetadata(operationContext(),
                                           corruptedCollName,
                                           8,
-                                          expectedCorruptedCollPlacement,
+                                          expectedCorruptedCollPlacementIds,
                                           false /* setOnCurrentShardSince*/);
 
     // Ensure that the vector clock is able to return an up-to-date config time to both the
@@ -518,7 +525,7 @@ TEST_F(ConfigInitializationTest, InitializePlacementHistory) {
     const NamespacePlacementType expectedMarkerForDawnOfTime(
         ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
         Timestamp(0, 1),
-        allShardIds);
+        std::vector<ShardRef>(allShardIds.begin(), allShardIds.end()));
     const auto generatedMarkerForDawnOfTime = findOneOnConfigCollection<NamespacePlacementType>(
         operationContext(),
         NamespaceString::kConfigsvrPlacementHistoryNamespace,

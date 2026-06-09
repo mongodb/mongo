@@ -116,8 +116,25 @@ public:
         return !(*this == other);
     }
 
+    bool operator<(const ShardRef& other) const {
+        return _ref < other._ref;
+    }
+
+    bool operator>(const ShardRef& other) const {
+        return other < *this;
+    }
+
+    bool operator<=(const ShardRef& other) const {
+        return !(*this > other);
+    }
+
+    bool operator>=(const ShardRef& other) const {
+        return !(*this < other);
+    }
+
     static ShardRef parse(const BSONElement& element);
     void serialize(StringData fieldName, BSONObjBuilder* builder) const;
+    void serialize(BSONArrayBuilder* builder) const;
 
     friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, const ShardRef& ref) {
         ref.serialize(fieldName, &bob);

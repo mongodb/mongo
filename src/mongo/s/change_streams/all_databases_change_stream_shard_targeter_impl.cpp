@@ -29,6 +29,8 @@
 
 #include "mongo/s/change_streams/all_databases_change_stream_shard_targeter_impl.h"
 
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/change_streams/all_databases_change_stream_state_event_handler.h"
 #include "mongo/s/change_streams/shard_targeter_helper.h"
@@ -59,7 +61,10 @@ ShardTargeterDecision AllDatabasesChangeStreamShardTargeterImpl::initialize(
             "HistoricalPlacementStatus can not be in the future",
             placement.getStatus() != HistoricalPlacementStatus::FutureClusterTime);
 
-    const auto& shards = placement.getShards();
+    const auto& shardRefs = placement.getShards();
+    // TODO(SERVER-127411): once change-stream routing is UUID-aware via ShardHandle, remove this
+    // conversion and route directly by ShardRef.
+    const std::vector<ShardId> shards(shardRefs.begin(), shardRefs.end());
 
     LOGV2_DEBUG(11138104,
                 3,
@@ -123,7 +128,10 @@ AllDatabasesChangeStreamShardTargeterImpl::startChangeStreamSegment(
     // Determine 'nextPlacementChangedAt' value.
     const boost::optional<Timestamp> nextPlacementChangedAt = placement.getNextPlacementChangedAt();
 
-    const auto& shards = placement.getShards();
+    const auto& shardRefs = placement.getShards();
+    // TODO(SERVER-127411): once change-stream routing is UUID-aware via ShardHandle, remove this
+    // conversion and route directly by ShardRef.
+    const std::vector<ShardId> shards(shardRefs.begin(), shardRefs.end());
 
     LOGV2_DEBUG(11138108,
                 3,

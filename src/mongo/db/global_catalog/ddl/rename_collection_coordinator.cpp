@@ -74,6 +74,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -297,7 +298,7 @@ void persistPlacementChangeForCollectionBeingRenamed(
     const Timestamp& timeAtNewPlacementForTargetCollection,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const OperationSessionInfo& osi) {
-    auto shardIds =
+    auto shardRefs =
         sharding_ddl_util::getListOfShardsOwningChunksForCollection(opCtx, originalUUID);
 
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
@@ -307,7 +308,7 @@ void persistPlacementChangeForCollectionBeingRenamed(
             nss,
             uuidUponRename,
             timeAtNewPlacementForTargetCollection,
-            std::move(shardIds),
+            std::move(shardRefs),
             stmtId);
 
         return SemiFuture<void>::makeReady();
