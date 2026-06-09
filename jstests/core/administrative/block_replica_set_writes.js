@@ -5,9 +5,8 @@
 //   requires_replication,
 //   uses_parallel_shell,
 //   does_not_support_stepdowns,
-//   assumes_against_mongod_not_mongos,
-//   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
+//   assumes_against_mongod_not_mongos,
 //   featureFlagBlockReplicaSetWrites,
 //   does_not_support_config_fuzzer
 // ]
@@ -180,12 +179,22 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         const testColl = testDB.getCollection("testColl");
         assert.commandWorked(testColl.insert({_id: 1}));
 
-        // Profiling is not supported in some configurations (e.g. Disaggregated Storage), so we skip the test in that case.
-        const enableProfileRes = testDB.runCommand({profile: 2});
-        if (!enableProfileRes.ok && enableProfileRes.code === ErrorCodes.CommandNotSupported) {
-            jsTest.log.info(
-                "Skipping system.profile testing since profiling is not supported: " + tojsononeline(enableProfileRes),
-            );
+        // Profiling is not supported in some configurations (e.g. Disaggregated Storage) or in
+        // suites that apply the secondary read-preference override (which rejects profile commands
+        // because system.profile is not replicated).
+        let enableProfileRes;
+        try {
+            enableProfileRes = testDB.runCommand({profile: 2});
+        } catch (e) {
+            jsTest.log.info("Skipping system.profile testing since profiling is not supported", {e});
+            return;
+        }
+        if (!enableProfileRes.ok) {
+            const knownUnsupportedCodes = [ErrorCodes.CommandNotSupported, ErrorCodes.InvalidOptions];
+            assert(knownUnsupportedCodes.includes(enableProfileRes.code), "Unexpected error enabling profiling", {
+                enableProfileRes,
+            });
+            jsTest.log.info("Skipping system.profile testing since profiling is not supported", {enableProfileRes});
             return;
         }
 

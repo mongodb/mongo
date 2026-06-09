@@ -34,6 +34,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -124,8 +125,13 @@ public:
                         request().getReason());
             }
 
-            // TODO(SERVER-128256): Wait for the write of the critical section to be majority
-            // committed.
+            // Wait for the write of the critical section to be majority committed.
+            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+            WriteConcernResult writeConcernResult;
+            uassertStatusOK(waitForWriteConcern(opCtx,
+                                                replClient.getLastOp(),
+                                                defaultMajorityWriteConcernDoNotUse(),
+                                                &writeConcernResult));
         }
 
     private:
