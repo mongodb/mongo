@@ -34,18 +34,23 @@ AssertLocation = namedtuple("AssertLocation", ["sourceFile", "byteOffset", "line
 
 list_files = False
 
+# Using multiple patterns is faster than one pattern with | in it with both re and regex libraries
+# since they use backtracking regex engines. Re-evaluate if we ever switch to an NFA-based regex
+# engine.
 _CODE_PATTERNS = [
-    re.compile(p + r"\s*(?P<code>\d+)", re.MULTILINE)
+    re.compile(p + r"\s*(?P<code>\d+)", re.MULTILINE | re.VERBOSE)
     for p in [
         # All the asserts and their optional variant suffixes
-        r"(?:f|i|m|t|u)(?:assert)"
-        r"(?:ed)?"
-        r"(?:Failed)?"
-        r"(?:WithStatus)?"
-        r"(?:NoTrace)?"
-        r"(?:StatusOK)?"
-        r"(?:WithContext)?"
-        r"\s*\(",
+        r"""
+            (?:f|i|m|t|u)(?:assert)
+            (?:ed)?
+            (?:Failed)?
+            (?:WithStatus)?
+            (?:NoTrace)?
+            (?:StatusOK)?
+            (?:WithContext)?
+            \s*\(
+        """,
         r"MONGO_UN(?:REACHABLE|IMPLEMENTED)_TASSERT\(",
         # DBException and AssertionException constructors
         r"(?:DB|Assertion)Exception\s*[({]",
