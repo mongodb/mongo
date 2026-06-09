@@ -331,6 +331,8 @@ public:
             kValidatorError,
             // bypassDocumentValidation requested but validationLevel is 'constraint'.
             kBypassProhibitedWithConstraintLevel,
+            // bypassDocumentValidation requested but prepareConstraintValidationLevel is set.
+            kBypassProhibitedWithPrepareConstraintLevel,
             // bypassDocumentValidation requested on a timeseries collection.
             kBypassProhibitedForTimeseries,
             // The validator uses expressions incompatible with the current API version.
@@ -401,10 +403,12 @@ public:
      * A boost::none parameter means that it should not be changed or that the default will be
      * used.
      */
-    virtual Status setValidationOptions(OperationContext* opCtx,
-                                        boost::optional<ValidationLevelEnum> newLevel,
-                                        boost::optional<ValidationActionEnum> newAction,
-                                        boost::optional<Validator> newValidator) = 0;
+    virtual Status setValidationOptions(
+        OperationContext* opCtx,
+        boost::optional<ValidationLevelEnum> newLevel,
+        boost::optional<ValidationActionEnum> newAction,
+        boost::optional<Validator> newValidator,
+        boost::optional<bool> newPrepareConstraintValidationLevel = boost::none) = 0;
 
     virtual boost::optional<ValidationLevelEnum> getValidationLevel() const = 0;
     virtual boost::optional<ValidationActionEnum> getValidationAction() const = 0;

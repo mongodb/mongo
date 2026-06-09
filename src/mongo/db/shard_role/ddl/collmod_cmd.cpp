@@ -163,7 +163,8 @@ public:
                 }
             }
 
-            if (cmd.getValidator() || cmd.getValidationLevel() || cmd.getValidationAction()) {
+            if (cmd.getValidator() || cmd.getValidationLevel() || cmd.getValidationAction() ||
+                cmd.getPrepareConstraintValidationLevel()) {
                 // Check for config.settings in the user command since a validator is allowed
                 // internally on this collection but the user may not modify the validator.
                 uassert(ErrorCodes::InvalidOptions,
@@ -180,13 +181,15 @@ public:
                                 .isEnabledUseLastLTSFCVWhenUninitialized(
                                     VersionContext::getDecoration(opCtx), fcvSnapshot));
                 }
-                if (cmd.getValidationLevel() == ValidationLevelEnum::constraint) {
+                if (cmd.getValidationLevel() == ValidationLevelEnum::constraint ||
+                    cmd.getPrepareConstraintValidationLevel()) {
                     uassert(ErrorCodes::InvalidOptions,
                             "Validation level 'constraint' is not supported with current FCV",
                             gFeatureFlagConstraintValidationLevel
                                 .isEnabledUseLastLTSFCVWhenUninitialized(
                                     VersionContext::getDecoration(opCtx), fcvSnapshot));
-
+                }
+                if (cmd.getValidationLevel() == ValidationLevelEnum::constraint) {
                     // TODO SERVER-125951: skip scan if collection is already at
                     // 'constraint' level, since existing docs must already conform.
                     auto& oss = OperationShardingState::get(opCtx);

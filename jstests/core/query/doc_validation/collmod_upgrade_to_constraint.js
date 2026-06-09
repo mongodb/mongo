@@ -34,6 +34,8 @@ describe("collMod upgrade to constraint validationLevel", function () {
         // Insert a non-compliant document. Succeeds because validationAction is "warn".
         assert.commandWorked(db[collName].insert({b: 1}));
 
+        assert.commandWorked(db.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
+
         // 'constraint' requires action='error', so transition both fields together.
         const res = assert.commandFailedWithCode(
             db.runCommand({
@@ -64,6 +66,7 @@ describe("collMod upgrade to constraint validationLevel", function () {
         );
         assert.commandWorked(db[collName].insert({a: 1}));
 
+        assert.commandWorked(db.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
         assert.commandWorked(
             db.runCommand({
                 collMod: collName,
@@ -80,7 +83,19 @@ describe("collMod upgrade to constraint validationLevel", function () {
     });
 
     it("allows upgrade on an empty collection with a validator", () => {
-        assert.commandWorked(db.runCommand({collMod: collName, validator: validator, validationLevel: "strict"}));
+        assert.commandWorked(
+            db.runCommand({
+                collMod: collName,
+                validator: validator,
+                validationLevel: "strict",
+            }),
+        );
+        assert.commandWorked(
+            db.runCommand({
+                collMod: collName,
+                prepareConstraintValidationLevel: true,
+            }),
+        );
         assert.commandWorked(db.runCommand({collMod: collName, validationLevel: "constraint"}));
     });
 
@@ -95,6 +110,7 @@ describe("collMod upgrade to constraint validationLevel", function () {
         );
         // Insert a document with both 'a' and 'b' so it satisfies the updated validator later.
         assert.commandWorked(db[collName].insert({a: 1, b: 1}));
+        assert.commandWorked(db.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
         assert.commandWorked(
             db.runCommand({
                 collMod: collName,
@@ -115,6 +131,7 @@ describe("collMod upgrade to constraint validationLevel", function () {
         );
 
         // Re-upgrade to constraint -- the existing document satisfies the new validator.
+        assert.commandWorked(db.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
         assert.commandWorked(db.runCommand({collMod: collName, validationLevel: "constraint"}));
 
         // A document with only 'a' (missing 'b') is now rejected.

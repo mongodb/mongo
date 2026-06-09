@@ -36,7 +36,8 @@ MONGO_MOD_PRIVATE Status
 checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                                 boost::optional<ValidationLevelEnum> newLevel,
                                 boost::optional<ValidationActionEnum> newAction,
-                                boost::optional<Collection::Validator> newValidator);
+                                boost::optional<Collection::Validator> newValidator,
+                                boost::optional<bool> newPrepareConstraintValidationLevel);
 
 MONGO_MOD_PRIVATE std::pair<bool, MatchExpressionParser::AllowedFeatureSet> mustReparseValidator(
     boost::optional<ValidationLevelEnum> newLevel, boost::optional<ValidationActionEnum> newAction);

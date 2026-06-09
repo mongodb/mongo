@@ -156,10 +156,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status setValidationOptions(OperationContext* opCtx,
-                                boost::optional<ValidationLevelEnum> newLevel,
-                                boost::optional<ValidationActionEnum> newAction,
-                                boost::optional<Validator> newValidator) override {
+    Status setValidationOptions(
+        OperationContext* opCtx,
+        boost::optional<ValidationLevelEnum> newLevel,
+        boost::optional<ValidationActionEnum> newAction,
+        boost::optional<Validator> newValidator,
+        boost::optional<bool> newPrepareConstraintValidationLevel = boost::none) override {
         MONGO_UNREACHABLE;
     }
 
