@@ -124,7 +124,7 @@ public:
         const BSONObj& sort = BSONObj()) override;
 
     StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
-                                                               const ShardId& shardName) override;
+                                                               const ShardRef& shardRef) override;
 
     StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
                                                  const BSONObj& filter,

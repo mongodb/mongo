@@ -953,19 +953,20 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     future.default_timed_get();
 }
 
-TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
+TEST_F(ShardingCatalogClientTest, GetDatabasesByShardUuidValid) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
+    const auto uuid = UUID::gen();
+
     DatabaseType dbt1(DatabaseName::createDatabaseName_forTest(boost::none, "db1"),
-                      ShardId("shard0000"),
+                      ShardRef{uuid},
                       DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
     DatabaseType dbt2(DatabaseName::createDatabaseName_forTest(boost::none, "db2"),
-                      ShardId("shard0000"),
+                      ShardRef{uuid},
                       DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
-    auto future = launchAsync([this] {
-        return assertGet(
-            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000")));
+    auto future = launchAsync([this, uuid] {
+        return assertGet(catalogClient()->getDatabasesForShard(operationContext(), ShardRef{uuid}));
     });
 
     onFindCommand([this, dbt1, dbt2](const RemoteCommandRequest& request) {
@@ -990,12 +991,74 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
     ASSERT_EQ(dbt2.getDbName(), actualDbNames[1]);
 }
 
-TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
+TEST_F(ShardingCatalogClientTest, GetDatabasesByShardUuidInvalidDbName) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    const auto uuid = UUID::gen();
+
+    auto future = launchAsync([this, uuid] {
+        const auto swDatabaseNames =
+            catalogClient()->getDatabasesForShard(operationContext(), ShardRef{uuid});
+
+        ASSERT_EQ(ErrorCodes::TypeMismatch, swDatabaseNames.getStatus());
+    });
+
+    onFindCommand([uuid](const RemoteCommandRequest& request) {
+        DatabaseType dbt1(DatabaseName::createDatabaseName_forTest(boost::none, "db1"),
+                          ShardRef{uuid},
+                          DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+        return vector<BSONObj>{
+            dbt1.toBSON(),
+            BSON(DatabaseType::kDbNameFieldName << 0)  // Database name should be a string
+        };
+    });
+
+    future.default_timed_get();
+}
+
+TEST_F(ShardingCatalogClientTest, GetDatabasesByShardIdValid) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    DatabaseType dbt1(DatabaseName::createDatabaseName_forTest(boost::none, "db1"),
+                      ShardId("shard0000"),
+                      DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType dbt2(DatabaseName::createDatabaseName_forTest(boost::none, "db2"),
+                      ShardId("shard0000"),
+                      DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+
+    auto future = launchAsync([this] {
+        return assertGet(catalogClient()->getDatabasesForShard(operationContext(),
+                                                               ShardRef{ShardId("shard0000")}));
+    });
+
+    onFindCommand([this, dbt1, dbt2](const RemoteCommandRequest& request) {
+        auto opMsg = static_cast<OpMsgRequest>(request);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
+
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigDatabasesNamespace);
+        ASSERT_BSONOBJ_EQ(query->getFilter(),
+                          BSON(DatabaseType::kPrimaryFieldName << dbt1.getPrimary()));
+        ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
+
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
+
+        return vector<BSONObj>{dbt1.toBSON(), dbt2.toBSON()};
+    });
+
+    const auto& actualDbNames = future.default_timed_get();
+    ASSERT_EQ(2U, actualDbNames.size());
+    ASSERT_EQ(dbt1.getDbName(), actualDbNames[0]);
+    ASSERT_EQ(dbt2.getDbName(), actualDbNames[1]);
+}
+
+TEST_F(ShardingCatalogClientTest, GetDatabasesByShardIdInvalidDbName) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        const auto swDatabaseNames =
-            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000"));
+        const auto swDatabaseNames = catalogClient()->getDatabasesForShard(
+            operationContext(), ShardRef{ShardId("shard0000")});
 
         ASSERT_EQ(ErrorCodes::TypeMismatch, swDatabaseNames.getStatus());
     });

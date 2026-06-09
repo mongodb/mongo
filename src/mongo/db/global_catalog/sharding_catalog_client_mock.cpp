@@ -122,7 +122,7 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getUnsplittableCollectio
 }
 
 StatusWith<std::vector<DatabaseName>> ShardingCatalogClientMock::getDatabasesForShard(
-    OperationContext* opCtx, const ShardId& shardName) {
+    OperationContext* opCtx, const ShardRef& shardRef) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

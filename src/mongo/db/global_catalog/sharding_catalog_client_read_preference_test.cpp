@@ -116,7 +116,8 @@ protected:
                          DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
         auto future = launchAsync([&] {
-            return assertGet(catalogClient()->getDatabasesForShard(operationContext(), kShardId1));
+            return assertGet(
+                catalogClient()->getDatabasesForShard(operationContext(), ShardRef{kShardId1}));
         });
 
         onFindCommand([this, dbt, expectedReadPreference](const RemoteCommandRequest& request) {
