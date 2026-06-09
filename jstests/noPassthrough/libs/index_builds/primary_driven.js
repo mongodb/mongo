@@ -246,7 +246,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     static setUp({testName, nodes = 2} = {}) {
         const name = testName || jsTestName();
         const {metricsDir, otelParams} = otelFileExportParams(name);
-        const rst = new ReplSetTest({nodes, nodeOptions: {setParameter: {...otelParams}}});
+        // Slow down OTel flushes so the per-node JSONL stays under the shell cat() 16 MiB cap on
+        // long-running variants (e.g. TSAN); _readResumeMetrics only needs the latest snapshot.
+        const rst = new ReplSetTest({
+            nodes,
+            nodeOptions: {setParameter: {...otelParams, openTelemetryExportIntervalMillis: 5000}},
+        });
         rst.startSet();
         rst.initiate();
         rst._pdibMetricsDir = metricsDir;
