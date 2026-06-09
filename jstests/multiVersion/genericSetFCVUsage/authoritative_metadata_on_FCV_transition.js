@@ -9,6 +9,7 @@
  *   featureFlagAuthoritativeShardsDDL,
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -252,6 +253,71 @@ describeOrSkip("FCV lifecycle for authoritative metadata", function () {
 
         assertShardCatalogMatchesGlobal(shard1, trackedNs, {isDbPrimary: false});
         assertShardCatalogMatchesGlobal(shard0, trackedNs, {isDbPrimary: true});
+    });
+
+    // Pauses the donor's cloning DDL mid-upgrade, moves the database to the destination while paused,
+    // then resumes it. In this case the movePrimary, rather than the cloning DDL, becomes responsible
+    // for making the collection metadata authoritative.
+    function runMovePrimaryRaceDuringUpgrade(donorShard, destShard) {
+        const dbName = "movePrimaryRaceDb";
+        const db = mongos.getDB(dbName);
+        assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
+
+        // A collection whose only chunk stays on the donor.
+        const onDonorNs = `${dbName}.onDonor`;
+        assert.commandWorked(db.adminCommand({shardCollection: onDonorNs, key: {x: 1}}));
+
+        // A collection whose only chunk is moved onto the destination.
+        const movedNs = `${dbName}.movedToNewPrimary`;
+        assert.commandWorked(db.adminCommand({shardCollection: movedNs, key: {x: 1}}));
+        assert.commandWorked(
+            db.adminCommand({moveChunk: movedNs, find: {x: 0}, to: destShard.shardName, _waitForDelete: true}),
+        );
+
+        // A collection with a chunk on both shards.
+        const onBothNs = `${dbName}.onBoth`;
+        assert.commandWorked(db.adminCommand({shardCollection: onBothNs, key: {x: 1}}));
+        assert.commandWorked(db.adminCommand({split: onBothNs, middle: {x: 0}}));
+        assert.commandWorked(
+            db.adminCommand({moveChunk: onBothNs, find: {x: 0}, to: destShard.shardName, _waitForDelete: true}),
+        );
+
+        // An unsplittable collection on the donor.
+        const trackedNs = `${dbName}.tracked`;
+        assert.commandWorked(db.runCommand({createUnsplittableCollection: "tracked", dataShard: donorShard.shardName}));
+
+        const fp = configureFailPoint(donorShard, "hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL", {
+            dbName: dbName,
+        });
+        const awaitUpgrade = startParallelShell(() => {
+            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        }, mongos.port);
+
+        fp.wait();
+        assert.commandWorked(db.adminCommand({movePrimary: dbName, to: destShard.shardName}));
+        fp.off();
+        awaitUpgrade();
+
+        st.awaitReplicationOnShards();
+
+        for (const ns of [onDonorNs, movedNs, onBothNs, trackedNs]) {
+            assertShardCatalogMatchesGlobal(destShard, ns, {isDbPrimary: true});
+            assertShardCatalogMatchesGlobal(donorShard, ns, {isDbPrimary: false});
+        }
+    }
+
+    // Test both shard0 -> shard1 and shard1 -> shard0 interleavings to ensure that we test the case
+    // where movePrimary has to clone the collection metadata and no later cloning fixes it up.
+    // I.e. the test may spuriously pass if the only interleaving we tested were:
+    // * cloneAuthoritativeMetadata(db, shard0)
+    // * movePrimary(db, from: shard0, to: shard1)
+    // * cloneAuthoritativeMetadata(db, shard1)
+    it("makes collection metadata authoritative when movePrimary races the cloning DDL (shard0 -> shard1)", function () {
+        runMovePrimaryRaceDuringUpgrade(shard0, shard1);
+    });
+
+    it("makes collection metadata authoritative when movePrimary races the cloning DDL (shard1 -> shard0)", function () {
+        runMovePrimaryRaceDuringUpgrade(shard1, shard0);
     });
 });
 

@@ -395,6 +395,20 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendFetchCollMetadataToShards(
     const CancellationToken& token);
 
 /**
+ * Makes a single tracked collection's authoritative metadata durable on the shards owning its
+ * chunks and on `primaryShardId`. Throws `RequestAlreadyFulfilled` if the collection is untracked.
+ * TODO (SERVER-98118): Remove this once v9.0 becomes last-lts.
+ */
+MONGO_MOD_PARENT_PRIVATE void cloneAuthoritativeCollectionMetadataToShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& primaryShardId,
+    const std::function<OperationSessionInfo()>& osiGenerator,
+    AuthoritativeMetadataAccessLevelEnum authoritativeAccessLevel,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
+/**
  *  Commits a refineCollectionShardKey operations to the shard catalog by sending the command
  * `_shardsvrCommitRefineCollectionShardKey` to all given shards.
  */

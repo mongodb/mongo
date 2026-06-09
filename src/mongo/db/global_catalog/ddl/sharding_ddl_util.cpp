@@ -963,6 +963,41 @@ void sendFetchCollMetadataToShards(OperationContext* opCtx,
     sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
+void cloneAuthoritativeCollectionMetadataToShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& primaryShardId,
+    const std::function<OperationSessionInfo()>& osiGenerator,
+    AuthoritativeMetadataAccessLevelEnum authoritativeAccessLevel,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    uassert(ErrorCodes::RequestAlreadyFulfilled,
+            str::stream() << "The collection " << nss.toStringForErrorMsg() << " is not tracked",
+            cm.hasRoutingTable());
+    std::set<ShardId> shardSet;
+    cm.getAllShardIds(&shardSet);
+    // The DB primary must always know that a collection is tracked, even when it owns no chunks.
+    shardSet.insert(primaryShardId);
+    const std::vector<ShardId> shardIds(shardSet.begin(), shardSet.end());
+
+    // TODO (SERVER-127654): Remove this workaround to manually stop and resume migrations once
+    // setFCV stops all chunk operations.
+    stopMigrations(opCtx,
+                   nss,
+                   boost::none /* expectedCollectionUUID */,
+                   osiGenerator,
+                   authoritativeAccessLevel);
+    sendFetchCollMetadataToShards(
+        opCtx, nss, shardIds, primaryShardId, osiGenerator(), executor, token);
+    resumeMigrations(opCtx,
+                     nss,
+                     boost::none /* expectedCollectionUUID */,
+                     osiGenerator,
+                     authoritativeAccessLevel);
+}
+
 void commitRefineCollectionShardKeyToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,

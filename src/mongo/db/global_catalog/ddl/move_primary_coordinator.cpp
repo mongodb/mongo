@@ -233,7 +233,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(  //
             Phase::kClone,
-            [this, anchor = shared_from_this()](auto* opCtx) {
+            [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& toShardId = _doc.getToShardId();
 
                 if (!_firstExecution) {
@@ -261,21 +261,9 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                     cloneAuthoritativeDatabaseMetadata(opCtx);
 
-                    // A clone authoritative metadata operation may have stopped migrations on some
-                    // of this database's collections and failed before resuming them (e.g. crashed
-                    // mid-clone). Resume them now, while we are still the primary shard and hold
-                    // the database DDL lock in MODE_X, so they aren't left with chunk ops disabled.
-                    // TODO (SERVER-127654): Remove together with the clone stop/resume workaround.
-                    const auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
-                        opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
-                    for (const auto& coll : collections) {
-                        sharding_ddl_util::resumeMigrations(
-                            opCtx,
-                            coll.getNss(),
-                            coll.getUuid(),
-                            [&] { return getNewSession(opCtx); },
-                            _doc.getAuthoritativeMetadataAccessLevel());
-                    }
+                    // The per-shard authoritative metadata cloning DDL may have raced with this
+                    // movePrimary and skipped this DB, so clone the collection metadata ourselves.
+                    cloneAuthoritativeCollectionsMetadata(opCtx, executor, token);
                 }
 
                 ScopeGuard unblockWritesLegacyOnExit([&] {
@@ -908,6 +896,29 @@ void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
         ShardingRecoveryService::NoCustomAction(),
         false /* throwIfReasonDiffers */);
+}
+
+void MovePrimaryCoordinator::cloneAuthoritativeCollectionsMetadata(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+    const auto trackedColls = Grid::get(opCtx)->catalogClient()->getCollections(
+        opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+
+    // movePrimary holds the database DDL lock in MODE_X, so no collection can be dropped or
+    // untracked concurrently and no per-collection DDL lock is needed. This shard is still the
+    // primary, so pass it as the shard that must always carry an entry.
+    for (const auto& coll : trackedColls) {
+        sharding_ddl_util::cloneAuthoritativeCollectionMetadataToShards(
+            opCtx,
+            coll.getNss(),
+            thisShardId,
+            [&] { return getNewSession(opCtx); },
+            _doc.getAuthoritativeMetadataAccessLevel(),
+            executor,
+            token);
+    }
 }
 
 void MovePrimaryCoordinator::blockWritesLegacy(OperationContext* opCtx) const {

@@ -30,7 +30,6 @@
 
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator.h"
 
-#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
@@ -42,8 +41,6 @@
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
-
-#include <set>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -63,20 +60,6 @@ std::vector<NamespaceString> getTrackedNamespaces(OperationContext* opCtx,
         nssList.push_back(coll.getNss());
     }
     return nssList;
-}
-
-std::vector<ShardId> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
-                                                    const NamespaceString& nss) {
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    uassert(ErrorCodes::RequestAlreadyFulfilled,
-            str::stream() << "The collection " << nss.toStringForErrorMsg() << " is not tracked",
-            cm.hasRoutingTable());
-    std::set<ShardId> shardSet;
-    cm.getAllShardIds(&shardSet);
-    // The DB primary must always know that a collection is tracked, even when it owns no chunks.
-    shardSet.insert(ShardingState::get(opCtx)->shardId());
-    return std::vector<ShardId>(shardSet.begin(), shardSet.end());
 }
 
 }  // namespace
@@ -125,8 +108,6 @@ void CloneAuthoritativeMetadataCoordinator::_clone(
 
             auto wantedVersion = extraInfo->getVersionWanted();
             if (wantedVersion && *wantedVersion > extraInfo->getVersionReceived()) {
-                // TODO (SERVER-128063): Handle the case where the database has been moved.
-
                 // If there is a wanted version and this is newer than the received one, it
                 // indicates that the routing information is stale. The database has either been
                 // moved or dropped and recreated. In such cases, another DDL operation was
@@ -205,31 +186,15 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
         try {
             DDLLockManager::ScopedCollectionDDLLock collLock(
                 opCtx, nss, "cloneAuthoritativeMetadata"_sd, MODE_X);
-            const auto shardIds = getDataShardsAndDbPrimaryShard(opCtx, nss);
 
-            // TODO (SERVER-127654): Remove this workaround to manually stop and resume migrations
-            // once setFCV stops all chunk operations.
-            sharding_ddl_util::stopMigrations(
+            sharding_ddl_util::cloneAuthoritativeCollectionMetadataToShards(
                 opCtx,
                 nss,
-                boost::none,
+                dbMetadata.getPrimary(),
                 [&] { return getNewSession(opCtx); },
-                _doc.getAuthoritativeMetadataAccessLevel());
-
-            sharding_ddl_util::sendFetchCollMetadataToShards(opCtx,
-                                                             nss,
-                                                             shardIds,
-                                                             dbMetadata.getPrimary(),
-                                                             getNewSession(opCtx),
-                                                             executor,
-                                                             token);
-
-            sharding_ddl_util::resumeMigrations(
-                opCtx,
-                nss,
-                boost::none,
-                [&] { return getNewSession(opCtx); },
-                _doc.getAuthoritativeMetadataAccessLevel());
+                _doc.getAuthoritativeMetadataAccessLevel(),
+                executor,
+                token);
         } catch (const ExceptionFor<ErrorCodes::RequestAlreadyFulfilled>&) {
             // The collection is no longer tracked (e.g. it was dropped after we listed it but
             // before taking the DDL lock), so there is nothing to clone. If any concurrent
