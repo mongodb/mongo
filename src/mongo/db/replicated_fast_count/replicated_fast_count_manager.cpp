@@ -457,6 +457,11 @@ bool ReplicatedFastCountManager::usesContainers_ForTest() const {
     return _sizeCountStore->usesContainers();
 }
 
+std::pair<SizeCountStore*, SizeCountTimestampStore*>
+ReplicatedFastCountManager::getSizeCountStores_ForTest() const {
+    return {_sizeCountStore.get(), _timestampStore.get()};
+}
+
 void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
                                           const FastSizeCountMap& dirtyMetadata) {
     // Flushing the logical size and count metadata checkpoint is an internal maintenance operation

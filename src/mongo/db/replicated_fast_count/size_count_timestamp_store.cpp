@@ -184,4 +184,8 @@ void ContainerSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp 
             container_write::insert(opCtx, ru, container, kTimestampContainerKey, valSpan));
     }
 }
+
+RecordStore* ContainerSizeCountTimestampStore::rs_ForTest() const {
+    return _recordStore.get();
+}
 }  // namespace mongo::replicated_fast_count

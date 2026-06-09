@@ -1575,12 +1575,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // TODO SERVER-114575 Is this check still necessary if layered table drops can't leave
           // dangling idents.
           if (status == ErrorCodes::ObjectAlreadyExists) {
-              if (auto [metadataStatus, _] = handleExistingFastCountIdent(
-                      opCtx,
-                      op->getNss(),
-                      parsedO2.getFastCountMetadataStoreIdent(),
-                      metadataKeyFormat,
-                      parsedO2.getFastCountMetadataStoreTimestampsIdent());
+              if (auto [metadataStatus, _] =
+                      handleExistingFastCountIdent(opCtx,
+                                                   op->getNss(),
+                                                   parsedO2.getFastCountMetadataStoreIdent(),
+                                                   metadataKeyFormat);
                   !metadataStatus.isOK()) {
                   return metadataStatus;
               }
@@ -1588,8 +1587,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                       opCtx,
                       op->getNss(),
                       parsedO2.getFastCountMetadataStoreTimestampsIdent(),
-                      timestampsKeyFormat,
-                      parsedO2.getFastCountMetadataStoreIdent());
+                      timestampsKeyFormat);
                   !timestampsStatus.isOK()) {
                   return timestampsStatus;
               }

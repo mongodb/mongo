@@ -220,6 +220,12 @@ public:
      */
     bool usesContainers_ForTest() const;
 
+    /**
+     * Returns raw pointers to the metadata and timestamp SizeCount[Timestamp]Store's. Intended for
+     * tests that need access to the underlying RecordStore objects when testing the container path.
+     */
+    std::pair<SizeCountStore*, SizeCountTimestampStore*> getSizeCountStores_ForTest() const;
+
 private:
     /**
      * Centralized point for flushing logic.

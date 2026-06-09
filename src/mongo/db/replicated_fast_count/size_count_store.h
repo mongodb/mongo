@@ -182,6 +182,8 @@ public:
      */
     static std::span<const char> uuidToContainerKey(const UUID& uuid);
 
+    RecordStore* rs_ForTest() const;
+
 private:
     StringKeyedContainer& _getStringKeyedContainer() const;
 

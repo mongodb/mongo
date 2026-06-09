@@ -218,6 +218,10 @@ std::span<const char> ContainerSizeCountStore::uuidToContainerKey(const UUID& uu
     return {reinterpret_cast<const char*>(cdr.data()), cdr.length()};
 }
 
+RecordStore* ContainerSizeCountStore::rs_ForTest() const {
+    return _recordStore.get();
+}
+
 StringKeyedContainer& ContainerSizeCountStore::_getStringKeyedContainer() const {
     auto container = _recordStore->getContainer();
     massert(12566002,

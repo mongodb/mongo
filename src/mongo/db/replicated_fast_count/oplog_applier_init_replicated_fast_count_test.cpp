@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -134,8 +135,7 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountWithKeyFormatString) {
     EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
 }
 
-// TODO SERVER-122317 Test that this behavior only holds when the idents are empty.
-TEST_F(OplogApplierImplTest, InitReplicatedFastCountSucceedsWhenIdentsAlreadyExist) {
+TEST_F(OplogApplierImplTest, InitReplicatedFastCountSucceedsWhenEmptyIdentsAlreadyExist) {
     auto storageEngine = serviceContext->getStorageEngine();
     const std::string metadataIdent = storageEngine->generateNewInternalIdent();
     const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
@@ -183,6 +183,272 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountSucceedsWhenIdentsAlreadyExi
         EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
         EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
+}
+
+TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesTimestampsWhenOnlyEmptyMetadataExists) {
+    auto storageEngine = serviceContext->getStorageEngine();
+    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
+    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
+
+    // Pre-create only the metadata ident to simulate partial state.
+    {
+        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
+            provider,
+            ru,
+            NamespaceString::kAdminCommandNamespace,
+            metadataIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::Long}));
+        wuow.commit();
+    }
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+
+    auto op =
+        makeCommandOplogEntry(nextOpTime(),
+                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                              BSON("initReplicatedFastCount" << 1),
+                              makeInitReplicatedFastCountO2(metadataIdent,
+                                                            static_cast<int>(KeyFormat::Long),
+                                                            timestampsIdent,
+                                                            static_cast<int>(KeyFormat::Long)));
+
+    ASSERT_OK(runOpSteadyState(op));
+
+    // Both idents should exist after we reuse the empty metadata ident and create the timestamps
+    // ident.
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+}
+
+TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesMetadataWhenOnlyEmptyTimestampsExists) {
+    auto storageEngine = serviceContext->getStorageEngine();
+    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
+    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
+
+    // Pre-create only the timestamps ident to simulate partial state.
+    {
+        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
+            provider,
+            ru,
+            NamespaceString::kAdminCommandNamespace,
+            timestampsIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::Long}));
+        wuow.commit();
+    }
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+
+    auto op =
+        makeCommandOplogEntry(nextOpTime(),
+                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                              BSON("initReplicatedFastCount" << 1),
+                              makeInitReplicatedFastCountO2(metadataIdent,
+                                                            static_cast<int>(KeyFormat::Long),
+                                                            timestampsIdent,
+                                                            static_cast<int>(KeyFormat::Long)));
+
+    ASSERT_OK(runOpSteadyState(op));
+
+    // Both idents should exist after since we create the metadata ident and reuse the empty
+    // timestamps ident.
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+}
+
+TEST_F(OplogApplierImplTest, InitReplicatedFastCountFailsWhenBothIdentsExistAndNonEmpty) {
+    auto storageEngine = serviceContext->getStorageEngine();
+    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
+    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
+
+    // Pre-create both idents.
+    {
+        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
+            provider,
+            ru,
+            NamespaceString::kAdminCommandNamespace,
+            metadataIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::String}));
+        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
+            provider,
+            ru,
+            NamespaceString::kAdminCommandNamespace,
+            timestampsIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::Long}));
+        wuow.commit();
+    }
+
+    // Insert a record into each ident to make them non-empty.
+    {
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        auto metadataRs = storageEngine->getEngine()->getRecordStore(
+            _opCtx.get(),
+            NamespaceString::kAdminCommandNamespace,
+            metadataIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::String},
+            boost::none);
+        auto timestampsRs = storageEngine->getEngine()->getRecordStore(
+            _opCtx.get(),
+            NamespaceString::kAdminCommandNamespace,
+            timestampsIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::Long},
+            boost::none);
+        WriteUnitOfWork wuow(_opCtx.get());
+        std::string key = "test_key";
+        RecordId rid(std::span<const char>(key.data(), key.size()));
+        const char data[] = "value";
+        ASSERT_OK(metadataRs->insertRecord(_opCtx.get(), ru, rid, data, sizeof(data), Timestamp{}));
+        ASSERT_OK(timestampsRs->insertRecord(_opCtx.get(), ru, data, sizeof(data), Timestamp{}));
+        wuow.commit();
+    }
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+
+    auto op =
+        makeCommandOplogEntry(nextOpTime(),
+                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                              BSON("initReplicatedFastCount" << 1),
+                              makeInitReplicatedFastCountO2(metadataIdent,
+                                                            static_cast<int>(KeyFormat::String),
+                                                            timestampsIdent,
+                                                            static_cast<int>(KeyFormat::Long)));
+
+    // Application should fail because both idents are non-empty.
+    ASSERT_NOT_OK(runOpSteadyState(op));
+}
+
+TEST_F(OplogApplierImplTest, InitReplicatedFastCountFailsWhenOnlyMetadataExistsAndNonEmpty) {
+    auto storageEngine = serviceContext->getStorageEngine();
+    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
+    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
+
+    // Pre-create only the metadata ident.
+    {
+        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
+            provider,
+            ru,
+            NamespaceString::kAdminCommandNamespace,
+            metadataIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::String}));
+        wuow.commit();
+    }
+
+    // Insert a record to make it non-empty.
+    {
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        auto metadataRs = storageEngine->getEngine()->getRecordStore(
+            _opCtx.get(),
+            NamespaceString::kAdminCommandNamespace,
+            metadataIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::String},
+            boost::none);
+        WriteUnitOfWork wuow(_opCtx.get());
+        std::string key = "test_key";
+        RecordId rid(std::span<const char>(key.data(), key.size()));
+        const char data[] = "value";
+        ASSERT_OK(metadataRs->insertRecord(_opCtx.get(), ru, rid, data, sizeof(data), Timestamp{}));
+        wuow.commit();
+    }
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+
+    auto op =
+        makeCommandOplogEntry(nextOpTime(),
+                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                              BSON("initReplicatedFastCount" << 1),
+                              makeInitReplicatedFastCountO2(metadataIdent,
+                                                            static_cast<int>(KeyFormat::String),
+                                                            timestampsIdent,
+                                                            static_cast<int>(KeyFormat::Long)));
+
+    // Application should fail because the existing metadata ident is non-empty.
+    ASSERT_NOT_OK(runOpSteadyState(op));
+}
+
+TEST_F(OplogApplierImplTest, InitReplicatedFastCountFailsWhenOnlyTimestampsExistsAndNonEmpty) {
+    auto storageEngine = serviceContext->getStorageEngine();
+    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
+    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
+
+    // Pre-create only the timestamps ident.
+    {
+        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
+            provider,
+            ru,
+            NamespaceString::kAdminCommandNamespace,
+            timestampsIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::Long}));
+        wuow.commit();
+    }
+
+    // Insert a record to make it non-empty.
+    {
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        auto timestampsRs = storageEngine->getEngine()->getRecordStore(
+            _opCtx.get(),
+            NamespaceString::kAdminCommandNamespace,
+            timestampsIdent,
+            RecordStore::Options{.keyFormat = KeyFormat::Long},
+            boost::none);
+        WriteUnitOfWork wuow(_opCtx.get());
+        const char data[] = "value";
+        ASSERT_OK(timestampsRs->insertRecord(_opCtx.get(), ru, data, sizeof(data), Timestamp{}));
+        wuow.commit();
+    }
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    }
+
+    auto op =
+        makeCommandOplogEntry(nextOpTime(),
+                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                              BSON("initReplicatedFastCount" << 1),
+                              makeInitReplicatedFastCountO2(metadataIdent,
+                                                            static_cast<int>(KeyFormat::String),
+                                                            timestampsIdent,
+                                                            static_cast<int>(KeyFormat::Long)));
+
+    // Application should fail because the existing timestamps ident is non-empty.
+    ASSERT_NOT_OK(runOpSteadyState(op));
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsInvalidMetadataKeyFormat) {
@@ -293,96 +559,6 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsDuplicateIdents) {
     // Neither ident should have been created.
     auto ru = storageEngine->newRecoveryUnit();
     EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, sharedIdent));
-}
-
-TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesTimestampsWhenOnlyEmptyMetadataExists) {
-    auto storageEngine = serviceContext->getStorageEngine();
-    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
-    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
-
-    // Pre-create only the metadata ident to simulate partial state.
-    {
-        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
-        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
-        WriteUnitOfWork wuow(_opCtx.get());
-        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
-            provider,
-            ru,
-            NamespaceString::kAdminCommandNamespace,
-            metadataIdent,
-            RecordStore::Options{.keyFormat = KeyFormat::Long}));
-        wuow.commit();
-    }
-
-    {
-        auto ru = storageEngine->newRecoveryUnit();
-        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
-    }
-
-    auto op =
-        makeCommandOplogEntry(nextOpTime(),
-                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
-                              BSON("initReplicatedFastCount" << 1),
-                              makeInitReplicatedFastCountO2(metadataIdent,
-                                                            static_cast<int>(KeyFormat::Long),
-                                                            timestampsIdent,
-                                                            static_cast<int>(KeyFormat::Long)));
-
-    ASSERT_OK(runOpSteadyState(op));
-
-    // Both idents should exist after we reuse the empty metadata ident and create the timestamps
-    // ident.
-    {
-        auto ru = storageEngine->newRecoveryUnit();
-        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
-    }
-}
-
-TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesMetadataWhenOnlyEmptyTimestampsExists) {
-    auto storageEngine = serviceContext->getStorageEngine();
-    const std::string metadataIdent = storageEngine->generateNewInternalIdent();
-    const std::string timestampsIdent = storageEngine->generateNewInternalIdent();
-
-    // Pre-create only the timestamps ident to simulate partial state.
-    {
-        auto& provider = rss::ReplicatedStorageService::get(_opCtx.get()).getPersistenceProvider();
-        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
-        WriteUnitOfWork wuow(_opCtx.get());
-        ASSERT_OK(storageEngine->getEngine()->createRecordStore(
-            provider,
-            ru,
-            NamespaceString::kAdminCommandNamespace,
-            timestampsIdent,
-            RecordStore::Options{.keyFormat = KeyFormat::Long}));
-        wuow.commit();
-    }
-
-    {
-        auto ru = storageEngine->newRecoveryUnit();
-        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
-    }
-
-    auto op =
-        makeCommandOplogEntry(nextOpTime(),
-                              NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
-                              BSON("initReplicatedFastCount" << 1),
-                              makeInitReplicatedFastCountO2(metadataIdent,
-                                                            static_cast<int>(KeyFormat::Long),
-                                                            timestampsIdent,
-                                                            static_cast<int>(KeyFormat::Long)));
-
-    ASSERT_OK(runOpSteadyState(op));
-
-    // Both idents should exist after since we create the metadata ident and reuse the empty
-    // timestamps ident.
-    {
-        auto ru = storageEngine->newRecoveryUnit();
-        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
-    }
 }
 
 }  // namespace

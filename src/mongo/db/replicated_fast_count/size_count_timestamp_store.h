@@ -99,6 +99,8 @@ public:
     boost::optional<Timestamp> read(OperationContext* opCtx) const override;
     void write(OperationContext* opCtx, Timestamp timestamp) override;
 
+    RecordStore* rs_ForTest() const;
+
 private:
     std::unique_ptr<RecordStore> _recordStore;
 };

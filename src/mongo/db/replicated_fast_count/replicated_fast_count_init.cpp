@@ -200,8 +200,7 @@ Status _createInternalFastCountContainer(OperationContext* opCtx,
 std::pair<Status, std::string> handleExistingFastCountIdent(OperationContext* opCtx,
                                                             const NamespaceString& nss,
                                                             StringData existingIdent,
-                                                            KeyFormat existingIdentFormat,
-                                                            StringData nonExistentIdent) {
+                                                            KeyFormat existingIdentFormat) {
     auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
@@ -222,18 +221,15 @@ std::pair<Status, std::string> handleExistingFastCountIdent(OperationContext* op
 
     if (!empty) {
         return {Status(ErrorCodes::Error{12309402},
-                       fmt::format("The fast count ident {} already exists and was non-empty even "
-                                   "though the ident {} did not exist",
-                                   existingIdent,
-                                   nonExistentIdent)),
+                       fmt::format("The fast count ident {} already exists and was non-empty",
+                                   existingIdent)),
                 ""};
     }
 
     return {Status::OK(),
-            fmt::format("One replicated fast count ident already exists on disk after drop attempt "
-                        "but the other did not. {} can be re-used and {} was created",
-                        existingIdent,
-                        nonExistentIdent)};
+            fmt::format("Fast count ident {} already exists on disk after drop attempt "
+                        "but it can be re-used",
+                        existingIdent)};
 }
 
 Status createInternalFastCountContainers(OperationContext* opCtx,
@@ -287,11 +283,11 @@ Status createInternalFastCountContainers(OperationContext* opCtx,
     Status existingIdentStatus = Status::OK();
     std::string msg;
     if (metadataStatus == ErrorCodes::ObjectAlreadyExists) {
-        std::tie(existingIdentStatus, msg) = handleExistingFastCountIdent(
-            opCtx, nss, metadataIdent, metadataKeyFormat, timestampsIdent);
+        std::tie(existingIdentStatus, msg) =
+            handleExistingFastCountIdent(opCtx, nss, metadataIdent, metadataKeyFormat);
     } else if (timestampsStatus == ErrorCodes::ObjectAlreadyExists) {
-        std::tie(existingIdentStatus, msg) = handleExistingFastCountIdent(
-            opCtx, nss, timestampsIdent, timestampsKeyFormat, metadataIdent);
+        std::tie(existingIdentStatus, msg) =
+            handleExistingFastCountIdent(opCtx, nss, timestampsIdent, timestampsKeyFormat);
     } else {
         // Success cases or unexpected errors should have already been handled.
         MONGO_UNREACHABLE_TASSERT(12309405);
