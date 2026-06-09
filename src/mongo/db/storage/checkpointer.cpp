@@ -115,7 +115,6 @@ void Checkpointer::run() {
         const Date_t startTime = Date_t::now();
 
         opCtx->getServiceContext()->getStorageEngine()->checkpoint();
-        _policy->onCheckpointComplete();
 
         if (isReplicatedFastCountEnabled(opCtx.get())) {
             replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
@@ -169,14 +168,6 @@ void Checkpointer::shutdown(const Status& reason) {
 
     wait();
     LOGV2(22323, "Finished shutting down checkpoint thread");
-}
-
-void Checkpointer::notifyOplogWrite(int64_t bytes) {
-    // accumulateOplogBytes() is lock-free. Returns true only the first time accumulated bytes
-    // cross the threshold in a given checkpoint cycle; notify_one() wakes Phase 2.
-    if (_policy->accumulateOplogBytes(bytes)) {
-        _sleepCV.notify_one();
-    }
 }
 
 }  // namespace mongo

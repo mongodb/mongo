@@ -47,10 +47,8 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -611,68 +609,6 @@ TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
                                  MODE_X);
     ASSERT_OK(applyCommand_inlock(
         opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
-}
-
-// ------------------------------------------------------------------
-// Test: oplog writes notify the injected CheckpointSchedulePolicy
-// ------------------------------------------------------------------
-
-class MockCheckpointPolicy : public CheckpointSchedulePolicy {
-public:
-    void waitUntilReady(std::unique_lock<std::mutex>&,
-                        stdx::condition_variable&,
-                        std::function<bool()>) override {}
-    void onCheckpointComplete() override {}
-    bool accumulateOplogBytes(int64_t bytes) override {
-        _accumulated.fetchAndAdd(bytes);
-        return false;
-    }
-    int64_t accumulated() const {
-        return _accumulated.load();
-    }
-
-private:
-    AtomicWord<int64_t> _accumulated{0};
-};
-
-// Fixture that installs a spy checkpointer and removes it before teardown.
-// The checkpointer is never started, so stopStorageControls must not see it.
-class OplogCheckpointNotificationTest : public OplogTest {
-protected:
-    void tearDown() override {
-        Checkpointer::set(getServiceContext(), nullptr);
-        OplogTest::tearDown();
-    }
-};
-
-TEST_F(OplogCheckpointNotificationTest, OplogWriteNotifiesCheckpointPolicy) {
-    auto opCtx = cc().makeOperationContext();
-
-    MockCheckpointPolicy* mock = nullptr;
-    {
-        auto owned = std::make_unique<MockCheckpointPolicy>();
-        mock = owned.get();
-        Checkpointer::set(getServiceContext(), std::make_unique<Checkpointer>(std::move(owned)));
-    }
-
-    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    int64_t expectedBytes = 0;
-    {
-        MutableOplogEntry entry;
-        entry.setOpType(repl::OpTypeEnum::kNoop);
-        entry.setNss(nss);
-        entry.setObject(BSON("msg" << "test"));
-        entry.setWallClockTime(Date_t::now());
-        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-        WriteUnitOfWork wunit(opCtx.get());
-        logOp(opCtx.get(), &entry);
-        wunit.commit();
-        // logOp fills in all oplog fields (ts, t, v, op, ns, …); toBSON() reflects the full
-        // serialized size that notifyOplogWrite accumulates.
-        expectedBytes = entry.toBSON().objsize();
-    }
-
-    ASSERT_GTE(mock->accumulated(), expectedBytes);
 }
 
 }  // namespace
