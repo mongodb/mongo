@@ -52,8 +52,7 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        const auto snap =
-            collectGlobalLockStatsSnapshot(opCtx->getClient()->getServiceContext(), _startedAt);
+        const auto snap = collectGlobalLockStatsSnapshot(_startedAt);
 
         BSONObjBuilder ret;
         ret.append("totalTime", snap.totalTimeMicros);

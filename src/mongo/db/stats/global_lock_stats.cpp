@@ -29,40 +29,18 @@
 
 #include "mongo/db/stats/global_lock_stats.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
-#include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/util/assert_util.h"
-
-#include <array>
-#include <mutex>
 
 namespace mongo {
 
-GlobalLockStatsSnapshot collectGlobalLockStatsSnapshot(ServiceContext* svcCtx, Date_t startedAt) {
-    std::array<int64_t, 5> counts{};
-    static_assert(Locker::kQueuedWriter < counts.size(),
-                  "GlobalLockStatsSnapshot expects Locker::ClientState to fit in 5 buckets");
-
-    for (ServiceContext::LockedClientsCursor cursor(svcCtx); Client* client = cursor.next();) {
-        invariant(client);
-        std::unique_lock<Client> uniqueLock(*client);
-
-        const OperationContext* clientOpCtx = client->getOperationContext();
-        const auto state = clientOpCtx
-            ? shard_role_details::getLocker(clientOpCtx)->getClientState()
-            : Locker::kInactive;
-        invariant(static_cast<size_t>(state) < counts.size());
-        ++counts[state];
-    }
+GlobalLockStatsSnapshot collectGlobalLockStatsSnapshot(Date_t startedAt) {
+    const auto counts = Locker::getGlobalClientStateCounts();
 
     GlobalLockStatsSnapshot snap;
-    snap.activeReaders = counts[Locker::kActiveReader];
-    snap.activeWriters = counts[Locker::kActiveWriter];
-    snap.queuedReaders = counts[Locker::kQueuedReader];
-    snap.queuedWriters = counts[Locker::kQueuedWriter];
+    snap.activeReaders = counts.activeReader;
+    snap.activeWriters = counts.activeWriter;
+    snap.queuedReaders = counts.queuedReader;
+    snap.queuedWriters = counts.queuedWriter;
 
     const auto elapsed = Date_t::now() - startedAt;
     snap.totalTimeMicros = durationCount<Microseconds>(elapsed);

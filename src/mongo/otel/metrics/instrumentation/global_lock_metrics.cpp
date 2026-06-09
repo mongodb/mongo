@@ -125,7 +125,7 @@ void installGlobalLockOtelMetrics(ServiceContext* svcCtx) {
     state.job = svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
         "GlobalLockOtelMetrics",
         [&state, svcCtx](Client*) {
-            state.metrics->update(collectGlobalLockStatsSnapshot(svcCtx, state.startedAt));
+            state.metrics->update(collectGlobalLockStatsSnapshot(state.startedAt));
         },
         Seconds(1),
         false /*isKillableByStepdown*/});

@@ -131,7 +131,26 @@ public:
     /**
      * State for reporting the number of active and queued reader and writer clients.
      */
-    enum ClientState { kInactive, kActiveReader, kActiveWriter, kQueuedReader, kQueuedWriter };
+    enum class ClientState : int {
+        kInactive = 0,
+        kActiveReader = 1,
+        kActiveWriter = 2,
+        kQueuedReader = 3,
+        kQueuedWriter = 4
+    };
+
+    /**
+     * Per-state counts maintained atomically as Locker instances transition states. Read by the
+     * globalLock serverStatus section without any locking.
+     */
+    struct ClientStateCounts {
+        int32_t inactive;
+        int32_t activeReader;
+        int32_t activeWriter;
+        int32_t queuedReader;
+        int32_t queuedWriter;
+    };
+    static ClientStateCounts getGlobalClientStateCounts();
 
     /**
      * Return whether client is holding any locks (active), or is queued on any locks or waiting
@@ -722,6 +741,12 @@ protected:
     void _releaseTicket();
 
     /**
+     * Atomically transitions _clientState and updates the global per-state counters so that
+     * the globalLock serverStatus section can read state counts without iterating clients.
+     */
+    void _setClientState(ClientState newState);
+
+    /**
      * Called if a lock acquisition has blocked.
      */
     void _setWaitingResource(ResourceId resId);
@@ -808,7 +833,7 @@ protected:
     LockMode _modeForTicket = MODE_NONE;
 
     // Indicates whether the client is active reader/writer or is queued.
-    AtomicWord<ClientState> _clientState{kInactive};
+    AtomicWord<ClientState> _clientState{ClientState::kInactive};
 
     // If true, shared locks will participate in two-phase locking.
     bool _sharedLocksShouldTwoPhaseLock = false;

@@ -46,6 +46,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <array>
 #include <iterator>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -137,10 +138,52 @@ AtomicWord<LockerId> idCounter(0);
 // indexed by LockerId in order to minimize concurrent access conflicts.
 PartitionedInstanceWideLockStats globalStats;
 
+struct GlobalClientStateCounts {
+    void update(Locker::ClientState state, int32_t adjustment) {
+        switch (state) {
+            case Locker::ClientState::kInactive:
+                inactive.fetchAndAddRelaxed(adjustment);
+                break;
+            case Locker::ClientState::kActiveReader:
+                activeReader.fetchAndAddRelaxed(adjustment);
+                break;
+            case Locker::ClientState::kActiveWriter:
+                activeWriter.fetchAndAddRelaxed(adjustment);
+                break;
+            case Locker::ClientState::kQueuedReader:
+                queuedReader.fetchAndAddRelaxed(adjustment);
+                break;
+            case Locker::ClientState::kQueuedWriter:
+                queuedWriter.fetchAndAddRelaxed(adjustment);
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    Locker::ClientStateCounts snapshot() const {
+        return {inactive.loadRelaxed(),
+                activeReader.loadRelaxed(),
+                activeWriter.loadRelaxed(),
+                queuedReader.loadRelaxed(),
+                queuedWriter.loadRelaxed()};
+    }
+
+private:
+    alignas(std::hardware_destructive_interference_size) Atomic<int32_t> inactive;
+    alignas(std::hardware_destructive_interference_size) Atomic<int32_t> activeReader;
+    alignas(std::hardware_destructive_interference_size) Atomic<int32_t> activeWriter;
+    alignas(std::hardware_destructive_interference_size) Atomic<int32_t> queuedReader;
+    alignas(std::hardware_destructive_interference_size) Atomic<int32_t> queuedWriter;
+};
+GlobalClientStateCounts globalClientStateCounts;
+
 // How often (in millis) to check for deadlock if a lock has not been granted for some time
 constexpr Milliseconds kMaxWaitTime = Milliseconds(500);
 
 }  // namespace
+
+using enum Locker::ClientState;
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 namespace {
@@ -230,6 +273,7 @@ Locker::Locker(ServiceContext* serviceContext)
     _lockOrderingsSet = &globalLockOrderingsSet(serviceContext);
 #endif
     updateThreadIdToCurrentThread();
+    globalClientStateCounts.update(_clientState.load(), 1);
 }
 
 Locker::~Locker() {
@@ -246,6 +290,20 @@ Locker::~Locker() {
     invariant(_requests.empty());
 
     invariant(_modeForTicket == MODE_NONE);
+    globalClientStateCounts.update(_clientState.load(), -1);
+}
+
+void Locker::_setClientState(ClientState newState) {
+    auto oldState = _clientState.swap(newState);
+    if (newState == oldState) {
+        return;
+    }
+    globalClientStateCounts.update(oldState, -1);
+    globalClientStateCounts.update(newState, 1);
+}
+
+Locker::ClientStateCounts Locker::getGlobalClientStateCounts() {
+    return globalClientStateCounts.snapshot();
 }
 
 void Locker::updateThreadIdToCurrentThread() {
@@ -286,8 +344,8 @@ void Locker::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
         // being modified here to change serverStatus' `globalLock.currentQueue` metrics. This
         // method must not exit with a side-effect on the clientState. That value is also used for
         // tracking whether other resources need to be released.
-        _clientState.store(kQueuedWriter);
-        ScopeGuard restoreState([&] { _clientState.store(kInactive); });
+        _setClientState(kQueuedWriter);
+        ScopeGuard restoreState([&] { _setClientState(kInactive); });
 
         if (MONGO_unlikely(_assertOnLockAttempt)) {
             LOGV2_FATAL(9360804,
@@ -1143,14 +1201,14 @@ void Locker::_lockComplete(OperationContext* opCtx,
 bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     // MODE_X is exclusive of all other locks, thus acquiring a ticket is unnecessary.
     if (mode == MODE_X || mode == MODE_NONE || !_ticketingSystem) {
-        _clientState.store(isSharedLockMode(mode) ? kActiveReader : kActiveWriter);
+        _setClientState(isSharedLockMode(mode) ? kActiveReader : kActiveWriter);
         return true;
     }
 
-    _clientState.store(isSharedLockMode(mode) ? kQueuedReader : kQueuedWriter);
+    _setClientState(isSharedLockMode(mode) ? kQueuedReader : kQueuedWriter);
 
     // If the ticket wait is interrupted, restore the state of the client.
-    ScopeGuard restoreStateOnErrorGuard([&] { _clientState.store(kInactive); });
+    ScopeGuard restoreStateOnErrorGuard([&] { _setClientState(kInactive); });
 
     if (MONGO_unlikely(_assertOnLockAttempt)) {
         LOGV2_FATAL(9360803,
@@ -1171,7 +1229,7 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
 
     restoreStateOnErrorGuard.dismiss();
 
-    _clientState.store(isSharedLockMode(mode) ? kActiveReader : kActiveWriter);
+    _setClientState(isSharedLockMode(mode) ? kActiveReader : kActiveWriter);
     return true;
 }
 
@@ -1228,10 +1286,28 @@ bool Locker::_unlockImpl(LockRequestsMap::Iterator* it) {
 
 void Locker::_releaseTicket() {
     _ticket.reset();
-    _clientState.store(kInactive);
+    _setClientState(kInactive);
 }
 
 void Locker::_setWaitingResource(ResourceId resId) {
+    // Transition between Active and Queued client states so that globalClientStateCounts
+    // accurately reflects whether this locker is blocked waiting for a lock. A valid resId
+    // means we just entered the wait queue; an invalid resId means the lock was granted and
+    // we are no longer queued.
+    if (resId.isValid()) {
+        auto state = _clientState.load();
+        if (state == kActiveReader)
+            _setClientState(kQueuedReader);
+        else if (state == kActiveWriter)
+            _setClientState(kQueuedWriter);
+    } else {
+        auto state = _clientState.load();
+        if (state == kQueuedReader)
+            _setClientState(kActiveReader);
+        else if (state == kQueuedWriter)
+            _setClientState(kActiveWriter);
+    }
+
     scoped_spinlock lg(_lock);
     _waitingResource = resId;
 }

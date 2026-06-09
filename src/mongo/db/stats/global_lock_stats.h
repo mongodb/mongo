@@ -47,13 +47,11 @@ struct MONGO_MOD_PUBLIC GlobalLockStatsSnapshot {
 };
 
 /**
- * Walks the live clients on `svcCtx` and tallies their global-lock state into a
- * GlobalLockStatsSnapshot. `startedAt` is the reference point used to compute
- * `totalTimeMicros`; each caller owns its own "started" reference (the
- * serverStatus section captures it at static initialization, while the OTel
- * periodic updater captures it at install time).
+ * Reads global atomic lock-state counters and returns a snapshot of active/queued reader and
+ * writer counts. `startedAt` is subtracted from `Date_t::now()` to produce `totalTimeMicros`;
+ * each caller owns its own reference point (e.g. captured at static initialization or at
+ * install time).
  */
-MONGO_MOD_PUBLIC GlobalLockStatsSnapshot collectGlobalLockStatsSnapshot(ServiceContext* svcCtx,
-                                                                        Date_t startedAt);
+MONGO_MOD_PUBLIC GlobalLockStatsSnapshot collectGlobalLockStatsSnapshot(Date_t startedAt);
 
 }  // namespace mongo

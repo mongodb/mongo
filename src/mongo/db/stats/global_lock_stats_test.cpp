@@ -105,7 +105,7 @@ protected:
 
 TEST_F(CollectGlobalLockSnapshotTest, ReportsZeroCountsWhenNoActiveClients) {
     const auto startedAt = Date_t::now();
-    const auto snap = collectGlobalLockStatsSnapshot(getServiceContext(), startedAt);
+    const auto snap = collectGlobalLockStatsSnapshot(startedAt);
 
     ASSERT_EQ(0, snap.activeReaders);
     ASSERT_EQ(0, snap.activeWriters);
@@ -146,10 +146,10 @@ TEST_F(CollectGlobalLockSnapshotTest, TallyActiveAndQueuedReadersAndWriters) {
         activeWriterLock.reset();
     };
 
-    waitForClientState(queuedReaderOpCtx, Locker::kQueuedReader);
-    waitForClientState(queuedWriterOpCtx, Locker::kQueuedWriter);
+    waitForClientState(queuedReaderOpCtx, Locker::ClientState::kQueuedReader);
+    waitForClientState(queuedWriterOpCtx, Locker::ClientState::kQueuedWriter);
 
-    const auto snap = collectGlobalLockStatsSnapshot(getServiceContext(), Date_t::now());
+    const auto snap = collectGlobalLockStatsSnapshot(Date_t::now());
 
     ASSERT_EQ(1, snap.activeReaders);
     ASSERT_EQ(1, snap.activeWriters);
@@ -159,8 +159,91 @@ TEST_F(CollectGlobalLockSnapshotTest, TallyActiveAndQueuedReadersAndWriters) {
 
 TEST_F(CollectGlobalLockSnapshotTest, TotalTimeIncreasesFromStartedAt) {
     const auto startedAt = Date_t::now() - Milliseconds{50};
-    const auto snap = collectGlobalLockStatsSnapshot(getServiceContext(), startedAt);
+    const auto snap = collectGlobalLockStatsSnapshot(startedAt);
     ASSERT_GTE(snap.totalTimeMicros, durationCount<Microseconds>(Milliseconds{50}));
+}
+
+// Verifies that constructing and destroying Lockers (via operation contexts) correctly increments
+// and decrements the global inactive counter.
+TEST_F(CollectGlobalLockSnapshotTest, GlobalCountersTrackLockerLifecycle) {
+    const auto before = Locker::getGlobalClientStateCounts();
+
+    {
+        auto clients = makeClientsWithOperationContexts(3);
+        const auto during = Locker::getGlobalClientStateCounts();
+        ASSERT_EQ(before.inactive + 3, during.inactive);
+    }
+
+    const auto after = Locker::getGlobalClientStateCounts();
+    ASSERT_EQ(before.inactive, after.inactive);
+}
+
+// Verifies that the _setWaitingResource() code path correctly transitions global counters from
+// active to queued when a lock acquisition blocks on the lock manager (not on ticket wait).
+// This exercises the active->queued->active state machine that is separate from ticket queuing.
+TEST_F(CollectGlobalLockSnapshotTest, GlobalCountersReflectLockContention) {
+    // No ticketing installed so queuing happens only at the lock-manager level.
+    auto clients = makeClientsWithOperationContexts(2);
+    auto* holderOpCtx = clients[0].second.get();
+    auto* waiterOpCtx = clients[1].second.get();
+
+    const auto baseline = Locker::getGlobalClientStateCounts();
+
+    boost::optional<Lock::GlobalLock> exclusiveLock(boost::in_place_init, holderOpCtx, MODE_X);
+    ASSERT(exclusiveLock->isLocked());
+
+    unittest::JoinThread waiterThread{[&] {
+        Lock::GlobalLock readLock(waiterOpCtx, MODE_IS);
+    }};
+
+    // Release the exclusive lock (and thus unblock the waiter) before joining the thread.
+    ScopeGuard releaseHolder = [&] {
+        exclusiveLock.reset();
+    };
+
+    // _setWaitingResource() fires once the lock manager returns LOCK_WAITING and transitions
+    // _clientState from kActiveReader to kQueuedReader, updating the global atomic counters.
+    waitForClientState(waiterOpCtx, Locker::ClientState::kQueuedReader);
+
+    const auto counts = Locker::getGlobalClientStateCounts();
+    ASSERT_EQ(baseline.activeWriter + 1, counts.activeWriter);
+    ASSERT_EQ(baseline.queuedReader + 1, counts.queuedReader);
+}
+
+// Verifies that getGlobalClientStateCounts() and collectGlobalLockStatsSnapshot() agree under
+// ticket contention, confirming the snapshot function correctly delegates to the atomic counters.
+TEST_F(CollectGlobalLockSnapshotTest, GlobalCountersMatchSnapshotUnderTicketContention) {
+    installTicketing(/*numTickets=*/1);
+    ScopeGuard restoreTicketing = [&] {
+        clearTicketing();
+    };
+
+    auto clients = makeClientsWithOperationContexts(2);
+    auto* readerOpCtx = clients[0].second.get();
+    auto* queuedReaderOpCtx = clients[1].second.get();
+
+    const auto baseline = Locker::getGlobalClientStateCounts();
+
+    boost::optional<Lock::GlobalLock> readerLock(boost::in_place_init, readerOpCtx, MODE_IS);
+    ASSERT(readerLock->isLocked());
+
+    unittest::JoinThread waiterThread{[&] {
+        Lock::GlobalLock waiterLock(queuedReaderOpCtx, MODE_IS);
+    }};
+
+    ScopeGuard releaseReader = [&] {
+        readerLock.reset();
+    };
+
+    waitForClientState(queuedReaderOpCtx, Locker::ClientState::kQueuedReader);
+
+    const auto counts = Locker::getGlobalClientStateCounts();
+    ASSERT_EQ(baseline.activeReader + 1, counts.activeReader);
+    ASSERT_EQ(baseline.queuedReader + 1, counts.queuedReader);
+
+    const auto snap = collectGlobalLockStatsSnapshot(Date_t::now());
+    ASSERT_EQ(counts.activeReader, snap.activeReaders);
+    ASSERT_EQ(counts.queuedReader, snap.queuedReaders);
 }
 
 }  // namespace

@@ -150,8 +150,8 @@ TEST_F(GlobalLockServerStatusSectionTest, ReportsActiveAndQueuedReaderWriterCoun
         activeWriterLock.reset();
     };
 
-    waitForClientState(queuedReaderOpCtx, Locker::kQueuedReader);
-    waitForClientState(queuedWriterOpCtx, Locker::kQueuedWriter);
+    waitForClientState(queuedReaderOpCtx, Locker::ClientState::kQueuedReader);
+    waitForClientState(queuedWriterOpCtx, Locker::ClientState::kQueuedWriter);
 
     auto statusOpCtx = makeOperationContext();
     const auto sectionObj = section->generateSection(statusOpCtx.get(), BSONElement{});
