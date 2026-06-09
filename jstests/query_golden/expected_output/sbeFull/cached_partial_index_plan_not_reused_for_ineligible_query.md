@@ -226,7 +226,7 @@ Verifying that the plan cache contains an entry with the partial index
 			"sort" : { }
 		},
 		"isActive" : true,
-		"planCacheKey" : "7D81D3A7"
+		"planCacheKey" : "92EAA2B3"
 	}
 ]
 ```
@@ -527,7 +527,7 @@ Verifying that the plan cache contains an entry with the partial index
 			}
 		},
 		"isActive" : true,
-		"planCacheKey" : "BFDF7AB4"
+		"planCacheKey" : "788F01B0"
 	}
 ]
 ```
