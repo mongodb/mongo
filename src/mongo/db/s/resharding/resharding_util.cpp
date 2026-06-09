@@ -710,6 +710,13 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
                         vCtx, fcv) &&
                     resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
                         vCtx, fcv));
+        auto authoritativeLevel = feature_flags::gAuthoritativeShardsCRUD.isEnabled(vCtx, fcv)
+            ? ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed
+            : ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+        coordinatorDoc.setAuthoritativeMetadataAccessLevel(authoritativeLevel);
+    } else {
+        coordinatorDoc.setAuthoritativeMetadataAccessLevel(
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kNone);
     }
 
     return coordinatorDoc;

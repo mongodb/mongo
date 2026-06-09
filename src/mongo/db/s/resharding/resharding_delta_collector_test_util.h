@@ -137,12 +137,14 @@ public:
     void stopMigrations(OperationContext*,
                         const NamespaceString&,
                         const UUID&,
+                        ReshardingAuthoritativeMetadataAccessLevelEnum,
                         std::function<OperationSessionInfo()>) override {
         MONGO_UNREACHABLE;
     }
     void resumeMigrations(OperationContext*,
                           const NamespaceString&,
                           const UUID&,
+                          ReshardingAuthoritativeMetadataAccessLevelEnum,
                           std::function<OperationSessionInfo()>) override {
         MONGO_UNREACHABLE;
     }

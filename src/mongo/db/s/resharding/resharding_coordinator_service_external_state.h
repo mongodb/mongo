@@ -164,19 +164,23 @@ public:
      * To be called during the "initializing" state to set allowMigrations to preventing new chunk
      * migrations from starting and aborting any in-progress migrations on the source collection.
      */
-    virtual void stopMigrations(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const UUID& expectedCollectionUUID,
-                                std::function<OperationSessionInfo()> osiGenerator) = 0;
+    virtual void stopMigrations(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& expectedCollectionUUID,
+        ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
+        std::function<OperationSessionInfo()> osiGenerator) = 0;
 
     /**
      * To be called on completion (both success and abort) to unset allowMigrations, re-enabling
      * chunk migrations on the source collection.
      */
-    virtual void resumeMigrations(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const UUID& expectedCollectionUUID,
-                                  std::function<OperationSessionInfo()> osiGenerator) = 0;
+    virtual void resumeMigrations(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& expectedCollectionUUID,
+        ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
+        std::function<OperationSessionInfo()> osiGenerator) = 0;
     /**
      * Builds a CausalityBarrier for the given participant shards, which is used to perform a no-op
      * retryable write on each shard.
@@ -260,11 +264,13 @@ public:
     void stopMigrations(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const UUID& expectedCollectionUUID,
+                        ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
                         std::function<OperationSessionInfo()> osiGenerator) override;
 
     void resumeMigrations(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const UUID& expectedCollectionUUID,
+                          ReshardingAuthoritativeMetadataAccessLevelEnum authoritativeMetadataLevel,
                           std::function<OperationSessionInfo()> osiGenerator) override;
 
     std::unique_ptr<CausalityBarrier> buildCausalityBarrier(

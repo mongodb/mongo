@@ -382,9 +382,11 @@ void ReshardingCoordinator::_stopMigrations(
     // migrations from racing with resharding to acquire the critical section.
     auto opCtx = _makeOperationContext();
     _reshardingCoordinatorExternalState->stopMigrations(
-        opCtx.get(), _coordinatorDoc.getSourceNss(), _coordinatorDoc.getSourceUUID(), [&] {
-            return _getNewSession(opCtx.get());
-        });
+        opCtx.get(),
+        _coordinatorDoc.getSourceNss(),
+        _coordinatorDoc.getSourceUUID(),
+        _coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
+        [&] { return _getNewSession(opCtx.get()); });
 
     resharding::tellAllParticipantsToJoinMigrations(opCtx.get(),
                                                     _getNewSession(opCtx.get()),
@@ -405,10 +407,12 @@ void ReshardingCoordinator::_resumeMigrations(OperationContext* opCtx,
 
     auto collectionUUID =
         abortReason ? _coordinatorDoc.getSourceUUID() : _coordinatorDoc.getReshardingUUID();
-    _reshardingCoordinatorExternalState->resumeMigrations(opCtx,
-                                                          _coordinatorDoc.getSourceNss(),
-                                                          collectionUUID,
-                                                          [&] { return _getNewSession(opCtx); });
+    _reshardingCoordinatorExternalState->resumeMigrations(
+        opCtx,
+        _coordinatorDoc.getSourceNss(),
+        collectionUUID,
+        _coordinatorDoc.getAuthoritativeMetadataAccessLevel(),
+        [&] { return _getNewSession(opCtx); });
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(

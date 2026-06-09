@@ -94,6 +94,31 @@ enums:
             kRunning: "running"
             kInactive: "inactive"
 
+    # TODO (SERVER-98118): Remove this enum once v9.0 become last-lts.
+    # Note: This is an exact copy of AuthoritativeMetadataAccessLevel in order to avoid a linking shuffle.
+    # Ideally we should instead rely on the existing enum but that's present on the Sharding Coordinator IDL file which
+    # would cause a lot of linking churn just to make the various resharding libraries use it since the sharding
+    # coordinator usages are all linked in a single big library.
+    ReshardingAuthoritativeMetadataAccessLevel:
+        description: >-
+            Indicates the level of access to authoritative metadata granted by the FCV state at the
+            time of DDL document creation. The possible values are:
+                - `kNone`: No access to authoritative metadata. The DDL operates in a
+                    non-authoritative mode.
+                - `kWritesAllowed`: Write operations are permitted on authoritative metadata, but
+                    read access remains restricted. In this phase, the DDL is responsible for
+                    cloning the authoritative metadata from the global catalog to the shard catalog
+                    and committing changes to both catalogs.
+                - `kWritesAndReadsAllowed`: Both read and write operations are fully enabled. The
+                    DDL must still commit to both catalogs, but cloning is no longer required, as
+                    authoritative metadata is already present and reliable.
+        type: string
+        mod_visibility: private
+        values:
+            kNone: "none"
+            kWritesAllowed: "writesAllowed"
+            kWritesAndReadsAllowed: "writesAndReadsAllowed"
+
 structs:
     CommonReshardingMetadata:
         description: "Immutable metadata shared across all node types for a resharding operation."
@@ -156,6 +181,11 @@ structs:
                 type: shard_id
                 description: Primary shard id for the given namespace being resharded
                 optional: true
+
+            authoritativeMetadataAccessLevel:
+                type: ReshardingAuthoritativeMetadataAccessLevel
+                description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
+                default: kNone
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."
