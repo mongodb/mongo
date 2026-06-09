@@ -137,20 +137,23 @@ structs:
             metadata verification.
         strict: false
         fields:
-            # TODO SERVER-124326: The timeseries collection fields should ideally be stored exclusively in the global catalog.
+            # TODO (SERVER-128439): make TimeseriesOptions comparable via the IDL and move it to
+            # 'CommonCollectionTypeBase'.
             timeseriesFields:
                 type: TypeCollectionTimeseriesFields
                 description:
                     "Time-series collection fields. Only set when this is a time-series
                     buckets collection."
                 optional: true
-            # The time it was last updated at is never stored in memory, therefore making in-memory checks difficult if comparing
-            # against the durable state. We avoid using this for comparison purposes in consistency checks.
+            # The time it was last updated at is never stored in memory, therefore making in-memory
+            # checks difficult if comparing against the durable state.
+            # We avoid using this for comparison purposes in consistency checks.
             lastmod:
                 cpp_name: updatedAt
                 type: date
                 description: "Contains the time of when the collection was either created."
                 optional: false
+
     ShardCatalogCollectionTypeBase:
         description:
             "Represents the layout and contents of documents contained in the shard's
