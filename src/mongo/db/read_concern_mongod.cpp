@@ -95,6 +95,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeLinearizableReadConcern);
+MONGO_FAIL_POINT_DEFINE(hangInWaitForLastStableRecoveryTimestampLoop);
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
 /**
@@ -513,29 +514,44 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                 ->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal));
         auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        Lock::GlobalLock global(opCtx,
-                                MODE_IS,
-                                Date_t::max(),
-                                Lock::InterruptBehavior::kThrow,
-                                Lock::GlobalLockOptions{.skipRSTLLock = true});
-        auto lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
-        if (!lastStableRecoveryTimestamp ||
-            *lastStableRecoveryTimestamp < atClusterTime->asTimestamp()) {
-            // If the lastStableRecoveryTimestamp hasn't passed atClusterTime, we invoke
-            // flushAllFiles explicitly here to push it. By default, fsync will run every minute to
-            // call flushAllFiles. The lastStableRecoveryTimestamp should already be updated after
-            // flushAllFiles return but we add a retry to make sure we wait until the timestamp gets
-            // advanced.
-            storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
-            while (true) {
-                lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
+        bool needsPoll = false;
+
+        {
+            Lock::GlobalLock global(opCtx,
+                                    MODE_IS,
+                                    Date_t::max(),
+                                    Lock::InterruptBehavior::kThrow,
+                                    Lock::GlobalLockOptions{.skipRSTLLock = true});
+            auto lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
+            if (!lastStableRecoveryTimestamp ||
+                *lastStableRecoveryTimestamp < atClusterTime->asTimestamp()) {
+                // flushAllFiles does not guarantee that the lastStableRecoveryTimestamp will
+                // advance, since with some persistence providers, secondaries do not take their own
+                // checkpoints.
+                storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
+                needsPoll = true;
+            }
+        }
+
+        // Poll until lastStableRecoveryTimestamp advances past atClusterTime. Each
+        // iteration briefly acquires Global IS to read the timestamp, then releases it
+        // before sleeping so that step-up (which needs Global X) can make progress.
+        while (needsPoll) {
+            opCtx->checkForInterrupt();
+            hangInWaitForLastStableRecoveryTimestampLoop.pauseWhileSet(opCtx);
+            {
+                Lock::GlobalLock global(opCtx,
+                                        MODE_IS,
+                                        Date_t::max(),
+                                        Lock::InterruptBehavior::kThrow,
+                                        Lock::GlobalLockOptions{.skipRSTLLock = true});
+                auto lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
                 if (lastStableRecoveryTimestamp &&
                     *lastStableRecoveryTimestamp >= atClusterTime->asTimestamp()) {
                     break;
                 }
-
-                opCtx->sleepFor(Milliseconds(100));
             }
+            opCtx->sleepFor(Milliseconds(100));
         }
     }
     return Status::OK();
