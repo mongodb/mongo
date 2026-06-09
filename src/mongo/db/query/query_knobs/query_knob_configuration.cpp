@@ -226,6 +226,10 @@ bool QueryKnobConfiguration::getEnablePathArrayness() const {
     return get(query_knobs::kEnablePathArrayness);
 }
 
+int64_t QueryKnobConfiguration::getOperationResponseMaxMS() const {
+    return get(query_knobs::kOperationResponseMaxMS);
+}
+
 bool QueryKnobConfiguration::getEnablePipelineOptimizationAdditionalTestingRules() const {
     return get(query_knobs::kEnablePipelineOptimizationAdditionalTestingRules);
 }

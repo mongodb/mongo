@@ -227,6 +227,46 @@ public:
         return soln && soln->root()->hasNode(STAGE_DISTINCT_SCAN);
     }
 
+    /**
+     * Type of response deadlines, after which the executor should perform a specific task inside a
+     * lengthy getNext() operation. This can be used to interrupt lengthy getNext() operations
+     * without terminating the entire query. Currently only used for change stream queries. This
+     * type of deadline is softer than maxTimeMS, which will terminate the entire query when
+     * reached.
+     */
+    enum class ResponseDeadlineType {
+        // No special deadline for producing the getNext() response. Note that a maxTimeMS deadline
+        // will still be applied.
+        kNone,
+
+        // When set, interrupts the executor inside a lengthy getNext() operation when the deadline
+        // is reached, and returns its current response to the caller. This is used when the query
+        // knob 'operationResponseMaxMS' is set to a value > 0.
+        kInterruptWork,
+
+        // When set, logs an info message about a long-running execution when the deadline is
+        // reached. This is used for change stream queries when the query knob
+        // 'operationResponseMaxMS' is set to a value > 0. Once the message is logged, the
+        // deadline type is changed to kNone to avoid logging the message again for the
+        // same query.
+        kLogInfoMessage,
+    };
+
+    /**
+     * Period of time after which a change stream query will log a warning about a lengthy operation
+     * if the query knob 'operationResponseMaxMS' is set to a value > 0. The log message is
+     * currently only emitted for change stream queries, and at most once per query.
+     */
+    static constexpr auto kLongOperationResponseLogInfoDeadline = Seconds(90);
+
+    /**
+     * Returns the type of the currently installed response deadline for lengthy getNext()
+     * operations.
+     */
+    ResponseDeadlineType getResponseDeadlineType_forTest() const {
+        return _responseDeadlineType;
+    }
+
 private:
     const QuerySolution* getQuerySolution() const {
         if (_qs) {
@@ -239,6 +279,15 @@ private:
     }
 
     ExecState _getNextImpl(Document* objOut, RecordId* dlOut);
+
+    // Calculates the value for the response deadline to be used. Returns boost::none if no
+    // response deadline is active.
+    boost::optional<Date_t> _calculateResponseDeadlineValue() const;
+
+    // Handles the configured response deadline. Expected '_responseDeadlineType' to be set to a
+    // value other than 'ResponseDeadlineType::kNone'. The function can modify the value of 'code'
+    // to PlanStage::StageState::IS_EOF.
+    void _handleResponseDeadline(PlanStage::StageState& code);
 
     // Helper for handling the NEED_YIELD stage state.
     void _handleNeedYield(size_t& writeConflictsInARow, size_t& tempUnavailErrorsInARow);
@@ -302,6 +351,14 @@ private:
 
     // Whether the executor must return owned BSON.
     bool _mustReturnOwnedBson;
+
+    // The currently used response deadline type.
+    ResponseDeadlineType _responseDeadlineType = ResponseDeadlineType::kNone;
+
+    // The date/time at which the executor should interrupts its work or logs a message about a
+    // lengthy operation ongoing. This currently only has an effect for change stream queries, but
+    // not for other queries.
+    boost::optional<Date_t> _responseDeadlineValue;
 
     // What namespace are we operating over?
     NamespaceString _nss;

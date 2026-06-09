@@ -48,6 +48,7 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_util.h"
@@ -56,6 +57,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 
@@ -63,6 +65,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -75,6 +78,12 @@ namespace mongo {
 namespace {
 const BSONObj kEmptyPBRT;
 const std::vector<NamespaceStringOrUUID> kEmptyNssVector;
+
+// Avoid logging the same message about long-running collection scans from different queries too
+// frequently.
+logv2::SeveritySuppressor longCollectionScanLogSeveritySuppressor{
+    Seconds(300), logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(3)};
+
 }  // namespace
 
 const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKnownCommittedOpTime =
@@ -108,6 +117,31 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _planExplainer(plan_explainer_factory::make(
           _root.get(), cachedPlanHash, std::move(replanReason), std::move(maybeExplainData))),
       _mustReturnOwnedBson(returnOwnedBson),
+      _responseDeadlineType([&]() -> ResponseDeadlineType {
+          // Determine response deadline type for change stream queries.
+          if (_expCtx && _expCtx->getChangeStreamSpec().has_value()) {
+              // Read value of 'operationResponseMaxMS' query knob to determine whether we
+              // should set a response deadline for gracefully interrupting long-running operations
+              // or logging a warning about long-running oplog scans.
+              if (auto value = _expCtx->getQueryKnobConfiguration().getOperationResponseMaxMS();
+                  value > 0) {
+                  // Use the response deadline to periodically interrupt the executor after a
+                  // user-configurable time period of performing work. This allows us to return
+                  // an updated PBRT to the consumer and check for interrupts more frequently during
+                  // long-running operations.
+                  return ResponseDeadlineType::kInterruptWork;
+              }
+              // Use the response deadline to log an info message about long-running operations that
+              // exceed 'kLongOperationResponseLogInfoDeadline'.
+              // This allows end users to discover that long-running operations can be interrupted
+              // via configuration. Currently only used for change stream queries.
+              return ResponseDeadlineType::kLogInfoMessage;
+          }
+
+          // No response deadline.
+          return ResponseDeadlineType::kNone;
+      }()),
+      _responseDeadlineValue(_calculateResponseDeadlineValue()),
       _nss(std::move(nss)) {
     invariant(!_expCtx || _expCtx->getOperationContext() == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
@@ -243,6 +277,10 @@ void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context
 
 void PlanExecutorImpl::detachFromOperationContext() {
     invariant(_currentState == kSaved);
+
+    // Reset response deadline because the request is over.
+    _responseDeadlineValue.reset();
+
     _opCtx = nullptr;
     _root->detachFromOperationContext();
     if (_expCtx) {
@@ -264,6 +302,11 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
     if (_expCtx) {
         _expCtx->setOperationContext(opCtx);
     }
+
+    // The response deadline value needs to be (re)computed here on every invocation, because
+    // the same plan executor instance can be used to service multiple getMore requests.
+    _responseDeadlineValue = _calculateResponseDeadlineValue();
+
     _currentState = kSaved;
 }
 
@@ -393,9 +436,16 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
     // capped insert notifier is necessary for the notifierVersion to advance.
     auto notifier = makeNotifier();
 
+    PlanStage::StageState code = PlanStage::ADVANCED;
+
     // This callback is used by the yielding code once all storage resources are released.
     const auto afterSnapshotAndLocksRelinquishedCb = [&]() {
         doWaitDuringYield();
+
+        if (_responseDeadlineType != ResponseDeadlineType::kNone) {
+            // The called function can modify the value of 'code' to PlanStage::StageState::IS_EOF.
+            _handleResponseDeadline(code);
+        }
     };
 
     for (;;) {
@@ -409,10 +459,14 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
                                                            afterSnapshotAndLocksRelinquishedCb,
                                                            RestoreContext::RestoreType::kYield,
                                                            _afterSnapshotAbandonFn));
+
+            if (code == PlanStage::IS_EOF) {
+                return PlanExecutor::IS_EOF;
+            }
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState code = _root->work(&id);
+        code = _root->work(&id);
 
         if (code != PlanStage::NEED_YIELD) {
             writeConflictsInARow = 0;
@@ -495,6 +549,72 @@ std::unique_ptr<insert_listener::Notifier> PlanExecutorImpl::makeNotifier() {
         return insert_listener::getCappedInsertNotifier(_opCtx, _collection, _yieldPolicy.get());
     }
     return nullptr;
+}
+
+boost::optional<Date_t> PlanExecutorImpl::_calculateResponseDeadlineValue() const {
+    if (_responseDeadlineType == ResponseDeadlineType::kNone) {
+        // No response deadline configured.
+        return boost::none;
+    }
+
+    auto now = _opCtx->getServiceContext()->getPreciseClockSource()->now();
+    if (_responseDeadlineType == ResponseDeadlineType::kInterruptWork) {
+        auto value = _expCtx->getQueryKnobConfiguration().getOperationResponseMaxMS();
+        tassert(
+            10290002,
+            "Expected 'operationResponseMaxMS' to be set to a value > 0 if response deadline type "
+            "is 'kInterruptWork'",
+            value > 0);
+
+        // Use configured operation response timeout as the response deadline. If the
+        // response deadline is reached, the executor will return whatever results it has
+        // accumulated plus an updated PBRT to the consumer.
+        return now + Milliseconds(value);
+    }
+
+    // Use hard-coded response deadline to inform the user about a long-running oplog scan at
+    // most once per change stream query.
+    tassert(10290003,
+            "Expected response deadline type to be 'kLogInfoMessage'",
+            _responseDeadlineType == ResponseDeadlineType::kLogInfoMessage);
+    return now + kLongOperationResponseLogInfoDeadline;
+}
+
+void PlanExecutorImpl::_handleResponseDeadline(PlanStage::StageState& code) {
+    tassert(10290004,
+            "expecting response deadline type to be set",
+            _responseDeadlineType != ResponseDeadlineType::kNone);
+    tassert(10290005,
+            "expecting response deadline value to be set",
+            _responseDeadlineValue.has_value());
+
+    if (auto now = _opCtx->getServiceContext()->getPreciseClockSource()->now();
+        now < *_responseDeadlineValue) {
+        // There is a response deadline, but it has not been reached.
+        return;
+    }
+
+    if (_responseDeadlineType == ResponseDeadlineType::kInterruptWork) {
+        // Set code to EOF so we exit the for loop directly after yielding. Also cancel any
+        // outstanding awaitData waits.
+        code = PlanStage::IS_EOF;
+        awaitDataState(_opCtx).shouldWaitForInserts = false;
+
+        LOGV2_DEBUG(
+            10290000, 3, "Interrupting long-running collection scan after configured deadline");
+    } else if (_responseDeadlineType == ResponseDeadlineType::kLogInfoMessage) {
+        // Avoid logging the same message again for this executor.
+        _responseDeadlineType = ResponseDeadlineType::kNone;
+        _responseDeadlineValue.reset();
+        LOGV2_DEBUG(10290001,
+                    longCollectionScanLogSeveritySuppressor().toInt(),
+                    "Long-running collection scan detected for query. This message will only be "
+                    "logged once per query. Set the value of the 'operationResponseMaxMS' "
+                    "server parameter to periodically return updates from long-running operations "
+                    "and prevent timeouts. See the documentation for more details: "
+                    "https://docs.mongodb.com/manual/reference/parameters/"
+                    "#param.operationResponseMaxMS");
+    }
 }
 
 void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,

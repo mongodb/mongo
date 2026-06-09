@@ -1031,6 +1031,27 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+
+    internalOperationResponseMaxMS:
+        description: >-
+            Limits the time that individual find/getMore requests are allowed to spend inside the plan
+            executor for a single operation.
+            Limiting the operation time allows a query to return periodic updates during lengthy operations
+            that do not produce intermediate results or do not fill an entire result batch.
+            Honoring the time limit is currently only implemented for change stream queries that scan
+            the oplog, but not for any other types of queries.
+            Execution is only interrupted when the query yields, so the time configured here is only
+            approximate.
+            A value of 0 means that the operation time is not bounded.
+        set_at: [startup, runtime]
+        cpp_varname: "internalOperationResponseMaxMS"
+        cpp_vartype: AtomicWord<long long>
+        validator: {gte: 0}
+        default: 0
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: operationResponseMaxMS
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

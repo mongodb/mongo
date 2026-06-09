@@ -62,6 +62,9 @@
     KNOB(kSbeHashAggIncreasedSpillingMode,                                                \
          kInternalQuerySlotBasedExecutionHashAggIncreasedSpillingName,                    \
          SbeHashAggIncreasedSpillingMode)                                                 \
+    KNOB(kOperationResponseMaxMS,                                                         \
+         kInternalOperationResponseMaxMSName,                                             \
+         internalOperationResponseMaxMS)                                                  \
     /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
 // clang-format on
 

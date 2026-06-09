@@ -809,6 +809,19 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "plan_executor_impl_response_deadline_test",
+    srcs = [
+        "plan_executor_impl_response_deadline_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
 mongo_cc_library(
     name = "replanning_required_info",
     srcs = [

@@ -127,6 +127,13 @@ public:
     bool getEnablePathArrayness() const;
 
     /**
+     * Returns the max amount of time that queries are allowed to spend uninterrupted in an
+     * operation's response. A value of 0 means "unlimited". Currently only meaningful for change
+     * stream queries.
+     */
+    int64_t getOperationResponseMaxMS() const;
+
+    /**
      * Returns whether to apply experimental testing aggregation pipeline rules.
      */
     bool getEnablePipelineOptimizationAdditionalTestingRules() const;

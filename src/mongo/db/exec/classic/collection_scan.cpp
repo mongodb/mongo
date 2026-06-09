@@ -69,8 +69,6 @@ MONGO_FAIL_POINT_DEFINE(hangCollScanDoWork);
 
 namespace mongo {
 
-using std::unique_ptr;
-
 namespace {
 bool shouldIncludeStartRecord(const CollectionScanParams& params) {
     return params.boundInclusion ==
@@ -83,6 +81,18 @@ const char* getStageName(const CollectionAcquisition& coll, const CollectionScan
         ? "CLUSTERED_IXSCAN"
         : "COLLSCAN";
 }
+
+void handleCollScanDoWorkFailpoint() {
+    if (auto fp = hangCollScanDoWork.scoped(); MONGO_unlikely(fp.isActive())) {
+        const BSONObj& data = fp.getData();
+        if (auto delay = data.getField("delay"_sd); delay.isNumber()) {
+            sleepFor(Milliseconds(delay.numberInt()));
+        } else {
+            hangCollScanDoWork.pauseWhileSet();
+        }
+    }
+}
+
 }  // namespace
 
 
@@ -183,7 +193,7 @@ BSONObj getFirstEntry(RecoveryUnit& ru, SeekableRecordCursor* newCursor) {
     newCursor->saveUnpositioned();
     newCursor->restore(ru);
     return entry;
-};
+}
 
 /**
  * Asserts that the timestamp has not already fallen off the oplog and then returns an unpositioned
@@ -243,9 +253,7 @@ void CollectionScan::initCursor(OperationContext* opCtx,
 }
 
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
-    if (MONGO_unlikely(hangCollScanDoWork.shouldFail())) {
-        hangCollScanDoWork.pauseWhileSet();
-    }
+    handleCollScanDoWorkFailpoint();
 
     if (_commonStats.isEOF) {
         _priority.reset();
@@ -545,13 +553,14 @@ void CollectionScan::doReattachToOperationContext() {
         _cursor->reattachToOperationContext(opCtx());
 }
 
-unique_ptr<PlanStageStats> CollectionScan::getStats() {
+std::unique_ptr<PlanStageStats> CollectionScan::getStats() {
     // Add a BSON representation of the filter to the stats tree, if there is one.
     if (nullptr != _filter) {
         _commonStats.filter = _filter->serialize();
     }
 
-    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_COLLSCAN);
+    std::unique_ptr<PlanStageStats> ret =
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_COLLSCAN);
     ret->specific = std::make_unique<CollectionScanStats>(_specificStats);
     return ret;
 }
