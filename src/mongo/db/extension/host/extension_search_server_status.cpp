@@ -50,4 +50,7 @@ Counter64& inLookupKickbackRetryCount =
 Counter64& inHybridSearchKickbackRetryCount =
     *MetricBuilder<Counter64>("extension.search.inHybridSearchKickbackRetries");
 
+Counter64& inFacetKickbackRetryCount =
+    *MetricBuilder<Counter64>("extension.search.inFacetKickbackRetries");
+
 }  // namespace mongo::search_metrics

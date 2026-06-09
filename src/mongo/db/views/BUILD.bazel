@@ -43,8 +43,7 @@ mongo_cc_library(
         "pipeline_resolver.cpp",
     ],
     # This library has a mutual dependency with //src/mongo/db/pipeline:pipeline.
-    # pipeline_factory.cpp (in pipeline) uses PipelineResolver::applyViewToLiteParsed,
-    # while pipeline_resolver.cpp uses Pipeline::parseFromLiteParsed. To break the cycle,
+    # pipeline_resolver.cpp uses Pipeline::parseFromLiteParsed. To break the cycle,
     # pipeline depends on pipeline_resolver, and the Pipeline symbols are resolved at
     # link time when both libraries are combined.
     no_undefined_ref_DO_NOT_USE = False,
@@ -87,6 +86,20 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipeline_resolver_test",
+    srcs = [
+        "pipeline_resolver_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":pipeline_resolver",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
         "//src/mongo/unittest",
     ],
 )

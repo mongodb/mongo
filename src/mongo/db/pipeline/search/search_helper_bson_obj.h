@@ -91,6 +91,20 @@ inline bool isExtensionMongotPipeline(
 }
 
 /**
+ * Returns true if the pipeline's first stage is a hybrid search stage ($rankFusion or
+ * $scoreFusion).
+ * TODO SERVER-121091 Delete once $rankFusion/$scoreFusion desugar at LiteParsed time; the BSON
+ * pipeline will no longer start with those stages by the time this is consulted.
+ */
+inline bool isHybridSearchBsonPipeline(const std::vector<BSONObj>& pipeline) {
+    if (pipeline.empty()) {
+        return false;
+    }
+    using detail::is;
+    return is<DocumentSourceRankFusion>(pipeline[0]) || is<DocumentSourceScoreFusion>(pipeline[0]);
+}
+
+/**
  * Checks that the pipeline isn't empty and if the first stage in the pipeline is a mongot stage
  * using the legacy implementation. Namely, that includes:
  * - $vectorSearch (legacy implementation only, extensions intentionally need to avoid this kind of

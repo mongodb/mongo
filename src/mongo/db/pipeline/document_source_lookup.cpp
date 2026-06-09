@@ -39,6 +39,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/extension/host/extension_search_server_status.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -56,6 +58,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
@@ -316,8 +319,14 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     // Currently, if the pipeline to be run on the joined collection is a
     // mongot pipeline (it starts with $search, $searchMeta), $lookup assumes the view is
     // mongot-indexed.
+    //
+    // Skip validation/view application when we know that the router already processed the view.
+    const bool pipelineIsAlreadyDesugared = !pipeline.empty() &&
+        pipeline[0].hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName);
+
     if (_fromNsIsAView &&
-        search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline)) {
+        search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline) &&
+        !pipelineIsAlreadyDesugared) {
         // The user pipeline is a mongot pipeline so we assume the view is a mongot-indexed view. As
         // such, we overwrite the view pipeline. This is because in the case of mongot queries on
         // mongot-indexed views, idLookup applies the view transforms as part of its subpipeline.
@@ -394,7 +403,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     BSONObj letVariables,
     boost::optional<std::pair<std::string, std::string>> localForeignFields,
     boost::optional<BSONObj> unwindSpec,
-    const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+    bool containsUserSpecifiedPipeline)
     : DocumentSourceLookUp(fromNs, as, pExpCtx) {
     resolvedPipelineHelper(fromNs, userPipeline, localForeignFields, pExpCtx);
 
@@ -413,7 +423,12 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     }
     _fromExpCtx->stopExpressionCounters();
 
-    _userPipeline = std::move(userPipeline);
+    // Note that we can't just check `userPipeline.empty()` here.
+    // For localField/foreignField joins, a placeholder $match is injected into userPipeline, making
+    // it non-empty even though no pipeline was given explicitly by the user.
+    if (containsUserSpecifiedPipeline) {
+        _userPipeline = std::move(userPipeline);
+    }
 
     insertFieldMatchPlaceholder();
 
@@ -422,6 +437,24 @@ DocumentSourceLookUp::DocumentSourceLookUp(
         _unwindSrc = boost::dynamic_pointer_cast<DocumentSourceUnwind>(
             DocumentSourceUnwind::createFromBson(unwindSpec->firstElement(), pExpCtx));
     }
+}
+
+void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
+    boost::intrusive_ptr<DocumentSourceLookUp>& lookupStage, size_t newIdx) {
+    if (!lookupStage->_fieldMatchPipelineIdx || newIdx == *lookupStage->_fieldMatchPipelineIdx)
+        return;
+    auto& resolvedPipeline = lookupStage->_sharedState->resolvedPipeline;
+    auto oldIdx = *lookupStage->_fieldMatchPipelineIdx;
+    tassert(12761200,
+            "Expected empty $match placeholder at old _fieldMatchPipelineIdx",
+            oldIdx < resolvedPipeline.size() && resolvedPipeline[oldIdx].hasField("$match"_sd) &&
+                resolvedPipeline[oldIdx]["$match"].Obj().isEmpty());
+    tassert(12761201,
+            "internalFieldMatchPipelineIdx out of range of resolvedPipeline",
+            newIdx <= resolvedPipeline.size() - 1);
+    resolvedPipeline.erase(resolvedPipeline.begin() + oldIdx);
+    resolvedPipeline.insert(resolvedPipeline.begin() + newIdx, BSON("$match" << BSONObj()));
+    lookupStage->_fieldMatchPipelineIdx = newIdx;
 }
 
 DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
@@ -459,17 +492,41 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
 
     // Without a subpipeline there is no desugared LPP to forward.
     if (!params.liteParsedPipeline) {
+        // When a $lookup has no user pipeline, bypass createFromBson and instead just use the
+        // provided view LPP directly.
+        if (auto viewInfo =
+                tryGetPreResolvedViewInfo(params.fromNss, expCtx->getResolvedNamespaces())) {
+            auto lpp = viewInfo->getViewPipeline();
+            return {make_intrusive<DocumentSourceLookUp>(std::move(params.fromNss),
+                                                         std::move(params.as),
+                                                         std::vector<BSONObj>{},
+                                                         std::move(lpp),
+                                                         std::move(params.letVariables),
+                                                         std::move(localForeignFields),
+                                                         std::move(params.unwindSpec),
+                                                         expCtx)};
+        }
         return {DocumentSourceLookUp::createFromBson(params.getOriginalBson(), expCtx)};
     }
 
-    return {make_intrusive<DocumentSourceLookUp>(std::move(params.fromNss),
-                                                 std::move(params.as),
-                                                 std::move(params.pipeline),
-                                                 std::move(*params.liteParsedPipeline),
-                                                 std::move(params.letVariables),
-                                                 std::move(localForeignFields),
-                                                 std::move(params.unwindSpec),
-                                                 expCtx)};
+    auto lookupStage = make_intrusive<DocumentSourceLookUp>(std::move(params.fromNss),
+                                                            std::move(params.as),
+                                                            std::move(params.pipeline),
+                                                            std::move(*params.liteParsedPipeline),
+                                                            std::move(params.letVariables),
+                                                            std::move(localForeignFields),
+                                                            std::move(params.unwindSpec),
+                                                            expCtx,
+                                                            !params.isPlaceholderInjected);
+
+    if (const auto& idx = params.internalFieldMatchPipelineIdx)
+        relocateFieldMatchPlaceholder(lookupStage, static_cast<size_t>(*idx));
+
+    if (params.internalFromIsAView) {
+        lookupStage->_fromNsIsAView = true;
+    }
+
+    return {lookupStage};
 }
 
 DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
@@ -486,55 +543,42 @@ DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
         return {DocumentSourceLookUp::createFromBson(typedParams->getOriginalBson(), expCtx)};
     }
 
+    if (hybrid_scoring_util::isHybridSearchPipeline(typedParams->pipeline)) {
+        const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
+        auto it = resolvedNamespaces.find(typedParams->fromNss);
+        bool fromNsIsView = it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView;
+        search_helpers::throwIfrKickbackIfNecessary(
+            fromNsIsView,
+            feature_flags::gFeatureFlagExtensionsInsideHybridSearch,
+            search_metrics::inLookupKickbackRetryCount,
+            "$lookup with $rankFusion/$scoreFusion targeting a view is not supported with "
+            "featureFlagExtensionsInsideHybridSearch enabled.");
+    }
+
     return DocumentSourceLookUp::createFromStageParams(*typedParams, expCtx);
 }
 
 ALLOCATE_AND_REGISTER_STAGE_PARAMS(lookup, LookUpStageParams)
 
-// TODO SERVER-125518 Move this function into LiteParsed.
+// TODO SERVER-125519 Move this function into LiteParsed.
 std::unique_ptr<Pipeline> DocumentSourceLookUp::parsePipelineFromLPPWithMaybeViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ResolvedNamespace& resolvedNs,
     LiteParsedPipeline& desugaredPipeline,
     const std::vector<BSONObj>& rawPipeline,
     const NamespaceString& userNss) {
-
-    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
-        isRawDataOperation(expCtx->getOperationContext())) {
-        // Raw Data operations on timeseries collections operate without the timeseries view.
-        return Pipeline::parseFromLiteParsed(desugaredPipeline, expCtx, lookupPipeValidator);
-    }
-
-    if (resolvedNs.pipeline.empty()) {
-        return Pipeline::parseFromLiteParsed(desugaredPipeline, expCtx, lookupPipeValidator);
-    }
-
-    // For search views, fall back to the BSON-based path since search view handling
-    // requires raw BSON pipeline inspection.
-    if (search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), rawPipeline)) {
-        auto opts = pipeline_factory::kDesugarOnly;
-        opts.validator = lookupPipeValidator;
-        return pipeline_factory::makePipelineFromViewDefinition(
-            expCtx, resolvedNs, std::vector<BSONObj>(rawPipeline), opts, userNss);
-    }
-
-    {
-        // Add resolved namespaces from view pipeline.
-        LiteParsedPipeline viewLiteParsedPipeline(resolvedNs.ns, resolvedNs.pipeline);
-        expCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
-    }
-
-    // Apply the view to the desugared LPP.
-    const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
-    PipelineResolver::applyViewToLiteParsed(
-        &desugaredPipeline,
-        resolvedView,
+    auto opts = pipeline_factory::kDesugarOnly;
+    opts.validator = lookupPipeValidator;
+    // $lookup's desugaredPipeline already has the view applied during LiteParsed resolution, so the
+    // factory must not re-stitch the view onto it.
+    return pipeline_factory::makePipelineFromViewDefinitionLPP(
+        expCtx,
+        resolvedNs,
+        desugaredPipeline,
+        rawPipeline,
         userNss,
-        expCtx->getResolvedNamespaces(),
-        LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
-
-    // Parse from the modified LiteParsedPipeline (already desugared, view already applied).
-    return Pipeline::parseFromLiteParsed(desugaredPipeline, expCtx, lookupPipeValidator);
+        opts,
+        /*stitchViewOntoUserPipeline=*/false);
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
@@ -542,6 +586,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
     : DocumentSource(kStageName, newExpCtx),
       _fromNs(original._fromNs),
       _resolvedNs(original._resolvedNs),
+      _fromNsIsAView(original._fromNsIsAView),
       _as(original._as),
       _localField(original._localField),
       _foreignField(original._foreignField),
@@ -916,6 +961,17 @@ void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     _fromExpCtx->startExpressionCounters();
     pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kOptionsMinimal;
     pipelineOpts.validator = lookupPipeValidator;
+    // When '_sharedState->resolvedPipeline' carries a foreign view's stages (e.g.
+    // [$lookup: {from: qux}] from a view-of-bar), those stages reference namespaces that the outer
+    // expCtx never saw — they came from the view definition, not the user's pipeline. Lite-parse
+    // the resolved pipeline and add its involved namespaces so the inner stages' ctors (which call
+    // getResolvedNamespace()) don't tassert. The LPP-based ctor's
+    // parsePipelineFromLPPWithMaybeViewDefinition does this explicitly; mirror it here for the
+    // BSON-based path (which fires when the user did not supply 'pipeline:').
+    if (_fromNsIsAView) {
+        LiteParsedPipeline viewLpp(_resolvedNs, _sharedState->resolvedPipeline);
+        _fromExpCtx->addResolvedNamespaces(viewLpp.getInvolvedNamespaces());
+    }
     _sharedState->resolvedIntrospectionPipeline =
         pipeline_factory::makePipeline(_sharedState->resolvedPipeline, _fromExpCtx, pipelineOpts);
     _fromExpCtx->stopExpressionCounters();
@@ -923,15 +979,20 @@ void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
 
 void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
                                             const SerializationOptions& opts) const {
-    // Support alternative $lookup from config.cache.chunks* namespaces.
-    //
+    // When serializing for a remote dispatch, fully resolve the foreign namespace. `inRouter`
+    // covers cases where the router is serializing to a shard, and `isSerializingForRemoteDispatch`
+    // covers cases where a shard is serializing to another shard.
+    const bool serializeForRemote =
+        getExpCtx()->getInRouter() || opts.isSerializingForRemoteDispatch;
+    const auto& serializeFromNs = (_fromNsIsAView && serializeForRemote) ? _resolvedNs : _fromNs;
+
     // Do not include the tenantId in serialized 'from' namespace.
-    auto fromValue = getExpCtx()->getNamespaceString().isEqualDb(_fromNs)
-        ? Value(opts.serializeIdentifier(_fromNs.coll()))
-        : Value(Document{
-              {"db",
-               opts.serializeIdentifier(_fromNs.dbName().serializeWithoutTenantPrefix_UNSAFE())},
-              {"coll", opts.serializeIdentifier(_fromNs.coll())}});
+    auto fromValue = getExpCtx()->getNamespaceString().isEqualDb(serializeFromNs)
+        ? Value(opts.serializeIdentifier(serializeFromNs.coll()))
+        : Value(Document{{"db",
+                          opts.serializeIdentifier(
+                              serializeFromNs.dbName().serializeWithoutTenantPrefix_UNSAFE())},
+                         {"coll", opts.serializeIdentifier(serializeFromNs.coll())}});
 
     MutableDocument output(Document{
         {getSourceName(), Document{{"from", fromValue}, {"as", opts.serializeFieldPath(_as)}}}});
@@ -940,6 +1001,21 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         output[getSourceName()]["localField"] = Value(opts.serializeFieldPath(_localField.value()));
         output[getSourceName()]["foreignField"] =
             Value(opts.serializeFieldPath(_foreignField.value()));
+        // We need to serialize the `fieldMatchPipelineIdx` when fully resolving views so that the
+        // remote receiver knows where the $match stage is.
+        if (_fromNsIsAView && serializeForRemote && _userPipeline &&
+            _fieldMatchPipelineIdx.has_value() && !opts.isSerializingForQueryStats() &&
+            !opts.isSerializingForExplain() && !opts.serializeForFLE2) {
+            output[getSourceName()]["$_internalFieldMatchPipelineIdx"] =
+                Value(static_cast<long long>(*_fieldMatchPipelineIdx));
+        }
+    }
+
+    // Save whether or not this `fromNs` was a view or not so that the remote receiver can make
+    // optimization choices (specifically for identity-view $lookups and SBE-lowering to EQ_LOOKUP).
+    if (_fromNsIsAView && serializeForRemote && !opts.isSerializingForQueryStats() &&
+        !opts.isSerializingForExplain() && !opts.serializeForFLE2) {
+        output[getSourceName()]["$_internalFromIsAView"] = Value(true);
     }
 
     // Add a pipeline field if only-pipeline syntax was used (to ensure the output is valid $lookup
@@ -1006,6 +1082,16 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
             return *_additionalFilter;
         }();
         serializedPipeline.emplace_back(BSON("$match" << serializedFilter));
+    }
+    // Even if the user did not provide a pipeline, we still need to serialize the view's pipeline.
+    if (_fromNsIsAView && serializeForRemote && !_userPipeline &&
+        _fieldMatchPipelineIdx.has_value() && *_fieldMatchPipelineIdx > 0 &&
+        !opts.isSerializingForQueryStats() && !opts.isSerializingForExplain() &&
+        !opts.serializeForFLE2) {
+        std::vector<BSONObj> rewrittenViewStages =
+            _sharedState->resolvedIntrospectionPipeline->serializeToBson(opts);
+        serializedPipeline.insert(
+            serializedPipeline.begin(), rewrittenViewStages.begin(), rewrittenViewStages.end());
     }
     if (!hasLocalFieldForeignFieldJoin() || serializedPipeline.size() > 0) {
         MutableDocument exprList;
@@ -1319,6 +1405,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         lookupStage->_unwindSrc = boost::dynamic_pointer_cast<DocumentSourceUnwind>(
             DocumentSourceUnwind::createFromBson(unwindSpec.firstElement(), pExpCtx));
     }
+
+    if (const auto& idx = lookupSpec.getInternalFieldMatchPipelineIdx())
+        relocateFieldMatchPlaceholder(lookupStage, static_cast<size_t>(*idx));
+
+    if (lookupSpec.getInternalFromIsAView().value_or(false)) {
+        lookupStage->_fromNsIsAView = true;
+    }
+
     return lookupStage;
 }
 

@@ -61,8 +61,10 @@ public:
 
     /**
      * Applies the view to a LiteParsedPipeline by constructing a ViewInfo from the resolved view,
-     * desugaring the view pipeline, and calling handleView(). This is the common logic used by both
-     * mongod and mongos view handling. Modifies 'userLPP' in place.
+     * desugaring the view pipeline, and calling handleView(). This is the legacy view-application
+     * helper used by FF-off paths. Modifies 'userLPP' in place.
+     * TODO SERVER-121094 Remove together with the FF-off branches in $unionWith / $lookup once
+     * featureFlagExtensionsInsideHybridSearch is fully rolled out.
      */
     static void applyViewToLiteParsed(LiteParsedPipeline* userLPP,
                                       const ResolvedView& resolvedView,
@@ -80,6 +82,31 @@ public:
                                      const NamespaceString& viewNss,
                                      const ResolvedNamespaceMap& resolvedNamespaces,
                                      const LiteParserOptions& options = LiteParserOptions{});
+
+    /**
+     * Walks 'lpp' and binds any view found at 'mainNss' in 'resolvedNamespaces', then recurses
+     * into each stage's subpipelines using the subpipeline's original parse NSS as the recursive
+     * 'mainNss'. Returns whether any view was bound.
+     */
+    static bool resolveInvolvedNamespacesOnLiteParsedPipeline(
+        LiteParsedPipeline* lpp,
+        const NamespaceString& mainNss,
+        const ResolvedNamespaceMap& resolvedNamespaces);
+
+    /**
+     * Inserts a ResolvedView into a ResolvedNamespaceMap.
+     * Creates a ResolvedNamespace from the view with view-specific options set.
+     *
+     * Threads the caller-supplied 'ifrContext' into the resulting ResolvedNamespace's
+     * LiteParserOptions so that extension stages inside the view pipeline lite-parse with the
+     * same feature-flag view as the top-level request. Pass nullptr if there is no relevant IFR
+     * context (e.g. internal test fixtures).
+     */
+    static void insertTopLevelViewEntry(
+        ResolvedNamespaceMap& resolvedNamespaces,
+        const NamespaceString& requestedNss,
+        const ResolvedView& resolvedView,
+        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     using MakeExpressionContextFn = std::function<boost::intrusive_ptr<ExpressionContext>(
         OperationContext*,
@@ -115,21 +142,29 @@ public:
     };
 
     /**
-     * Builds a resolved aggregation request from a view for mongos, handling special cases for
-     * mongot pipelines, timeseries views, and invoking bindViewInfo() for extension stages.
+     * Builds a resolved aggregation request for mongos, handling special cases for mongot
+     * pipelines, timeseries views, and invoking bindViewInfo() for extension stages.
      *
-     * This is the single entrypoint for mongos view resolution. It returns a fully resolved
-     * request with the pipeline set, and optionally a LiteParsedPipeline that was created during
-     * resolution (for regular views) to avoid recreating it later.
+     * If 'resolvedView' is set, the top-level namespace is a view and its pipeline is
+     * prepended to the user pipeline (modulo mongot/timeseries handling). If 'resolvedView' is
+     * boost::none, the top-level namespace is a base collection: the request namespace and
+     * pipeline shape are preserved, but 'preResolvedNamespaces' (a transitive closure of
+     * sub-pipeline view resolutions shipped back from a sentinel-primary kickback) is still
+     * threaded through the LiteParsedPipeline so $unionWith / $lookup subpipelines see the
+     * resolved views.
+     *
+     * Returns a fully resolved request with the pipeline set, and optionally a LiteParsedPipeline
+     * that was created during resolution (for regular views) to avoid recreating it later.
      */
     static MongosViewRequestResult buildResolvedMongosViewRequest(
         OperationContext* opCtx,
         const AggregateCommandRequest& request,
-        const ResolvedView& resolvedView,
+        const boost::optional<ResolvedView>& resolvedView,
         const NamespaceString& requestedNss,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
-        const MongosPipelineHelpers& helpers);
+        const MongosPipelineHelpers& helpers,
+        const ResolvedNamespaceMap& preResolvedNamespaces);
 };
 
 }  // namespace mongo

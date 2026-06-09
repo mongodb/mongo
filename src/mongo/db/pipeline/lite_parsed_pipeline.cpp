@@ -264,6 +264,12 @@ void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
                                     const ResolvedNamespaceMap& resolvedNamespaces) {
     bindViewInfoToStages(viewInfo, resolvedNamespaces);
 
+    if (viewInfo.isEmpty()) {
+        // No top-level view to prepend; bindViewInfo has already done all the work that's
+        // possible against an empty ViewInfo.
+        return;
+    }
+
     const auto firstStagePolicy = _stageSpecs.empty()
         ? FirstStageViewApplicationPolicy::kDefaultPrepend
         : _stageSpecs.front()->getFirstStageViewApplicationPolicy();
@@ -271,6 +277,16 @@ void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
         // If the first stage doesn't explicitly disallow it, clone and prepend the desugared view
         // pipeline to the current pipeline.
         auto clonedViewPipe = viewInfo.getViewPipeline();
+
+        // The view-definition stages may themselves carry subpipelines that target views (e.g. a
+        // $unionWith inside the view definition). Bind view info on them so they can inspect
+        // 'resolvedNamespaces'.
+        for (auto& stage : clonedViewPipe._stageSpecs) {
+            if (!stage->isHybridSearchStage()) {
+                stage->bindViewInfo(ViewInfo{}, resolvedNamespaces);
+            }
+        }
+
         _stitchFront(std::move(clonedViewPipe));
     }
 }

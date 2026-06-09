@@ -183,7 +183,8 @@ public:
                          BSONObj letVariables,
                          boost::optional<std::pair<std::string, std::string>> localForeignFields,
                          boost::optional<BSONObj> unwindSpec,
-                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         bool containsUserSpecifiedPipeline = true);
 
     static std::unique_ptr<Pipeline> parsePipelineFromLPPWithMaybeViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -296,6 +297,17 @@ public:
     }
 
     /**
+     * True when the foreign namespace was a view at parse time, or when the mongos-to-shard
+     * rewrite of 'from' to the view's backing collection carried the bit through
+     * $_internalFromIsAView. Read by sbe_pushdown.cpp to refuse lowering $lookup against view
+     * foreigns (including rename-only identity views where the pre-existing
+     * 'pipeline.empty()' proxy can't tell the foreign was a view).
+     */
+    bool fromNsIsAView() const {
+        return _fromNsIsAView;
+    }
+
+    /**
      * Rebuilds the _sharedState->resolvedPipeline from the
      * _sharedState->resolvedIntrospectionPipeline. This is required for server rewrites for FLE2.
      * The server rewrite code operates on DocumentSources of a parsed pipeline, which we obtain
@@ -348,6 +360,9 @@ protected:
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceLookUpToStageFn(
         const boost::intrusive_ptr<DocumentSource>& documentSource);
+
+    static void relocateFieldMatchPlaceholder(
+        boost::intrusive_ptr<DocumentSourceLookUp>& lookupStage, size_t newIdx);
 
     /**
      * Target constructor. Handles common-field initialization for the syntax-specific delegating
@@ -423,7 +438,7 @@ private:
 
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
-    bool _fromNsIsAView;
+    bool _fromNsIsAView = false;
 
     // Path to the "as" field of the $lookup where the matches output array will be created.
     FieldPath _as;

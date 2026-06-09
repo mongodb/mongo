@@ -108,9 +108,11 @@ public:
     LiteParsedRankFusion(const BSONElement& spec,
                          const NamespaceString& nss,
                          RankFusionSpec parsedSpec,
-                         std::vector<OwnedLiteParsedPipeline> pipelines)
+                         std::vector<OwnedLiteParsedPipeline> pipelines,
+                         bool extensionsInHybridSearchEnabled = false)
         : LiteParsedDocumentSourceNestedPipelines(spec, nss, std::move(pipelines)),
-          _parsedSpec(std::move(parsedSpec)) {}
+          _parsedSpec(std::move(parsedSpec)),
+          _extensionsInHybridSearchEnabled(extensionsInHybridSearchEnabled) {}
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
         return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
@@ -122,6 +124,18 @@ public:
 
     bool isSearchStage() const final {
         return !_pipelines.empty() && _pipelines[0]->hasSearchStage();
+    }
+
+    // Suppress recursive subpipeline view resolution. The desugar splices the first input
+    // pipeline directly into the outer pipeline and wraps the others in $unionWith, so applying
+    // the view to '_pipelines[]' here would produce duplicate view stages in the outer pipeline.
+    // Per-stage view application on the desugared $unionWith stages handles each input pipeline's
+    // view stitching once. See LiteParsedDocumentSource::shouldResolveSubpipelineViews() for the
+    // full rationale.
+    // TODO SERVER-125594 / SERVER-121091 Remove this override once $rankFusion desugars at
+    // LiteParsed time.
+    bool shouldResolveSubpipelineViews() const final {
+        return false;
     }
 
     bool isHybridSearchStage() const final {
@@ -177,6 +191,12 @@ public:
 
 private:
     RankFusionSpec _parsedSpec;
+    // True when featureFlagExtensionsInsideHybridSearch is enabled at parse time. The IFR kickback
+    // throw is deferred to validate() so it fires inside the runAggregate retry loop where the
+    // IFRFlagRetry handler can catch it. Throwing during parse() would propagate before that loop.
+    // TODO SERVER-121091: Remove once $rankFusion is supported with
+    // featureFlagExtensionsInsideHybridSearch.
+    bool _extensionsInHybridSearchEnabled = false;
 };
 
 }  // namespace mongo

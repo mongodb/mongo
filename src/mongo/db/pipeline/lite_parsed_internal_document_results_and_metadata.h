@@ -116,6 +116,12 @@ public:
         return FirstStageViewApplicationPolicy::kDoNothing;
     }
 
+    bool shouldResolveSubpipelineViews() const override {
+        // We explicitly handle injecting the view info into the subpipeline in `bindViewInfo`, so
+        // we do not need to recurse during view resolution.
+        return false;
+    }
+
     void bindViewInfo(const ViewInfo& viewInfo,
                       const ResolvedNamespaceMap& resolvedNamespaces) override {
         // Propagate the bound view info to the single source stage so the inner stage can apply the

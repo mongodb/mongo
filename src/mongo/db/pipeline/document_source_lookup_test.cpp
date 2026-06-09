@@ -32,16 +32,19 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/explain_options.h"
@@ -1014,6 +1017,71 @@ TEST_F(DocumentSourceLookUpTest, ExplainSerializesSubpipelineIncludingViewStages
     ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 2UL);
     ASSERT_FALSE(serializedStage["pipeline"][0].getDocument().getField("$match").missing());
     ASSERT_FALSE(serializedStage["pipeline"][1].getDocument().getField("$addFields").missing());
+}
+
+TEST_F(DocumentSourceLookUpTest,
+       CreateFromStageParamsRoutesThroughLppConstructorForLocalForeignFieldView) {
+    // Exercises the createFromStageParams path for $lookup:{from:view, localField, foreignField}
+    // with a pre-resolved LPP (shouldParseLpp = true). This mirrors the $unionWith fix: instead of
+    // falling back to createFromBson, the drain loop's pre-resolved LPP is used directly.
+    auto mainNss = NamespaceString::createNamespaceString_forTest("test", "main");
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test", "myView");
+    auto backingNss = NamespaceString::createNamespaceString_forTest("test", "backing");
+
+    // Enable featureFlagExtensionsInsideHybridSearch so parsePipelineFromLPPWithMaybeViewDefinition
+    // skips applyViewToLiteParsed (the LPP is already the view pipeline — calling it again would
+    // double-prepend).
+    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+    auto expCtx =
+        ExpressionContextBuilder{}.opCtx(getOpCtx()).ns(mainNss).ifrContext(ifrCtx).build();
+    expCtx->setMongoProcessInterface(std::make_shared<DocumentSourceLookupMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+
+    // Build a view entry with shouldParseLpp = true to simulate what the drain loop produces.
+    BSONObj viewStage = BSON("$addFields" << BSON("viewField" << 1));
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(
+        viewNss,
+        ResolvedNamespace(viewNss, backingNss, std::vector<BSONObj>{viewStage}, BSONObj{}, opts));
+    expCtx->setResolvedNamespaces(std::move(nsMap));
+
+    // Construct stage params for $lookup:{from:viewNss, localField:"id", foreignField:"id", as:"r"}
+    // with liteParsedPipeline absent (the localField/foreignField form produces no subpipeline
+    // LPP).
+    auto lookupBson =
+        BSON("$lookup" << BSON("from" << viewNss.coll() << "localField" << "id" << "foreignField"
+                                      << "id" << "as" << "r"));
+    LookUpStageParams params(viewNss,
+                             "r",
+                             {},
+                             BSONObj{},
+                             std::string{"id"},
+                             std::string{"id"},
+                             boost::none,
+                             false,
+                             false,
+                             lookupBson.firstElement(),
+                             boost::none);
+
+    auto sources = DocumentSourceLookUp::createFromStageParams(params, expCtx);
+    ASSERT_EQ(sources.size(), 1U);
+
+    auto* lookup = dynamic_cast<DocumentSourceLookUp*>(sources.front().get());
+    ASSERT_TRUE(lookup != nullptr);
+
+    // The introspection pipeline must contain exactly the one view stage ($addFields).
+    const auto* subPipeline = lookup->getSubPipeline();
+    ASSERT_TRUE(subPipeline != nullptr);
+    ASSERT_EQ(subPipeline->size(), 1U);
+    ASSERT_EQ(subPipeline->front()->getSourceName(), "$addFields"_sd);
+
+    // The BSON resolved pipeline must also carry the view stage (set by the base constructor).
+    ASSERT_EQ(lookup->getResolvedPipelineForTest().size(), 2U);  // view stage + $match placeholder
+    ASSERT_FALSE(lookup->getResolvedPipelineForTest()[0].getField("$addFields").eoo());
 }
 
 TEST_F(DocumentSourceLookUpTest,

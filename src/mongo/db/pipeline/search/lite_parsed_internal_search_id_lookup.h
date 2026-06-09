@@ -97,6 +97,11 @@ public:
     }
 
     void bindViewInfo(const ViewInfo& viewInfo, const ResolvedNamespaceMap&) override {
+        if (viewInfo.isEmpty()) {
+            // Empty ViewInfo means this stage is being notified that its pipeline is *not*
+            // running on a view. Nothing to bind.
+            return;
+        }
         _ownedSpec.setViewPipeline(viewInfo.getSerializedViewPipeline());
     }
 

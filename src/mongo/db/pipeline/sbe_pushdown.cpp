@@ -169,9 +169,10 @@ SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
         // than indexes into arrays, which is compatible with SBE.)
         && !FieldRef(lookup->getLocalField()->fullPath()).hasNumericPathComponents() &&
         !FieldRef(lookup->getForeignField()->fullPath()).hasNumericPathComponents()
-        // We currently don't lower $lookup against views ('_fromNs' does not correspond to a
-        // view).
-        && lookup->getExpCtx()->getResolvedNamespace(lookup->getFromNs()).pipeline.empty();
+        // We don't lower $lookup to SBE when the foreign is a view, including a rename-only
+        // identity view whose resolved pipeline is empty. 'fromNsIsAView()' is set at parse
+        // time and preserved across the mongos-to-shard 'from' rewrite.
+        && !lookup->fromNsIsAView();
     if (!sbeCompatibleByStageConfig) {
         sbeCompatibility = SbeCompatibility::notCompatible;
     }

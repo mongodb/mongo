@@ -186,20 +186,24 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, GetSpecReturnsConsistentReference) 
 }
 
 TEST_F(LiteParsedInternalSearchIdLookUpTest,
-       ApplyViewToLiteParsedStoresDesugaredViewPipelineInIdLookup) {
+       ResolveInvolvedNamespacesStoresDesugaredViewPipelineInIdLookup) {
     // Build a user pipeline consisting of a single $_internalSearchIdLookup stage.
     BSONObj idLookupSpec =
         BSON(LiteParsedInternalSearchIdLookUp::kStageName << BSON("limit" << 100LL));
     LiteParsedPipeline pipeline(kTestNss, std::vector<BSONObj>{idLookupSpec});
 
-    // Create a ResolvedView with a two-stage view pipeline.
+    // Create a ResolvedView with a two-stage view pipeline and register it in the namespace map.
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("status" << "active")),
                                          BSON("$project" << BSON("name" << 1 << "status" << 1))};
     const ResolvedView resolvedView{kResolvedNss, viewPipeline, BSONObj()};
 
-    // Call applyViewToLiteParsed() which desugars the view pipeline and invokes handleView().
-    PipelineResolver::applyViewToLiteParsed(
-        &pipeline, resolvedView, kViewNss, ResolvedNamespaceMap{});
+    ResolvedNamespaceMap resolvedNamespaces;
+    PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces, kTestNss, resolvedView);
+
+    // resolveInvolvedNamespacesOnLiteParsedPipeline desugars the view pipeline and invokes
+    // handleView().
+    PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+        &pipeline, kTestNss, resolvedNamespaces);
 
     // IdLookup has a kDoNothing policy so the view pipeline should NOT be prepended.
     const auto& stages = pipeline.getStages();

@@ -46,4 +46,6 @@ extern Counter64& inLookupKickbackRetryCount;
 
 extern Counter64& inHybridSearchKickbackRetryCount;
 
+extern Counter64& inFacetKickbackRetryCount;
+
 }  // namespace mongo::search_metrics

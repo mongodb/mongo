@@ -542,6 +542,64 @@ TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsReferencedFieldsBef
     ASSERT_FALSE(deps.needWholeDocument);
 }
 
+class MockMongoInterfaceWithQueryExecution : public StubMongoProcessInterface {
+public:
+    explicit MockMongoInterfaceWithQueryExecution(
+        std::deque<DocumentSource::GetNextResult> mockResults)
+        : _mockResults(std::move(mockResults)) {}
+
+    bool isExpectedToExecuteQueries() override {
+        return true;
+    }
+
+    std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
+        std::unique_ptr<Pipeline> pipeline,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) override {
+        pipeline->addInitialSource(
+            DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
+        return pipeline;
+    }
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        std::unique_ptr<Pipeline> pipeline,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) override {
+        return attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
+    }
+
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        std::unique_ptr<Pipeline> pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) override {
+        return attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
+    }
+
+    std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::unique_ptr<Pipeline> pipeline,
+        bool attachCursorAfterOptimizing,
+        std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) override {
+        if (optimizePipeline) {
+            optimizePipeline(pipeline.get());
+        }
+        if (attachCursorAfterOptimizing) {
+            return attachCursorSourceToPipelineForLocalRead(std::move(pipeline));
+        }
+        return pipeline;
+    }
+
+private:
+    std::deque<DocumentSource::GetNextResult> _mockResults;
+};
+
 TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
     auto expCtx = getExpCtx();
     NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
@@ -554,7 +612,7 @@ TEST_F(DocumentSourceUnionWithTest, RespectsViewDefinition) {
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 1}},
                                                                   Document{{"_id", 2}}};
     expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::move(mockForeignContents)));
+        std::make_shared<MockMongoInterfaceWithQueryExecution>(std::move(mockForeignContents)));
 
     const auto localMock =
         exec::agg::MockStage::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());
@@ -590,7 +648,7 @@ TEST_F(DocumentSourceUnionWithTest, ConcatenatesViewDefinitionToPipeline) {
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 1}},
                                                                   Document{{"_id", 2}}};
     expCtx->setMongoProcessInterface(
-        std::make_shared<MockMongoInterface>(std::move(mockForeignContents)));
+        std::make_shared<MockMongoInterfaceWithQueryExecution>(std::move(mockForeignContents)));
 
     const auto localMock =
         exec::agg::MockStage::createForTest({Document{{"_id"_sd, "local"_sd}}}, getExpCtx());

@@ -64,7 +64,10 @@ LiteParsedLookUp::LiteParsedLookUp(const BSONElement& spec,
                                    boost::optional<std::string> foreignField,
                                    boost::optional<BSONObj> unwindSpec,
                                    bool hasForeignDB,
-                                   bool isHybridSearch)
+                                   bool isHybridSearch,
+                                   boost::optional<int64_t> internalFieldMatchPipelineIdx,
+                                   bool internalFromIsAView,
+                                   bool isPlaceholderInjected)
     : LiteParsedDocumentSourceNestedPipelines(spec, std::move(foreignNss), std::move(pipeline)),
       _rawPipeline(std::move(rawPipeline)),
       _as(std::move(as)),
@@ -73,7 +76,10 @@ LiteParsedLookUp::LiteParsedLookUp(const BSONElement& spec,
       _foreignField(std::move(foreignField)),
       _unwindSpec(std::move(unwindSpec)),
       _hasForeignDB(hasForeignDB),
-      _isHybridSearch(isHybridSearch) {}
+      _isHybridSearch(isHybridSearch),
+      _internalFieldMatchPipelineIdx(internalFieldMatchPipelineIdx),
+      _internalFromIsAView(internalFromIsAView),
+      _isPlaceholderInjected(isPlaceholderInjected) {}
 
 std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString& nss,
                                                           const BSONElement& spec,
@@ -108,11 +114,25 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
             str::stream() << "invalid $lookup namespace: " << fromNss.toStringForErrorMsg(),
             fromNss.isValid());
 
+    if (!lookupSpec.getPipeline().has_value()) {
+        uassert(ErrorCodes::FailedToParse,
+                "$lookup with a 'let' argument must also specify 'pipeline'",
+                !lookupSpec.getLetVars().has_value());
+    }
+
     boost::optional<OwnedLiteParsedPipeline> ownedPipeline;
     std::vector<BSONObj> rawPipeline;
+    bool isPlaceholderInjected = false;
     if (lookupSpec.getPipeline().has_value()) {
         rawPipeline = lookupSpec.getPipeline().value();
         ownedPipeline = OwnedLiteParsedPipeline(fromNss, rawPipeline, options);
+    } else if (options.ifrContext &&
+               options.ifrContext->getSavedFlagValue(
+                   feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+        // The user did not provide a pipeline object, but the foreign namespace might still be a
+        // view - we inject a placeholder here so that bindViewInfo binds a subpipeline.
+        ownedPipeline = OwnedLiteParsedPipeline(fromNss, std::vector<BSONObj>{}, options);
+        isPlaceholderInjected = true;
     }
 
     std::string as = std::string{lookupSpec.getAs()};
@@ -135,6 +155,11 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
 
     const bool isHybridSearch = lookupSpec.getIsHybridSearch().value_or(false);
 
+    boost::optional<int64_t> internalFieldMatchPipelineIdx =
+        lookupSpec.getInternalFieldMatchPipelineIdx();
+
+    const bool internalFromIsAView = lookupSpec.getInternalFromIsAView().value_or(false);
+
     return std::make_unique<LiteParsedLookUp>(spec,
                                               std::move(fromNss),
                                               std::move(ownedPipeline),
@@ -145,7 +170,10 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
                                               std::move(foreignField),
                                               std::move(unwindSpec),
                                               hasForeignDB,
-                                              isHybridSearch);
+                                              isHybridSearch,
+                                              internalFieldMatchPipelineIdx,
+                                              internalFromIsAView,
+                                              isPlaceholderInjected);
 }
 
 PrivilegeVector LiteParsedLookUp::requiredPrivileges(bool isMongos,
@@ -211,7 +239,31 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
                                                _hasForeignDB,
                                                _isHybridSearch,
                                                getOriginalBson(),
-                                               std::move(lpp));
+                                               std::move(lpp),
+                                               _internalFieldMatchPipelineIdx,
+                                               _internalFromIsAView,
+                                               _isPlaceholderInjected);
+}
+
+void LiteParsedLookUp::bindViewInfo(const ViewInfo& viewInfo,
+                                    const ResolvedNamespaceMap& resolvedNamespaces) {
+    LiteParsedDocumentSourceNestedPipelines::bindViewInfo(viewInfo, resolvedNamespaces);
+    if (!_foreignNss || !_isPlaceholderInjected) {
+        return;
+    }
+    auto it = resolvedNamespaces.find(*_foreignNss);
+    if (it == resolvedNamespaces.end() || !it->second.involvedNamespaceIsAView) {
+        return;
+    }
+    // TODO SERVER-122116 Clean this up when ViewInfo is fully replaced by ResolvedNamespace.
+    ResolvedNamespace viewEntry = it->second;
+    viewEntry.liteParseViewPipeline();
+    viewEntry.desugarViewPipeline();
+    if (_pipelines.empty()) {
+        _pipelines.push_back(std::move(*viewEntry.getMutableParsedPipeline()));
+    } else {
+        _pipelines[0] = std::move(*viewEntry.getMutableParsedPipeline());
+    }
 }
 
 void LiteParsedLookUp::validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {

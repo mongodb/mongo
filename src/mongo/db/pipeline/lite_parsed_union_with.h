@@ -63,13 +63,15 @@ public:
                          bool isHybridSearch,
                          // TODO SERVER-121262 Have the StageParams be owner of the BSONObj instead.
                          BSONElement originalBson,
-                         boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none)
+                         boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none,
+                         std::shared_ptr<ViewInfo> resolvedSubPipelineView = nullptr)
         : DefaultStageParams(originalBson),
           unionNss(std::move(unionNss)),
           pipeline(std::move(pipeline)),
           hasForeignDB(hasForeignDB),
           isHybridSearch(isHybridSearch),
-          liteParsedPipeline(std::move(liteParsedPipeline)) {}
+          liteParsedPipeline(std::move(liteParsedPipeline)),
+          resolvedSubPipelineView(std::move(resolvedSubPipelineView)) {}
 
     static const Id& id;
     Id getId() const final {
@@ -84,10 +86,18 @@ public:
     // search stage.
     bool isHybridSearch;
 
+    // TODO SERVER-127884 Remove the LPP from StageParams once the LP->DS->exec pipeline translation
+    // bridges the subpipeline across phase boundaries properly.
     // The desugared LiteParsedPipeline for the subpipeline. Present when the $unionWith spec
     // includes a pipeline in BSON object form, and absent when it includes string shorthand, i.e.
     // {$unionWith: "collName"}.
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
+
+    // The resolved view that the subpipeline targets, populated by
+    // LiteParsedDocumentSourceNestedPipelines::bindViewInfo at parse time. Null when the
+    // subpipeline target is not a view. Lets DocumentSourceUnionWith construction consume the
+    // resolved view directly, without re-looking it up from expCtx->getResolvedNamespaces().
+    std::shared_ptr<ViewInfo> resolvedSubPipelineView;
 };
 
 class LiteParsedUnionWith final

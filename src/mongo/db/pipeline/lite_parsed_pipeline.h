@@ -146,6 +146,11 @@ public:
         return LiteParsedPipeline(*this);
     }
 
+    void appendStage(std::unique_ptr<LiteParsedDocumentSource> stage) {
+        _stageSpecs.push_back(std::move(stage));
+        resetDeferredCaches();
+    }
+
     /**
      * Returns all foreign namespaces referenced by stages within this pipeline, if any.
      */
@@ -498,8 +503,8 @@ public:
      * pipeline is empty), the desugared view pipeline is cloned and prepended; otherwise it is not.
      *
      * The provided ViewInfo is not mutated. The resolvedNamespaces map is passed to each stage's
-     * bindViewInfo() to provide access to all resolved namespaces in the aggregation. This
-     * will be used for view resolution in secondary namespaces (e.g. `from` field in $unionWith or
+     * bindViewInfo() to provide access to all resolved namespaces in the aggregation. This will
+     * be used for view resolution in secondary namespaces (e.g. `from` field in $unionWith or
      * $lookup).
      */
     void handleView(const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces);

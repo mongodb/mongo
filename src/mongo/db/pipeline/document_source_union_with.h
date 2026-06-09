@@ -126,11 +126,15 @@ public:
                             bool hasForeignDB = false);
 
     // Constructor that accepts a pre-desugared LiteParsedPipeline for the subpipeline.
-    // Uses Pipeline::parseFromLiteParsed instead of re-parsing from BSON.
+    // Uses Pipeline::parseFromLiteParsed instead of re-parsing from BSON. 'resolvedSubPipelineView'
+    // is the resolved view recorded by LiteParsedDocumentSourceNestedPipelines::bindViewInfo at
+    // parse time; if non-null, it short-circuits the expCtx->getResolvedNamespaces() lookup that
+    // otherwise has to find the foreign namespace's resolved view.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             NamespaceString unionNss,
                             LiteParsedPipeline desugaredPipeline,
                             std::vector<BSONObj> userPipeline,
+                            std::shared_ptr<ViewInfo> resolvedSubPipelineView,
                             bool hasForeignDB);
 
     // Expose a constructor that skips the parsing step for testing purposes.
@@ -250,12 +254,15 @@ public:
         std::vector<BSONObj> currentPipeline,
         const NamespaceString& userNss);
 
+    // TODO SERVER-117260 Once $facet sub-pipelines go through LP view resolution (drain loop),
+    // viewAlreadyStitchedByDrainLoop will always be true and this parameter can be removed.
     static std::unique_ptr<Pipeline> parsePipelineFromLPPWithMaybeViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ResolvedNamespace& resolvedNs,
         LiteParsedPipeline& desugaredPipeline,
         const std::vector<BSONObj>& rawPipeline,
-        const NamespaceString& userNss);
+        const NamespaceString& userNss,
+        bool viewAlreadyStitchedByDrainLoop = false);
 
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
@@ -277,6 +284,9 @@ private:
     // Builds the complete {$unionWith: {coll: ..., db: ..., pipeline: ...}} Value from
     // pre-computed components. Handles collectionless and cross-db variations.
     Value buildUnionWithResult(Value pipelineValue, Value db, Value coll) const;
+
+    // TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
+    Value legacyUnionWithSerialize(const SerializationOptions& opts) const;
 
     std::shared_ptr<UnionWithSharedState> _sharedState;
 
@@ -300,6 +310,8 @@ private:
     // States whether this unionWith is crossDB and thus needs to serialize the db name in the
     // namespace.
     bool _hasForeignDB = false;
+
+    bool _fromNsIsAView = false;
 };
 
 }  // namespace mongo

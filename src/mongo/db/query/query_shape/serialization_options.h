@@ -267,6 +267,12 @@ struct SerializationOptions {
     // If set to true, serializes each stage and expression as needed for pull modifier in updates.
     bool serializeForUpdatePullModifier = false;
 
+    // True when serializing a pipeline that's about to be sent to another node (router-to-shard
+    // or shard-sub-router-to-peer). View-aware stages key off this to rewrite 'from:' to the
+    // resolved backing collection and emit the matching sidecar markers, so the receiver doesn't
+    // re-resolve the view. getInRouter() alone isn't enough — it's false on a shard sub-router.
+    bool isSerializingForRemoteDispatch = false;
+
     // Serialization state check helpers.
     bool isDefaultSerialization() const;
     bool isKeepingLiteralsUnchanged() const;

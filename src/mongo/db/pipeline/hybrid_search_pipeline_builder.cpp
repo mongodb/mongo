@@ -167,14 +167,39 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
                 ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
             if (hybridSearchFlagEnabled) {
                 auto unionNss = pExpCtx->getUserNss();
-                UnionWithStageParams params(
-                    std::move(unionNss), std::move(bsonPipeline), false, true, BSONElement());
+
+                // Build a pre-stitched LiteParsedPipeline for the internal $unionWith.
+                // parsePipelineFromLPPWithMaybeViewDefinition skips applyViewToLiteParsed when
+                // featureFlagExtensionsInsideHybridSearch is on (to avoid double-prepending for
+                // the normal drain-loop path). But this $unionWith is created at execution time
+                // from $rankFusion/$scoreFusion desugaring — the drain loop never ran on it — so
+                // we must stitch the view stages in here.
+                const auto& resolvedNamespaces = pExpCtx->getResolvedNamespaces();
+                auto viewIt = resolvedNamespaces.find(unionNss);
+                std::vector<BSONObj> stitchedPipeline;
+                if (viewIt != resolvedNamespaces.end() && viewIt->second.involvedNamespaceIsAView) {
+                    const auto& viewStages = viewIt->second.pipeline;
+                    stitchedPipeline.insert(
+                        stitchedPipeline.end(), viewStages.begin(), viewStages.end());
+                }
+                stitchedPipeline.insert(
+                    stitchedPipeline.end(), bsonPipeline.begin(), bsonPipeline.end());
+                LiteParsedPipeline lpp(
+                    unionNss, stitchedPipeline, false, LiteParserOptions{.ifrContext = ifrCtx});
+                lpp.makeOwned();
+
+                UnionWithStageParams params(std::move(unionNss),
+                                            std::move(bsonPipeline),
+                                            /* hasForeignDB= */ false,
+                                            /* isHybridSearch= */ true,
+                                            /* originalBson= */ BSONElement(),
+                                            std::move(lpp));
                 auto docSources = DocumentSourceUnionWith::createFromStageParams(params, pExpCtx);
                 outputStages.emplace_back(docSources.front());
             } else {
-                auto collName = pExpCtx->getUserNss().coll();
-                BSONObj inputToUnionWith =
-                    BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));
+                auto unionNss = pExpCtx->getUserNss();
+                BSONObj inputToUnionWith = BSON(
+                    "$unionWith" << BSON("coll" << unionNss.coll() << "pipeline" << bsonPipeline));
                 auto unionWithStage = DocumentSourceUnionWith::createFromBson(
                     inputToUnionWith.firstElement(), pExpCtx);
                 outputStages.emplace_back(unionWithStage);

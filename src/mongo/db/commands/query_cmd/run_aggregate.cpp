@@ -81,6 +81,7 @@
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/compiler/optimizer/join/executor.h"
@@ -1007,15 +1008,18 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
 enum class SecondParseRequirement { kNone, kReparseFromLPP, kReparseFromBson };
 
 /**
- * Applies the desugared view pipeline to the user's pipeline if this is a view aggregation.
- * Returns the second parse requirement indicating whether and how the pipeline needs to undergo its
- * second parse.
+ * Applies view stitching to the user's LPP. For a view aggregation this is the request's primary
+ * view; for a non-view aggregation this still walks the LPP so any sub-pipeline targeting a view
+ * (e.g. {$unionWith: {coll: viewA, pipeline: [...]}}) gets its view stages stitched in once at
+ * the LP layer. Returns the second parse requirement indicating whether and how the pipeline
+ * needs to undergo its second parse.
  */
 SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
                                               const AggCatalogState& aggCatalogState,
                                               LiteParsedPipeline* desugaredLPP,
                                               const SecondParseRequirement& currentRequirement) {
-    if (!aggExState.isView()) {
+    // Base case: nothing to resolve. Skip the catalog walk entirely.
+    if (!aggExState.isView() && desugaredLPP->getInvolvedNamespaces().empty()) {
         return currentRequirement;
     }
 
@@ -1024,7 +1028,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
     // rewrites.
     // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
     // timeseries collections will exist.
-    if (aggExState.getResolvedView().isTimeseries()) {
+    if (aggExState.isView() && aggExState.getResolvedView().isTimeseries()) {
         return SecondParseRequirement::kReparseFromBson;
     }
 
@@ -1033,26 +1037,36 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
     // TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and
     // handle the view through a bindViewInfo() override.
     if (search_helpers::isMongotLiteParsedPipeline(*desugaredLPP)) {
-        LOGV2_DEBUG(11856001, 4, "Skipping view pipeline prepend because this is a mongot query");
         // Still call bindViewInfo() on all stages so that any extension stages further in the
         // pipeline get properly validated against the view.
-        PipelineResolver::validateStagesOnView(
-            desugaredLPP,
-            aggExState.getResolvedView(),
-            aggExState.getOriginalNss(),
-            uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
-            LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
+        if (aggExState.isView()) {
+            LOGV2_DEBUG(
+                11856001, 4, "Skipping view pipeline prepend because this is a mongot query");
+            PipelineResolver::validateStagesOnView(
+                desugaredLPP,
+                aggExState.getResolvedView(),
+                aggExState.getOriginalNss(),
+                uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
+                LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
+        }
         return currentRequirement;
     }
 
-    // Desugar the viewPipeline and apply it to the desugared user pipeline.
-    PipelineResolver::applyViewToLiteParsed(
-        desugaredLPP,
-        aggExState.getResolvedView(),
-        aggExState.getOriginalNss(),
-        uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
-        LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
-    return SecondParseRequirement::kReparseFromLPP;
+    auto resolvedNamespaces =
+        uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx()));
+    if (aggExState.isView()) {
+        // Add the top-level namespace to the map, since its not present in the
+        // `additionalResolvedNamespaces` map.
+        PipelineResolver::insertTopLevelViewEntry(resolvedNamespaces,
+                                                  aggExState.getOriginalNss(),
+                                                  aggExState.getResolvedView(),
+                                                  aggCatalogState.getIfrContext());
+    }
+
+    bool anyViewBound = PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+        desugaredLPP, aggExState.getOriginalNss(), resolvedNamespaces);
+
+    return anyViewBound ? SecondParseRequirement::kReparseFromLPP : currentRequirement;
 }
 
 /**
@@ -1487,52 +1501,50 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
-    // If this is a view, we may need to resolve the view and recreate the AggExState and
-    // AggCatalogState for the resolved pipeline.
-    if (aggCatalogState->lockAcquired() && aggCatalogState->getMainCollectionOrView().isView()) {
-        // We do not need to expand the view pipeline when there is a $collStats stage, as
-        // $collStats is supported on a view namespace. For a time-series collection, however,
-        // the view is abstracted out for the users, so we needed to resolve the namespace to
-        // get the underlying bucket collection.
-        const auto& view = aggCatalogState->getMainCollectionOrView().getView();
-        const auto shouldViewBeExpanded =
-            !aggExState->startsWithCollStats() || view.getViewDefinition().timeseries();
+    // Under featureFlagExtensionsInsideHybridSearch, if the request came from a router, proactively
+    // resolve the transitive closure of sub-pipeline namespaces and — if any resolve to a view —
+    // throw a ResolvedView so mongos reparses with view expansions inlined and re-dispatches.
+    // Otherwise this is a no-op (legacy per-namespace resolution during ExpressionContext
+    // construction handles it). See the method comment for the fold-top-level-view behavior.
+    aggCatalogState->maybeProactivelyResolveInvolvedNamespaces(*aggExState);
 
-        if (shouldViewBeExpanded) {
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    "mapReduce on a view is not supported",
-                    !aggExState->getRequest().getIsMapReduceCommand());
+    // If the main namespace is a view we need to expand (i.e. not a pass-through $collStats on a
+    // non-timeseries view), resolve it and recreate the AggExState / AggCatalogState for the
+    // underlying pipeline.
+    if (aggCatalogState->shouldExpandMainView()) {
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                "mapReduce on a view is not supported",
+                !aggExState->getRequest().getIsMapReduceCommand());
 
-            // "Convert" aggExState into resolvedViewAggExState. Note that this will make the
-            // initial aggExState object unusable.
-            auto swResolvedViewAggExState =
-                ResolvedViewAggExState::create(std::move(aggExState), *aggCatalogState);
-            if (!swResolvedViewAggExState.isOK()) {
-                return swResolvedViewAggExState.getStatus();
-            }
-
-            auto resolvedViewAggExState = std::move(swResolvedViewAggExState.getValue());
-
-            // With the view and collation resolved, we can relinquish locks on the view namespace.
-            // We will create a new catalog state with the underlying collection information.
-            aggCatalogState->relinquishResources();
-            aggCatalogState.reset();
-
-            OperationContext* opCtx = resolvedViewAggExState->getOpCtx();
-            if (OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx)) {
-                // Sharding-aware operation on a view: execute the resolved aggregation under the
-                // shard-role for the underlying collection.
-                return runAggregateOnShardedView(std::move(resolvedViewAggExState), result);
-            }
-
-            // Non-sharded view: treat the resolved view as the new AggExState and proceed normally.
-            aggExState = std::move(resolvedViewAggExState);
-
-            // Re-run validation on the resolved request, then rebuild catalog state for the
-            // underlying collection.
-            aggExState->performValidationChecks();
-            aggCatalogState = aggExState->createAggCatalogState();
+        // "Convert" aggExState into resolvedViewAggExState. Note that this will make the
+        // initial aggExState object unusable.
+        auto swResolvedViewAggExState =
+            ResolvedViewAggExState::create(std::move(aggExState), *aggCatalogState);
+        if (!swResolvedViewAggExState.isOK()) {
+            return swResolvedViewAggExState.getStatus();
         }
+
+        auto resolvedViewAggExState = std::move(swResolvedViewAggExState.getValue());
+
+        // With the view and collation resolved, we can relinquish locks on the view namespace.
+        // We will create a new catalog state with the underlying collection information.
+        aggCatalogState->relinquishResources();
+        aggCatalogState.reset();
+
+        OperationContext* opCtx = resolvedViewAggExState->getOpCtx();
+        if (OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx)) {
+            // Sharding-aware operation on a view: execute the resolved aggregation under the
+            // shard-role for the underlying collection.
+            return runAggregateOnShardedView(std::move(resolvedViewAggExState), result);
+        }
+
+        // Non-sharded view: treat the resolved view as the new AggExState and proceed normally.
+        aggExState = std::move(resolvedViewAggExState);
+
+        // Re-run validation on the resolved request, then rebuild catalog state for the
+        // underlying collection.
+        aggExState->performValidationChecks();
+        aggCatalogState = aggExState->createAggCatalogState();
     }
 
     // At this point, aggExState and aggCatalogState both describe the final namespace/pipeline

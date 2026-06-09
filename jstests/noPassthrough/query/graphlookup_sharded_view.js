@@ -6,6 +6,7 @@
 //    requires_profiling,
 //  ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const sharded = new ShardingTest({
@@ -19,6 +20,19 @@ const primaryShard = sharded.shard0;
 assert(sharded.adminCommand({enableSharding: testDBName, primaryShard: primaryShard.shardName}));
 
 const testDB = sharded.getDB(testDBName);
+
+// Under featureFlagExtensionsInsideHybridSearch, mongos proactively walks a
+// top-level view's pipeline transitively at kickback time and folds nested-view discoveries into
+// the same kickback's 'additionalResolvedNamespaces'. The single kickback's slow-query
+// 'resolvedViews' profile entry then records each folded view's 'dependencyChain', so
+// per-namespace chain-occurrence counts go up by one for every test case that involves a nested
+// view chain. 'chainCount(legacy)' returns the appropriate count for either path.
+// TODO SERVER-121094: remove this gate (and inline the new counts at every call site) when
+// the legacy view-resolution path is removed.
+const proactiveViewResolution = FeatureFlagUtil.isEnabled(testDB, "ExtensionsInsideHybridSearch");
+function chainCount(legacyCount) {
+    return proactiveViewResolution ? legacyCount + 1 : legacyCount;
+}
 
 // Drop the 'profile' tables and then enable profiling on all shards.
 for (const shard of [sharded.shard0, sharded.shard1, sharded.shard2]) {
@@ -327,7 +341,7 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another four on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": 4},
+    expectedExceptions: {"test.docs": 1, "test.subjects": chainCount(4)},
 });
 
 // Create a view with a pipeline on 'physicists' to test resolution of a view on another view.
@@ -367,7 +381,7 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // one on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": 1},
+    expectedExceptions: {"test.docs": 1, "test.subjects": chainCount(1)},
 });
 
 // Test a $graphLookup with restrictSearchWithMatch that triggers a
@@ -404,7 +418,7 @@ testGraphLookupView({
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another two on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
-    expectedExceptions: {"test.docs": 1, "test.subjects": 2},
+    expectedExceptions: {"test.docs": 1, "test.subjects": chainCount(2)},
 });
 
 sharded.stop();

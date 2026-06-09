@@ -56,8 +56,7 @@ namespace mongo {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ResolvedView);
 
 ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
-    ResolvedNamespace inner = ResolvedNamespace::fromBSON(commandResponseObj);
-    return ResolvedView(std::move(inner));
+    return ResolvedView(ResolvedNamespace::fromBSON(commandResponseObj));
 }
 
 void ResolvedView::serialize(BSONObjBuilder* builder) const {
@@ -65,7 +64,7 @@ void ResolvedView::serialize(BSONObjBuilder* builder) const {
 }
 
 std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdReply) {
-    return std::make_shared<ResolvedView>(*ResolvedNamespace::parse(cmdReply));
+    return std::make_shared<ResolvedView>(fromBSON(cmdReply));
 }
 
 ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
@@ -73,7 +72,7 @@ ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
 }
 
 void ResolvedView::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-    _wrappedNamespace.serialize(builder);
+    serialize(builder);
 }
 
 void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {

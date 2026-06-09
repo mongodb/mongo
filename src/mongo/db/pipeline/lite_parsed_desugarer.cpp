@@ -32,7 +32,6 @@
 #include "mongo/base/init.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 
 namespace mongo {
 

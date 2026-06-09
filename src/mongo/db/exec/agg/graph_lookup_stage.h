@@ -67,7 +67,6 @@ public:
                      const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                      GraphLookUpParams params,
                      boost::intrusive_ptr<ExpressionContext> fromExpCtx,
-                     std::vector<BSONObj> fromPipeline,
                      boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwind,
                      Variables variables,
                      VariablesParseState variablesParseState);
@@ -197,15 +196,12 @@ private:
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
 
-    // The aggregation pipeline to perform against the '_from' namespace.
-    std::vector<BSONObj> _fromPipeline;
-
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
 
     // Holds variables defined both in this stage and in parent pipelines. These are copied to the
     // '_fromExpCtx' ExpressionContext's 'variables' and 'variablesParseState' for use in the
-    // '_fromPipeline' execution.
+    // '_params.fromLpp' execution.
     Variables _variables;
     VariablesParseState _variablesParseState;
 

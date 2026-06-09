@@ -108,6 +108,26 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     const NamespaceString& originalNs);
 
 /**
+ * If 'resolvedNs' refers to a view with a non-simple default collation, builds the corresponding
+ * collator and installs it on 'expCtx'. No-op for collections and simple-collation views.
+ */
+void applyViewDefaultCollation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               const ResolvedNamespace& resolvedNs);
+
+/**
+ * LiteParsed-input sibling of makePipelineFromViewDefinition(). Builds a sub-pipeline from an
+ * already-desugared LiteParsedPipeline rather than raw BSON.
+ */
+std::unique_ptr<Pipeline> makePipelineFromViewDefinitionLPP(
+    const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
+    const ResolvedNamespace& resolvedNs,
+    LiteParsedPipeline& desugaredUserPipeline,
+    const std::vector<BSONObj>& rawPipeline,
+    const NamespaceString& userNss,
+    const MakePipelineOptions& opts,
+    bool stitchViewOntoUserPipeline);
+
+/**
  * Parses a facet sub-pipeline from a vector of raw BSONObjs by sending the raw pipeline through
  * LiteParsed before creating the Pipeline. This skips top-level validation because facet
  * sub-pipelines have different validation requirements than top-level pipelines.

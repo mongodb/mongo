@@ -438,6 +438,60 @@ TEST(LiteParsedPipelineClone, CloneClonesSubpipelinesForNestedStages) {
               clonedSubPipelines[0]->getStages()[0].get());
 }
 
+TEST(LiteParsedDocumentSourceNestedPipelinesBindViewInfo, BindsViewWhenSubpipelineTargetIsAView) {
+    // $lookup with a subpipeline that targets "viewColl".
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest("test", "viewColl");
+    const NamespaceString kBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "backingColl");
+
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "viewColl"
+                                      << "let" << BSONObj() << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("a" << 1))) << "as"
+                                      << "joined")),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages);
+    auto& stage = lpp.getStages()[0];
+
+    // Map says viewColl is a view backed by backingColl.
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kForeignNss,
+                ResolvedNamespace(kForeignNss,
+                                  kBackingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("v" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    // bindViewInfo with an empty ViewInfo should still bind the subpipeline view from the map.
+    stage->bindViewInfo(ViewInfo{}, map);
+
+    auto bound = stage->getResolvedSubPipelineView();
+    ASSERT_TRUE(bound != nullptr);
+    ASSERT_EQ(bound->getViewName(), kForeignNss);
+}
+
+TEST(LiteParsedDocumentSourceNestedPipelinesBindViewInfo,
+     DoesNotBindWhenSubpipelineTargetIsNotAView) {
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "regularColl"
+                                      << "let" << BSONObj() << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("a" << 1))) << "as"
+                                      << "joined")),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages);
+    auto& stage = lpp.getStages()[0];
+
+    // Empty map → subpipeline target isn't a view.
+    ResolvedNamespaceMap map;
+    stage->bindViewInfo(ViewInfo{}, map);
+
+    ASSERT_TRUE(stage->getResolvedSubPipelineView() == nullptr);
+}
+
 TEST(LiteParsedPipelineClone, DeferredCachesAreResetInClonedPipeline) {
     // Create a pipeline that involves a foreign namespace to populate the deferred cache.
     std::vector<BSONObj> pipelineStages = {

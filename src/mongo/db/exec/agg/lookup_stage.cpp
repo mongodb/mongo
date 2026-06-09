@@ -337,7 +337,8 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
     // first input document.
-    _sharedState->resolvedPipeline = resolvedPipeline->serializeToBson();
+    SerializationOptions wireOptsForResolvedStore{.isSerializingForRemoteDispatch = true};
+    _sharedState->resolvedPipeline = resolvedPipeline->serializeToBson(wireOptsForResolvedStore);
 
     LOGV2_DEBUG(3254800,
                 3,

@@ -15,6 +15,7 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
 import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -94,10 +95,36 @@ function assertGraphLookupExecution(pipeline, opts, expectedResults, executionLi
             assert.eq(totalGraphLookupExecution, 1);
         }
 
+        // If 'toplevelExecTotal' is set, the isSentinelPrimary kickback causes a non-deterministic
+        // extra retry that may land on either shard (depending on which is primary at the time of
+        // the kickback, which varies across suites due to config stepdowns). In that case we only
+        // verify the aggregate count across all shards rather than the per-shard breakdown.
+        if (exec.hasOwnProperty("toplevelExecTotal")) {
+            const toplevelFilter = {
+                "command.aggregate": collName,
+                "command.comment": opts.comment,
+                "command.pipeline.$graphLookup": {$exists: !isLookup},
+                "command.pipeline.$lookup": {$exists: isLookup},
+                "errName": {$nin: ["StaleConfig", "CommandOnShardedViewNotSupportedOnMongod"]},
+            };
+            const totalToplevelExec = shardList.reduce(
+                (n, shard) => n + shard.system.profile.find(toplevelFilter).itcount(),
+                0,
+            );
+            assert.eq(
+                totalToplevelExec,
+                exec.toplevelExecTotal,
+                "Expected total toplevelExec across all shards to be " +
+                    exec.toplevelExecTotal +
+                    " but got " +
+                    totalToplevelExec,
+            );
+        }
+
         for (let shard = 0; shard < shardList.length; shard++) {
             // Confirm that top-level execution is as expected. In the nested cases, the top level
             // is a $lookup, so we check either for $lookup or $graphLookup as appropriate.
-            if (!exec.randomlyDelegatedMerger) {
+            if (!exec.randomlyDelegatedMerger && !exec.hasOwnProperty("toplevelExecTotal")) {
                 profilerHasNumMatchingEntriesOrThrow({
                     profileDB: shardList[shard],
                     filter: {
@@ -105,7 +132,7 @@ function assertGraphLookupExecution(pipeline, opts, expectedResults, executionLi
                         "command.comment": opts.comment,
                         "command.pipeline.$graphLookup": {$exists: !isLookup},
                         "command.pipeline.$lookup": {$exists: isLookup},
-                        "errName": {$ne: "StaleConfig"},
+                        "errName": {$nin: ["StaleConfig", "CommandOnShardedViewNotSupportedOnMongod"]},
                     },
                     numExpectedMatches: exec.toplevelExec[shard],
                 });
@@ -448,11 +475,14 @@ pipeline = [
     {$project: {firstName: 1, "destinations.airport": 1, "destinations.nearbyAirfields.airfield": 1}},
 ];
 
+// Under proactive view resolution, we kickback to the mongos to fully plan a resolved pipeline,
+// rather than resolve views locally at execution time.
+const proactiveViewResolutionEnabled = FeatureFlagUtil.isEnabled(mongosDB, "ExtensionsInsideHybridSearch");
 assertGraphLookupExecution(pipeline, {comment: "sharded_to_sharded_view_to_sharded"}, expectedRes, [
     {
         // The 'travelers' collection is sharded, so the $graphLookup stage is executed in parallel
         // on every shard that contains the local collection.
-        toplevelExec: [1, 1],
+        toplevelExecTotal: proactiveViewResolutionEnabled ? 3 : 2,
         // Each node executing the $graphLookup will, for every document that flows through the
         // stage, target the shard(s) that holds the relevant data for the sharded foreign view.
         recursiveMatchExec: [0, 3],
@@ -580,7 +610,7 @@ assertGraphLookupExecution(pipeline, {comment: "sharded_to_sharded_lookup_view_t
     {
         // The 'travelers' collection is sharded, so the $graphLookup stage is executed in
         // parallel on every shard that contains the local collection.
-        toplevelExec: [1, 1],
+        toplevelExecTotal: proactiveViewResolutionEnabled ? 3 : 2,
         // Each node executing the $graphLookup will, for every document that flows through the
         // stage, target the shard(s) that holds the relevant data for the sharded foreign view.
         recursiveMatchExec: [0, 3],

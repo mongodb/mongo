@@ -34,9 +34,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/extension/host/extension_search_server_status.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
 #include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -45,8 +48,11 @@
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -149,6 +155,56 @@ std::string getStageNameNotAllowedInFacet(const DocumentSource& source, StringDa
         return fmt::format("{} inside of {}", sourceName, parentName);
     }
     return std::string{sourceName};
+}
+
+// Returns true when any $unionWith or $lookup stage in a facet sub-pipeline names a collection
+// that resolves to a view. Handles the string shorthand, {coll} object, and cross-db {db, coll}
+// object forms for both stages, then checks the resolved-namespace map.
+bool facetSubPipelinesTargetView(const vector<pair<string, vector<BSONObj>>>& rawFacetPipelines,
+                                 const ResolvedNamespaceMap& resolvedNamespaces,
+                                 const DatabaseName& dbName) {
+    // Extract a NamespaceString from a $unionWith spec element (string or {coll[, db]} object)
+    // or a $lookup "from" element (string or {db, coll} object).
+    auto parseNss = [&](const BSONElement& elem) -> boost::optional<NamespaceString> {
+        if (elem.type() == BSONType::string) {
+            return NamespaceStringUtil::deserialize(dbName, elem.String());
+        }
+        if (elem.type() == BSONType::object) {
+            auto collElem = elem.Obj()["coll"];
+            if (collElem.type() != BSONType::string)
+                return boost::none;
+            if (auto dbElem = elem.Obj()["db"]; dbElem.type() == BSONType::string) {
+                auto targetDb = DatabaseNameUtil::deserialize(
+                    dbName.tenantId(), dbElem.String(), SerializationContext::stateDefault());
+                return NamespaceStringUtil::deserialize(targetDb, collElem.String());
+            }
+            return NamespaceStringUtil::deserialize(dbName, collElem.String());
+        }
+        return boost::none;
+    };
+
+    for (const auto& [facetName, pipeline] : rawFacetPipelines) {
+        for (const auto& stageObj : pipeline) {
+            StringData stageName = stageObj.firstElementFieldNameStringData();
+            boost::optional<NamespaceString> targetNss;
+
+            if (stageName == "$unionWith") {
+                targetNss = parseNss(stageObj.firstElement());
+            } else if (stageName == "$lookup") {
+                if (stageObj.firstElement().type() == BSONType::object) {
+                    targetNss = parseNss(stageObj.firstElement().Obj()["from"]);
+                }
+            }
+
+            if (targetNss) {
+                if (auto it = resolvedNamespaces.find(*targetNss);
+                    it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 }  // namespace
@@ -312,12 +368,34 @@ void DocumentSourceFacet::addVariableRefs(std::set<Variables::Id>* refs) const {
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    auto rawFacetPipelines = extractRawPipelines(elem);
+
+    // $facet bypasses the LPP view resolution code in the aggregate code by reparsing from raw
+    // BSON. When featureFlagExtensionsInsideHybridSearch is on, those inner stages skip
+    // applyViewToLiteParsed assuming that views were already bound. In these scenarios, retry the
+    // aggregate again with the feature flag off so that we have correct view resolution behavior
+    // across all subpipelines.
+    auto ifrCtx = expCtx->getIfrContext();
+    auto hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (hybridSearchFlagEnabled) {
+        bool hasViewTargetingStage =
+            facetSubPipelinesTargetView(rawFacetPipelines,
+                                        expCtx->getResolvedNamespaces(),
+                                        expCtx->getNamespaceString().dbName());
+        search_helpers::throwIfrKickbackIfNecessary(
+            hasViewTargetingStage,
+            feature_flags::gFeatureFlagExtensionsInsideHybridSearch,
+            search_metrics::inFacetKickbackRetryCount,
+            "$facet with $unionWith/$lookup targeting a view is not supported with "
+            "featureFlagExtensionsInsideHybridSearch enabled.");
+    }
 
     boost::optional<std::string> needsRouter;
     boost::optional<std::string> needsShard;
 
     std::vector<FacetPipeline> facetPipelines;
-    for (auto&& rawFacet : extractRawPipelines(elem)) {
+    for (auto&& rawFacet : rawFacetPipelines) {
         const auto facetName = rawFacet.first;
 
         auto pipeline = pipeline_factory::makeFacetPipeline(

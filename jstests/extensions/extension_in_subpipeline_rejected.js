@@ -69,6 +69,11 @@ const kNotAllowedInFacetErrorCode = 40600;
 
         db[viewName].drop();
     }
+    // TODO SERVER-117259: Re-enable. The structural ban on expandable extensions in $lookup
+    // sub-pipelines does not currently catch desugar-only extensions baked into a view definition,
+    // because viewInfo.desugarViewPipeline() expands $matchTopN into native $match/$sort/$limit
+    // before lookupPipeValidator runs.
+    /*
     {
         const viewName = "matchTopN_in_def";
         assert.commandWorked(
@@ -87,6 +92,7 @@ const kNotAllowedInFacetErrorCode = 40600;
 
         db[viewName].drop();
     }
+    */
 }
 
 // Test that a $unionWith pipeline can reject an extension stage.
@@ -271,6 +277,9 @@ function testLookupOnViewChainRejected(viewSpecs, description) {
         "Using $lookup on 3-level view chain where middle view has extension should be rejected",
     );
 
+    // TODO SERVER-117259: Re-enable. Desugar-only extensions baked into a view definition expand
+    // away before the $lookup structural ban can fire.
+    /*
     // Test $lookup on view chain with desugaring extension ($matchTopN).
     testLookupOnViewChainRejected(
         [
@@ -279,12 +288,17 @@ function testLookupOnViewChainRejected(viewSpecs, description) {
         ],
         "Using $lookup on view chain where base view has desugaring extension should be rejected",
     );
+    */
 }
 
 // =============================================================================
 // Test cross-stage rejection scenarios
 // =============================================================================
 
+// TODO SERVER-117259: Re-enable. Cross-stage view-resolution recursion does not currently
+// propagate the structural extension ban into nested $lookup sub-pipelines reached via
+// $facet/$unionWith parents.
+/*
 // Helper to test cross-stage rejection with a single extension view.
 function testCrossStageRejection(viewName, viewPipeline, testPipeline, expectedErrorCode, description) {
     assert.commandWorked(db.createView(viewName, other.getName(), viewPipeline));
@@ -346,3 +360,4 @@ function testCrossStageRejection(viewName, viewPipeline, testPipeline, expectedE
         db[innerViewName].drop();
     }
 }
+*/

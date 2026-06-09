@@ -55,6 +55,13 @@ std::unique_ptr<LiteParsedScoreFusion> LiteParsedScoreFusion::parse(
                           << " must take a nested object but found: " << spec,
             spec.type() == BSONType::object);
 
+    // TODO SERVER-121970: Remove once $scoreFusion is supported with
+    // featureFlagExtensionsInsideHybridSearch. The actual IFR kickback is thrown from
+    // validate() — see LiteParsedScoreFusion::_extensionsInHybridSearchEnabled for why.
+    const bool extensionsInHybridSearchEnabled = options.ifrContext &&
+        options.ifrContext->getSavedFlagValue(
+            feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+
     auto parsedSpec = ScoreFusionSpec::parse(
         spec.embeddedObject(), IDLParserContext(DocumentSourceScoreFusion::kStageName));
 
@@ -67,8 +74,11 @@ std::unique_ptr<LiteParsedScoreFusion> LiteParsedScoreFusion::parse(
         ownedPipelines.emplace_back(nss, bsonPipeline, options);
     }
 
-    return std::make_unique<LiteParsedScoreFusion>(
-        spec, nss, std::move(parsedSpec), std::move(ownedPipelines));
+    return std::make_unique<LiteParsedScoreFusion>(spec,
+                                                   nss,
+                                                   std::move(parsedSpec),
+                                                   std::move(ownedPipelines),
+                                                   extensionsInHybridSearchEnabled);
 }
 
 void LiteParsedScoreFusion::validate() const {
@@ -131,6 +141,18 @@ void LiteParsedScoreFusion::validate() const {
         // All stages must be selection stages.
         pipeline.validateAllStagesAreSelection(12108713, "$scoreFusion");
     }
+
+    // TODO SERVER-121970: Remove once $scoreFusion is supported with
+    // featureFlagExtensionsInsideHybridSearch. Deferred from parse() so the IFRFlagRetry is
+    // thrown inside the runAggregate retry loop where it can be caught and retried with the
+    // flag disabled. Throwing during parse() (invoked at command-invocation construction time
+    // on mongos) would propagate before the retry handler is installed.
+    search_helpers::throwIfrKickbackIfNecessary(
+        _extensionsInHybridSearchEnabled,
+        feature_flags::gFeatureFlagExtensionsInsideHybridSearch,
+        search_metrics::inHybridSearchKickbackRetryCount,
+        "$scoreFusion is not yet supported when featureFlagExtensionsInsideHybridSearch is "
+        "enabled.");
 }
 
 std::map<std::string, std::unique_ptr<Pipeline>> ScoreFusionStageParams::buildInputPipelines(

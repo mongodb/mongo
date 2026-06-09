@@ -3,6 +3,7 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages, getLookupStage, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {
     prepareUnionWithExplain,
@@ -142,29 +143,35 @@ export function assertUnionWithSearchSubPipelineAppliedViews(
     const unionWithStage = getUnionWithStage(explainOutput);
     const unionWithExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
     if (!isStoredSource) {
-        // In fully-sharded environments, check for the correct view name on the view object and
-        // $unionWith stage. For single node and single shard environments, there is no view object
-        // that will exist on the $unionWith explain output. We can still assert that the
-        // $unionWith.coll is "resolved" to its collNss. Note that the view name is not resolved to
-        // its collNss in full-sharded environments, and this is intended behavior.
-        if (unionWithExplain.hasOwnProperty("splitPipeline") && unionWithExplain["splitPipeline"] !== null) {
-            const firstStage = unionWithExplain.splitPipeline.shardsPart[0];
-
-            print("explainOutput: " + tojson(explainOutput));
-            // The first stage is either $search or $vectorSearch.
-            if (firstStage.hasOwnProperty("$search")) {
-                assert.eq(firstStage.$search.view.name, viewName);
-            } else if (firstStage.hasOwnProperty("$vectorSearch")) {
-                assert.eq(firstStage.$vectorSearch.view.name, viewName);
-            } else {
-                assert.fail(
-                    "Expected first stage to have either $search or $vectorSearch, but found neither: " +
-                        tojson(firstStage),
-                );
-            }
-            assert.eq(unionWithStage.$unionWith.coll, viewName);
-        } else {
+        // TODO SERVER-121094 Remove this when the feature flag is removed.
+        const extensionsInsideHybridSearchEnabled = FeatureFlagUtil.isPresentAndEnabled(
+            collNss.getDB(),
+            "ExtensionsInsideHybridSearch",
+        );
+        if (extensionsInsideHybridSearchEnabled) {
             assert.eq(unionWithStage.$unionWith.coll, collNss.getName());
+        } else {
+            // In fully-sharded environments, check for the correct view name on the view object
+            // inside the $search/$vectorSearch stage. The $unionWith.coll is resolved to the
+            // underlying collection in all environments.
+            if (unionWithExplain.hasOwnProperty("splitPipeline") && unionWithExplain["splitPipeline"] !== null) {
+                const firstStage = unionWithExplain.splitPipeline.shardsPart[0];
+
+                // The first stage is either $search or $vectorSearch.
+                if (firstStage.hasOwnProperty("$search")) {
+                    assert.eq(firstStage.$search.view.name, viewName);
+                } else if (firstStage.hasOwnProperty("$vectorSearch")) {
+                    assert.eq(firstStage.$vectorSearch.view.name, viewName);
+                } else {
+                    assert.fail(
+                        "Expected first stage to have either $search or $vectorSearch, but found neither: " +
+                            tojson(firstStage),
+                    );
+                }
+                assert.eq(unionWithStage.$unionWith.coll, collNss.getName());
+            } else {
+                assert.eq(unionWithStage.$unionWith.coll, collNss.getName());
+            }
         }
 
         assertIdLookupContainsViewPipeline(unionWithExplain, viewPipeline);

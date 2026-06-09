@@ -34,6 +34,9 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/resolved_view.h"
 
@@ -50,6 +53,13 @@ LiteParsedPipeline makeLiteParsedPipeline(const boost::intrusive_ptr<ExpressionC
                               rawPipeline,
                               false,
                               LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
+}
+
+void addViewInvolvedNamespaces(const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
+                               const std::vector<BSONObj>& viewPipeline) {
+    LiteParsedPipeline viewLiteParsedPipeline(
+        makeLiteParsedPipeline(subPipelineExpCtx, viewPipeline));
+    subPipelineExpCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
 }
 
 void desugarIfNecessary(LiteParsedPipeline& liteParsedPipeline,
@@ -96,7 +106,8 @@ std::unique_ptr<Pipeline> finalizePipeline(
                 "AggregateCommandRequest contains the correct serialization of the pipeline.",
                 opts.desugar);
 
-        aggRequest.setPipeline(pipeline->serializeToBson());
+        SerializationOptions wireOptsForAggReq{.isSerializingForRemoteDispatch = true};
+        aggRequest.setPipeline(pipeline->serializeToBson(wireOptsForAggReq));
 
         pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
             expCtx,
@@ -206,6 +217,10 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     // Update subpipeline's ExpressionContext with the resolved namespace.
     subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
 
+    // When the sub-pipeline targets a view, stages inside the view's definition must run under the
+    // view's default collation, not the outer collection's.
+    applyViewDefaultCollation(subPipelineExpCtx, resolvedNs);
+
     if (resolvedNs.pipeline.empty()) {
         return makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
@@ -216,30 +231,30 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
             subPipelineExpCtx, std::move(resolvedNs), std::move(currentPipeline), opts, originalNs);
     }
 
-    {
-        // When we get a resolved pipeline back, we may not yet have its namespaces available in the
-        // expression context, e.g. if the view's pipeline contains a $lookup on another collection.
-        // This is scoped as to ensure that viewLiteParsedPipeline gets destroyed while
-        // resolvedNs.pipeline is still alive. There is a call to std::move(resolvedNs.pipeline)
-        // below.
-        LiteParsedPipeline viewLiteParsedPipeline(
-            makeLiteParsedPipeline(subPipelineExpCtx, resolvedNs.pipeline));
-        subPipelineExpCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
-    }
+    // Register the view's own involved namespaces before the std::move(resolvedNs.pipeline) below;
+    // the helper keeps its transient LiteParsedPipeline local so it cannot outlive that move.
+    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.pipeline);
 
     // Create a LiteParsedPipeline for the user pipeline and apply view handling via bindViewInfo().
     LiteParsedPipeline userLiteParsedPipeline(
         makeLiteParsedPipeline(subPipelineExpCtx, currentPipeline));
     desugarIfNecessary(userLiteParsedPipeline, opts, subPipelineExpCtx);
 
-    // Apply the view to the user pipeline.
-    const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
-    PipelineResolver::applyViewToLiteParsed(
-        &userLiteParsedPipeline,
-        resolvedView,
-        originalNs,
-        subPipelineExpCtx->getResolvedNamespaces(),
-        LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()});
+    // Apply the view to the user pipeline by registering it in the namespace map and running the
+    // recursive resolver. This is equivalent to the old applyViewToLiteParsed call.
+    //
+    // Thread the sub-pipeline's IFR context into the inserted view entry so that re-parsing the
+    // view's pipeline (e.g. on an IFR-flag retry) sees the same feature-flag view as the rest of
+    // the request — otherwise extension stages inside the view would lite-parse against the
+    // global flag value and the retry would never converge.
+    {
+        const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
+        auto resolvedNamespaces = subPipelineExpCtx->getResolvedNamespaces();
+        PipelineResolver::insertTopLevelViewEntry(
+            resolvedNamespaces, originalNs, resolvedView, subPipelineExpCtx->getIfrContext());
+        PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+            &userLiteParsedPipeline, originalNs, resolvedNamespaces);
+    }
 
     // Parse from the modified LiteParsedPipeline. Skip desugar since we already did it above.
     auto optsWithoutDesugar = opts;
@@ -249,6 +264,68 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     auto aggRequest =
         AggregateCommandRequest(subPipelineExpCtx->getNamespaceString(), std::vector<BSONObj>{});
     return finalizePipeline(std::move(pipeline), subPipelineExpCtx, opts, aggRequest);
+}
+
+void applyViewDefaultCollation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               const ResolvedNamespace& resolvedNs) {
+    const BSONObj& viewCollation = resolvedNs.getDefaultCollation();
+    if (viewCollation.isEmpty()) {
+        // No explicit view collation: leave the inherited collator in place.
+        return;
+    }
+    auto viewCollator = uassertStatusOK(
+        CollatorFactoryInterface::get(expCtx->getOperationContext()->getServiceContext())
+            ->makeFromBSON(viewCollation));
+    expCtx->setCollator(std::move(viewCollator));
+}
+
+std::unique_ptr<Pipeline> makePipelineFromViewDefinitionLPP(
+    const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
+    const ResolvedNamespace& resolvedNs,
+    LiteParsedPipeline& desugaredUserPipeline,
+    const std::vector<BSONObj>& rawPipeline,
+    const NamespaceString& userNss,
+    const MakePipelineOptions& opts,
+    bool stitchViewOntoUserPipeline) {
+
+    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
+        isRawDataOperation(subPipelineExpCtx->getOperationContext())) {
+        // Raw Data operations on timeseries collections operate without the timeseries view.
+        return Pipeline::parseFromLiteParsed(
+            desugaredUserPipeline, subPipelineExpCtx, opts.validator);
+    }
+
+    subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
+
+    if (resolvedNs.pipeline.empty()) {
+        return Pipeline::parseFromLiteParsed(
+            desugaredUserPipeline, subPipelineExpCtx, opts.validator);
+    }
+
+    // For search views, fall back to the BSON-based path since search view handling requires raw
+    // BSON pipeline inspection.
+    if (search_helper_bson_obj::isMongotPipeline(subPipelineExpCtx->getIfrContext(), rawPipeline)) {
+        return makePipelineFromViewDefinition(
+            subPipelineExpCtx, resolvedNs, std::vector<BSONObj>(rawPipeline), opts, userNss);
+    }
+
+    addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.pipeline);
+
+    // TODO SERVER-117260 Once $facet sub-pipelines go through LP view resolution, the
+    // 'stitchViewOntoUserPipeline' guard can be revisited.
+    if (stitchViewOntoUserPipeline &&
+        subPipelineExpCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
+        PipelineResolver::applyViewToLiteParsed(
+            &desugaredUserPipeline,
+            resolvedView,
+            userNss,
+            subPipelineExpCtx->getResolvedNamespaces(),
+            LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()});
+    }
+
+    // Parse from the modified LiteParsedPipeline (already desugared, view already applied).
+    return Pipeline::parseFromLiteParsed(desugaredUserPipeline, subPipelineExpCtx, opts.validator);
 }
 
 std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipeline,

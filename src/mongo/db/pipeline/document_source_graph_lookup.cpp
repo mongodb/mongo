@@ -39,6 +39,8 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
@@ -227,12 +229,20 @@ DocumentSourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
                                                  const SerializationOptions& opts) const {
     // Do not include tenantId in serialized 'from' namespace.
-    auto fromValue = getExpCtx()->getNamespaceString().isEqualDb(getFromNs())
-        ? Value(opts.serializeIdentifier(getFromNs().coll()))
+    // Rewrite to the resolved backing whenever we're producing a wire-bound payload — that covers
+    // both the router and a shard acting as sub-router. Without the latter, a shard dispatching a
+    // sub-aggregate to peer shards would emit the view name and the peers would re-resolve it,
+    // which races with concurrent view-catalog mutations.
+    const bool serializeForRemote =
+        getExpCtx()->getInRouter() || opts.isSerializingForRemoteDispatch;
+    const auto& serializeFromNs =
+        serializeForRemote ? _fromExpCtx->getNamespaceString() : getFromNs();
+    auto fromValue = getExpCtx()->getNamespaceString().isEqualDb(serializeFromNs)
+        ? Value(opts.serializeIdentifier(serializeFromNs.coll()))
         : Value(Document{{"db",
                           opts.serializeIdentifier(
-                              getFromNs().dbName().serializeWithoutTenantPrefix_UNSAFE())},
-                         {"coll", opts.serializeIdentifier(getFromNs().coll())}});
+                              serializeFromNs.dbName().serializeWithoutTenantPrefix_UNSAFE())},
+                         {"coll", opts.serializeIdentifier(serializeFromNs.coll())}});
 
     // Serialize default options.
     MutableDocument spec(DOC("from"
@@ -257,6 +267,22 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
             spec["restrictSearchWithMatch"] = Value(matchExpr->serialize(opts));
         } else {
             spec["restrictSearchWithMatch"] = Value(*getAdditionalFilter());
+        }
+    }
+
+    // When producing a wire-bound payload (router dispatch or shard sub-router), carry the
+    // resolved view pipeline so the receiver can reconstruct _params.fromLpp without re-resolving
+    // the view. This is necessary because serializeFromNs above uses the backing collection name
+    // (not the view name), so the receiver's lite parse sees no view and leaves fromLpp empty.
+    if (serializeForRemote && !opts.isSerializingForExplain() &&
+        !opts.isSerializingForQueryStats()) {
+        if (_params.fromLpp && !(*_params.fromLpp)->getStages().empty()) {
+            auto pipeline = Pipeline::parseFromLiteParsed(_params.fromLpp->pipeline(), _fromExpCtx);
+            std::vector<Value> pipelineVals;
+            for (const auto& stage : pipeline->getSources()) {
+                stage->serializeToArray(pipelineVals, opts);
+            }
+            spec["$_internalFromPipeline"] = Value(std::move(pipelineVals));
         }
     }
 
@@ -310,20 +336,25 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
         globalOpCounters().gotNestedAggregate();
     }
 
-    // TODO SERVER-125119 Refactor $graphLookup to use a subpipeline when namespaces are resolved on
-    // mongos.
     const auto& resolvedNamespace = getExpCtx()->getResolvedNamespace(getFromNs());
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
         getExpCtx(), resolvedNamespace.ns, resolvedNamespace.uuid);
     _fromExpCtx->setInLookup(true);
 
-    // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match
-    // stage we'll eventually construct from the input document.
-    if (!isRawDataOperation(expCtx->getOperationContext()) ||
-        !resolvedNamespace.ns.isTimeseriesBucketsCollection()) {
-        _fromPipeline = resolvedNamespace.pipeline;
+    // If fromLpp was populated by createFromStageParams (view path), keep it. Otherwise build it
+    // from the resolved namespace (createFromBson / create path).
+    if (!_params.fromLpp) {
+        const auto& pipeline = (!isRawDataOperation(expCtx->getOperationContext()) ||
+                                !resolvedNamespace.ns.isTimeseriesBucketsCollection())
+            ? resolvedNamespace.pipeline
+            : std::vector<BSONObj>{};
+        LiteParserOptions opts;
+        opts.ifrContext = expCtx->getIfrContext();
+        _params.fromLpp.emplace(resolvedNamespace.ns, pipeline, opts);
     }
-    _fromPipeline.push_back(BSON("$match" << BSONObj()));
+    auto& subLpp = _params.fromLpp->pipeline();
+    LiteParsedDesugarer::desugar(&subLpp, _fromExpCtx->getIfrContext());
+    _fromExpCtx->addResolvedNamespaces(subLpp.getInvolvedNamespaces());
 }
 
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
@@ -335,7 +366,6 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
           original._fromExpCtx,
           original.getExpCtx()->getResolvedNamespace(getFromNs()).ns,
           original.getExpCtx()->getResolvedNamespace(getFromNs()).uuid)),
-      _fromPipeline(original._fromPipeline),
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
     if (_params.startWith) {
@@ -360,15 +390,14 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
     boost::optional<long long> maxDepth,
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc) {
     return new DocumentSourceGraphLookUp(expCtx,
-                                         GraphLookUpParams(std::move(fromNs),
+                                         GraphLookUpParams{std::move(fromNs),
                                                            std::move(asField),
                                                            std::move(connectFromField),
                                                            std::move(connectToField),
                                                            std::move(startWith),
                                                            std::move(additionalFilter),
                                                            depthField,
-                                                           maxDepth),
-
+                                                           maxDepth},
                                          std::move(unwindSrc));
 }
 
@@ -413,16 +442,16 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromStageParams(
             "Failed to parse 'restrictSearchWithMatch' option to $graphLookup");
     }
 
-    return new DocumentSourceGraphLookUp(expCtx,
-                                         GraphLookUpParams(std::move(params.from),
-                                                           std::move(*params.as),
-                                                           std::move(*params.connectFromField),
-                                                           std::move(*params.connectToField),
-                                                           std::move(startWith),
-                                                           std::move(params.additionalFilter),
-                                                           std::move(params.depthField),
-                                                           params.maxDepth),
-                                         boost::none);
+    GraphLookUpParams glParams{std::move(params.from),
+                               std::move(*params.as),
+                               std::move(*params.connectFromField),
+                               std::move(*params.connectToField),
+                               std::move(startWith),
+                               std::move(params.additionalFilter),
+                               std::move(params.depthField),
+                               params.maxDepth};
+    glParams.fromLpp = std::move(params.liteParsedPipeline);
+    return new DocumentSourceGraphLookUp(expCtx, std::move(glParams), boost::none);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
@@ -479,6 +508,15 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             continue;
         }
 
+        if (argName == "$_internalFromPipeline"_sd) {
+            // This internal field is consumed at lite-parse time (LiteParsedGraphLookUp::parse).
+            // Reject it from external clients and ignore it on the legacy createFromBson path.
+            assertAllowedInternalIfRequired(expCtx->getOperationContext(),
+                                            "$_internalFromPipeline"_sd,
+                                            AllowedWithClientType::kInternal);
+            continue;
+        }
+
         if (argName == "from" || argName == "as" || argName == "connectFromField" ||
             argName == "depthField" || argName == "connectToField") {
             // All remaining arguments to $graphLookup are expected to be strings.
@@ -515,14 +553,14 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             !isMissingRequiredField);
 
     return new DocumentSourceGraphLookUp(expCtx,
-                                         GraphLookUpParams(std::move(from),
+                                         GraphLookUpParams{std::move(from),
                                                            std::move(as),
                                                            std::move(connectFromField),
                                                            std::move(connectToField),
                                                            std::move(startWith),
                                                            std::move(additionalFilter),
                                                            depthField,
-                                                           maxDepth),
+                                                           maxDepth},
                                          boost::none);
 }
 
@@ -534,8 +572,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::clone(
 void DocumentSourceGraphLookUp::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
     collectionNames->insert(_fromExpCtx->getNamespaceString());
+    if (!_params.fromLpp) {
+        return;
+    }
     auto introspectionPipeline =
-        pipeline_factory::makePipeline(_fromPipeline, _fromExpCtx, pipeline_factory::kDesugarOnly);
+        Pipeline::parseFromLiteParsed(_params.fromLpp->pipeline(), _fromExpCtx);
     for (auto&& stage : introspectionPipeline->getSources()) {
         stage->addInvolvedCollections(collectionNames);
     }

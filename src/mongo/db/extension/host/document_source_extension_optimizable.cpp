@@ -228,6 +228,12 @@ DocumentSourceExtensionOptimizable::LiteParsedExpanded::getFirstStageViewApplica
 
 void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
     const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces) {
+    if (viewInfo.isEmpty()) {
+        // Empty ViewInfo means this stage is being notified that its pipeline is *not* running
+        // on a view. Skip the view-policy checks and the SDK bindViewInfo handoff.
+        // TODO SERVER-125741 Enable extensions to bind to non-top-level involved namespaces.
+        return;
+    }
     auto hybridSearchFlagEnabled = _ifrContext &&
         _ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
     if (!hybridSearchFlagEnabled) {

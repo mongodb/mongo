@@ -734,6 +734,7 @@ idl_generator(
     name = "document_source_graph_lookup_gen",
     src = "document_source_graph_lookup.idl",
     deps = [
+        ":aggregate_command_gen",
         "//src/mongo/db:basic_types_gen",
     ],
 )

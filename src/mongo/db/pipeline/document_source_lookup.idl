@@ -76,3 +76,22 @@ structs:
                 type: optionalBool
                 stability: internal
                 cpp_name: isHybridSearch
+            $_internalFieldMatchPipelineIdx:
+                description: >-
+                    Internal use only. On the mongos-to-shard dispatch path for a localField/foreignField
+                    $lookup against a view, this field carries the correct _fieldMatchPipelineIdx so the
+                    shard inserts the equality match after the view stages.
+                type: safeInt64
+                optional: true
+                stability: internal
+                cpp_name: internalFieldMatchPipelineIdx
+            $_internalFromIsAView:
+                description: >-
+                    Internal use only. Carried by the mongos-to-shard $lookup rewrite when
+                    the original foreign namespace was a view (including a rename-only
+                    identity view with `pipeline: []`). The shard uses it to restore
+                    _fromNsIsAView so the "$lookup against a view is never SBE-lowered"
+                    invariant holds after the rewrite has erased the view name.
+                type: optionalBool
+                stability: internal
+                cpp_name: internalFromIsAView

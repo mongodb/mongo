@@ -65,7 +65,10 @@ public:
                       bool isHybridSearch,
                       // TODO SERVER-121262 Have the StageParams be owner of the BSONObj instead.
                       BSONElement originalBson,
-                      boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none)
+                      boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none,
+                      boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
+                      bool internalFromIsAView = false,
+                      bool isPlaceholderInjected = false)
         : DefaultStageParams(originalBson),
           fromNss(std::move(fromNss)),
           as(std::move(as)),
@@ -76,7 +79,10 @@ public:
           unwindSpec(std::move(unwindSpec)),
           hasForeignDB(hasForeignDB),
           isHybridSearch(isHybridSearch),
-          liteParsedPipeline(std::move(liteParsedPipeline)) {}
+          liteParsedPipeline(std::move(liteParsedPipeline)),
+          internalFieldMatchPipelineIdx(std::move(internalFieldMatchPipelineIdx)),
+          internalFromIsAView(internalFromIsAView),
+          isPlaceholderInjected(isPlaceholderInjected) {}
 
     static const Id& id;
     Id getId() const final {
@@ -96,9 +102,25 @@ public:
     // search stage.
     bool isHybridSearch;
 
+    // TODO SERVER-127884 Remove the LPP from StageParams once the LP->DS->exec pipeline translation
+    // bridges the subpipeline across phase boundaries properly.
     // The desugared LiteParsedPipeline for the subpipeline. Absent when $lookup is used without a
     // 'pipeline' field (local/foreignField-only form).
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
+
+    // Position for the foreignField $match placeholder, set by the router when a
+    // localField/foreignField+pipeline $lookup targets a view.
+    boost::optional<int64_t> internalFieldMatchPipelineIdx;
+
+    // Set by the router's $lookup rewrite when the original foreign namespace was a view
+    // (including an identity view with `pipeline: []`). Used to restore _fromNsIsAView so $lookup
+    // against a view is never SBE-lowered after the 'from' rewrite has erased the view name.
+    bool internalFromIsAView = false;
+
+    // True when parse() injected an empty placeholder LPP for a $lookup with no `pipeline:` field
+    // under featureFlagExtensionsInsideHybridSearch. Lets createFromStageParams keep
+    // _userPipeline = boost::none instead of [].
+    bool isPlaceholderInjected = false;
 };
 
 class LiteParsedLookUp final : public LiteParsedDocumentSourceNestedPipelines<LiteParsedLookUp> {
@@ -119,7 +141,10 @@ public:
                      boost::optional<std::string> foreignField,
                      boost::optional<BSONObj> unwindSpec,
                      bool hasForeignDB,
-                     bool isHybridSearch);
+                     bool isHybridSearch,
+                     boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
+                     bool internalFromIsAView = false,
+                     bool isPlaceholderInjected = false);
 
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const final;
@@ -136,6 +161,9 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const override;
 
+    void bindViewInfo(const ViewInfo& viewInfo,
+                      const ResolvedNamespaceMap& resolvedNamespaces) override;
+
     // Moved from document_source_lookup.cpp so createFromBson can still call it.
     static void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline);
     static void validateLookupCollectionlessPipeline(const BSONElement& pipelineElem);
@@ -149,6 +177,16 @@ private:
     boost::optional<BSONObj> _unwindSpec;
     bool _hasForeignDB;
     bool _isHybridSearch;
+    // Parsed from $_internalFieldMatchPipelineIdx at construction so getStageParams() can forward
+    // it.
+    boost::optional<int64_t> _internalFieldMatchPipelineIdx;
+    // Parsed from $_internalFromIsAView; forwarded by getStageParams() to restore _fromNsIsAView
+    // on the shard.
+    bool _internalFromIsAView = false;
+    // True when an empty placeholder LPP was injected at parse time because there was no
+    // `pipeline:` field and featureFlagExtensionsInsideHybridSearch is on. Distinguishes that case
+    // from an explicit `pipeline: []` so _userPipeline stays boost::none.
+    bool _isPlaceholderInjected = false;
 };
 
 }  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

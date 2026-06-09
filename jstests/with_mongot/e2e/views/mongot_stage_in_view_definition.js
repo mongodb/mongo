@@ -6,6 +6,7 @@
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     getMovieData,
     getMoviePlotEmbeddingById,
@@ -138,22 +139,41 @@ const runTest = (collOrView, pipeline, expectedResults) => {
     assert.commandWorked(collOrView.runCommand("aggregate", {pipeline: pipeline, explain: true, cursor: {}}));
 };
 
-const runTestFails = (collOrView, pipeline, isShardedLookup = false) => {
+const runTestFails = (collOrView, pipeline, isShardedLookup = false, outerNamespaceIsView = false) => {
     assert.commandFailedWithCode(
         collOrView.runCommand("aggregate", {pipeline: pipeline, explain: false, cursor: {}}),
         [10623000, 10623001],
     );
 
-    // Sharded lookups will successfully run explain, all other topologies will fail on explain.
-    if (isShardedLookup) {
-        assert.commandWorked(collOrView.runCommand("aggregate", {pipeline: pipeline, explain: true, cursor: {}}));
+    const ffOn = FeatureFlagUtil.isEnabled(db.getMongo(), "ExtensionsInsideHybridSearch");
+    const explainResult = collOrView.runCommand("aggregate", {pipeline: pipeline, explain: true, cursor: {}});
+
+    let expectedExplainWorked;
+    if (!isShardedLookup) {
+        // Non-sharded: explain goes to a single mongod, which fully resolves the $lookup's
+        // sub-pipeline view and validation runs, failing the explain.
+        expectedExplainWorked = false;
+    } else if (outerNamespaceIsView && ffOn) {
+        // Sharded + outer view: mongos LPP view resolution path processes the $lookup's
+        // sub-pipeline view (via resolveInvolvedNamespacesOnLiteParsed) and binds view info to
+        // $search → shard calls validate() on the bound view → explain fails.
+        expectedExplainWorked = false;
     } else {
-        assert.commandFailedWithCode(
-            collOrView.runCommand("aggregate", {pipeline: pipeline, explain: true, cursor: {}}),
-            [10623000, 10623001],
-        );
+        // Sharded + (outer is a plain collection OR FF off): mongos dispatches explain to the
+        // shard without binding view info into the $lookup's sub-pipeline LPP. The shard's
+        // explain parsing does not trigger validate() for $lookup sub-pipelines.
+        expectedExplainWorked = true;
+    }
+
+    if (expectedExplainWorked) {
+        assert.commandWorked(explainResult);
+    } else {
+        assert.commandFailedWithCode(explainResult, [10623000, 10623001]);
     }
 };
+
+const runTestFailsWithOuterView = (collOrView, pipeline, isShardedLookup = false) =>
+    runTestFails(collOrView, pipeline, isShardedLookup, /* outerNamespaceIsView */ true);
 
 const isShardedCollection = coll.stats().sharded;
 
@@ -179,22 +199,22 @@ const isShardedCollection = coll.stats().sharded;
         buildLookupPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
-    runTestFails(
+    runTestFailsWithOuterView(
         matchView,
         buildLookupPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
-    runTestFails(
+    runTestFailsWithOuterView(
         searchView,
         buildLookupPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
-    runTestFails(
+    runTestFailsWithOuterView(
         unionWithView,
         buildLookupPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
-    runTestFails(
+    runTestFailsWithOuterView(
         lookupView,
         buildLookupPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
@@ -277,25 +297,25 @@ const isShardedCollection = coll.stats().sharded;
 
 (function searchSubpipelineFromUnionWithView() {
     runTestFails(searchView, buildUnionWithPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         searchView,
         buildLookupPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
     runTestFails(unionWithView, buildUnionWithPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         unionWithView,
         buildLookupPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
     runTestFails(lookupView, buildUnionWithPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         lookupView,
         buildLookupPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
     runTestFails(matchView, buildUnionWithPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         matchView,
         buildLookupPipeline(unionWithViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
@@ -304,25 +324,25 @@ const isShardedCollection = coll.stats().sharded;
 
 (function searchSubpipelineFromLookupView() {
     runTestFails(searchView, buildUnionWithPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         searchView,
         buildLookupPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
     runTestFails(unionWithView, buildUnionWithPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         unionWithView,
         buildLookupPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
     runTestFails(lookupView, buildUnionWithPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         lookupView,
         buildLookupPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,
     );
     runTestFails(matchView, buildUnionWithPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)));
-    runTestFails(
+    runTestFailsWithOuterView(
         matchView,
         buildLookupPipeline(lookupViewName, buildSearchPipeline(searchIndexOnCollName)),
         isShardedCollection,

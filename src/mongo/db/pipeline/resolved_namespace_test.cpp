@@ -29,12 +29,14 @@
 
 #include "mongo/db/pipeline/resolved_namespace.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -145,6 +147,136 @@ TEST(ResolvedNamespaceSerializeTest, RoundTripWithoutTimeseriesMetadata) {
     auto tsMeta = roundTripped.getTimeseriesViewMetadata();
     ASSERT(tsMeta.has_value());
     ASSERT_FALSE(tsMeta->options.has_value());
+}
+
+TEST(ResolvedNamespaceSerializeTest, SerializesAndParsesAdditionalResolvedNamespaces) {
+    ResolvedNamespace primary(NamespaceString::createNamespaceString_forTest("db.primary"),
+                              NamespaceString::createNamespaceString_forTest("db.primary"),
+                              {BSON("$match" << BSON("a" << 1))},
+                              BSONObj());
+    primary.setAdditionalResolvedNamespaces({
+        ResolvedNamespace(NamespaceString::createNamespaceString_forTest("db.view1"),
+                          NamespaceString::createNamespaceString_forTest("db.coll1"),
+                          {BSON("$match" << BSON("b" << 2))},
+                          BSONObj()),
+        ResolvedNamespace(NamespaceString::createNamespaceString_forTest("otherDb.view2"),
+                          NamespaceString::createNamespaceString_forTest("otherDb.coll2"),
+                          {BSON("$project" << BSON("c" << 1))},
+                          BSONObj()),
+    });
+
+    auto serialized = serializeToObj(primary);
+    ResolvedNamespace parsed = ResolvedNamespace::fromBSON(serialized);
+    ASSERT_EQ(parsed.getAdditionalResolvedNamespaces().size(), 2u);
+
+    const auto& rn0 = parsed.getAdditionalResolvedNamespaces()[0];
+    ASSERT_EQ(rn0.getNamespace().ns_forTest(), "db.view1");
+    ASSERT_EQ(rn0.getResolvedNamespace().ns_forTest(), "db.coll1");
+    ASSERT_EQ(rn0.getBsonPipeline().size(), 1u);
+    ASSERT_BSONOBJ_EQ(rn0.getBsonPipeline()[0], BSON("$match" << BSON("b" << 2)));
+
+    const auto& rn1 = parsed.getAdditionalResolvedNamespaces()[1];
+    ASSERT_EQ(rn1.getNamespace().ns_forTest(), "otherDb.view2");
+    ASSERT_EQ(rn1.getResolvedNamespace().ns_forTest(), "otherDb.coll2");
+    ASSERT_EQ(rn1.getBsonPipeline().size(), 1u);
+    ASSERT_BSONOBJ_EQ(rn1.getBsonPipeline()[0], BSON("$project" << BSON("c" << 1)));
+}
+
+TEST(ResolvedNamespaceSerializeTest, AdditionalResolvedNamespacesOmittedWhenEmpty) {
+    const auto ns = NamespaceString::createNamespaceString_forTest("db.primary");
+    ResolvedNamespace rn(ns, ns, {BSON("$match" << BSON("a" << 1))}, BSONObj());
+    auto obj = serializeToObj(rn);
+    ASSERT_FALSE(obj["resolvedView"].Obj().hasField("additionalResolvedNamespaces"));
+}
+
+TEST(ResolvedNamespaceSerializeTest, AdditionalResolvedNamespacesPreservesCollation) {
+    const auto ns = NamespaceString::createNamespaceString_forTest("db.primary");
+    ResolvedNamespace primary(ns, ns, {BSON("$match" << BSON("a" << 1))}, BSONObj());
+    primary.setAdditionalResolvedNamespaces({
+        ResolvedNamespace(NamespaceString::createNamespaceString_forTest("db.localizedView"),
+                          NamespaceString::createNamespaceString_forTest("db.coll"),
+                          {BSON("$match" << BSON("x" << 1))},
+                          BSON("locale" << "fr_CA")),
+    });
+
+    ResolvedNamespace parsed = ResolvedNamespace::fromBSON(serializeToObj(primary));
+    ASSERT_EQ(parsed.getAdditionalResolvedNamespaces().size(), 1u);
+    ASSERT_BSONOBJ_EQ(parsed.getAdditionalResolvedNamespaces()[0].getDefaultCollation(),
+                      BSON("locale" << "fr_CA"));
+}
+
+TEST(ResolvedNamespaceSerializeTest, AdditionalResolvedNamespacesRejectsNonObjectEntries) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.coll");
+    BSONObj serialized =
+        BSON("resolvedView" << BSON("ns" << nss.ns_forTest() << "pipeline" << BSONArray()
+                                         << "additionalResolvedNamespaces"
+                                         << BSON_ARRAY("notAnObject")));
+    ASSERT_THROWS_CODE(ResolvedNamespace::fromBSON(serialized), AssertionException, 12451401);
+}
+
+TEST(ResolvedNamespaceSerializeTest, AdditionalResolvedNamespacesOmitsUserNsWhenEqualToResolvedNs) {
+    const auto ns = NamespaceString::createNamespaceString_forTest("db.primary");
+    ResolvedNamespace primary(ns, ns, {BSON("$match" << BSON("a" << 1))}, BSONObj());
+    // Simple constructor: _userNss == ns, so userNs should be omitted on the wire.
+    primary.setAdditionalResolvedNamespaces(
+        {ResolvedNamespace(NamespaceString::createNamespaceString_forTest("db.coll"),
+                           std::vector<BSONObj>{},
+                           boost::none)});
+
+    auto serialized = serializeToObj(primary);
+    auto additionalArr = serialized["resolvedView"].Obj()["additionalResolvedNamespaces"].Array();
+    ASSERT_EQ(additionalArr.size(), 1u);
+    BSONObj entry = additionalArr[0].Obj();
+    ASSERT_FALSE(entry.hasField("userNs"));
+    ASSERT_EQ(entry["ns"].str(), "db.coll");
+}
+
+TEST(ResolvedNamespaceParseFromBSONTest, ParseFromBSONAndFromBSONRoundTripEqually) {
+    const auto ns = NamespaceString::createNamespaceString_forTest("db.coll");
+    ResolvedNamespace original = ResolvedNamespace::makeWithSentinelPrimary({
+        ResolvedNamespace(NamespaceString::createNamespaceString_forTest("db.view"),
+                          NamespaceString::createNamespaceString_forTest("db.backing"),
+                          {BSON("$match" << BSON("x" << 1))},
+                          BSON("locale" << "fr")),
+    });
+
+    BSONObj serialized = serializeToObj(original);
+
+    // Additional fields must be nested inside resolvedView, not alongside it.
+    ASSERT_TRUE(serialized["resolvedView"].Obj().hasField("additionalResolvedNamespaces"));
+    ASSERT_TRUE(serialized["resolvedView"].Obj().hasField("isSentinelPrimary"));
+    ASSERT_FALSE(serialized.hasField("additionalResolvedNamespaces"));
+    ASSERT_FALSE(serialized.hasField("isSentinelPrimary"));
+
+    ResolvedNamespace viaFromBSON = ResolvedNamespace::fromBSON(serialized);
+    ResolvedNamespace viaParseFromBSON =
+        ResolvedNamespace::parseFromBSON(serialized.getField("resolvedView"));
+
+    for (const auto& parsed : {viaFromBSON, viaParseFromBSON}) {
+        ASSERT_TRUE(parsed.hasSentinelPrimary());
+        ASSERT_EQ(parsed.getAdditionalResolvedNamespaces().size(), 1u);
+        const auto& rn = parsed.getAdditionalResolvedNamespaces()[0];
+        ASSERT_EQ(rn.getNamespace().ns_forTest(), "db.view");
+        ASSERT_EQ(rn.getResolvedNamespace().ns_forTest(), "db.backing");
+        ASSERT_BSONOBJ_EQ(rn.getBsonPipeline()[0], BSON("$match" << BSON("x" << 1)));
+        ASSERT_BSONOBJ_EQ(rn.getDefaultCollation(), BSON("locale" << "fr"));
+    }
+}
+
+TEST(ResolvedNamespaceSerializeTest, BuildsSentinelPrimaryWithOnlyAdditional) {
+    std::vector<ResolvedNamespace> additional = {
+        ResolvedNamespace(NamespaceString::createNamespaceString_forTest("db.view1"),
+                          NamespaceString::createNamespaceString_forTest("db.coll1"),
+                          {BSON("$match" << BSON("x" << 1))},
+                          BSONObj()),
+    };
+    ResolvedNamespace rn = ResolvedNamespace::makeWithSentinelPrimary(std::move(additional));
+    ASSERT_TRUE(rn.hasSentinelPrimary());
+    ASSERT_EQ(rn.getAdditionalResolvedNamespaces().size(), 1u);
+
+    ResolvedNamespace parsed = ResolvedNamespace::fromBSON(serializeToObj(rn));
+    ASSERT_TRUE(parsed.hasSentinelPrimary());
+    ASSERT_EQ(parsed.getAdditionalResolvedNamespaces().size(), 1u);
 }
 
 }  // namespace

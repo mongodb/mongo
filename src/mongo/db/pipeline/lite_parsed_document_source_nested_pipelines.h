@@ -50,6 +50,14 @@ public:
           _pipelines(std::move(pipelines)) {}
 
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
+                                            const LiteParserOptions& options,
+                                            boost::optional<NamespaceString> foreignNss,
+                                            std::vector<OwnedLiteParsedPipeline> pipelines)
+        : LiteParsedDocumentSourceDefault<Derived>(originalBson, options),
+          _foreignNss(std::move(foreignNss)),
+          _pipelines(std::move(pipelines)) {}
+
+    LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
                                             boost::optional<OwnedLiteParsedPipeline> pipeline)
         : LiteParsedDocumentSourceNestedPipelines(
@@ -128,6 +136,19 @@ public:
         return true;
     }
 
+    void bindViewInfo(const ViewInfo&, const ResolvedNamespaceMap& resolvedNamespaces) override {
+        for (const auto& subpipeline : _pipelines) {
+            auto it = resolvedNamespaces.find(subpipeline->getOriginalParseNss());
+            if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+                _resolvedSubPipelineView = std::make_shared<ViewInfo>(it->second);
+            }
+        }
+    }
+
+    std::shared_ptr<const ViewInfo> getResolvedSubPipelineView() const override {
+        return _resolvedSubPipelineView;
+    }
+
 protected:
     /**
      * Simple implementation that only gets the privileges needed by children pipelines.
@@ -144,6 +165,15 @@ protected:
 
     boost::optional<NamespaceString> _foreignNss;
     std::vector<OwnedLiteParsedPipeline> _pipelines;
+
+    // Set by the recursive resolver when this stage's subpipeline target resolves to a view and
+    // the view's pipeline has been stitched into the subpipeline. Allows downstream
+    // DocumentSource construction to skip a per-stage view application. Held via shared_ptr
+    // because ViewInfo is move-only and LiteParsedDocumentSource subclasses must remain copyable
+    // through the default clone() implementation.
+    //
+    // TODO SERVER-127924 Replace with ResolvedNamespace once ViewInfo is fully retired.
+    std::shared_ptr<ViewInfo> _resolvedSubPipelineView;
 };
 
 }  // namespace mongo

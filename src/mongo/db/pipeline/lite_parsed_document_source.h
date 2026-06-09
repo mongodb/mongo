@@ -135,6 +135,24 @@ struct MONGO_MOD_PUBLIC ViewInfo {
     }
 
     /**
+     * Returns the underlying ResolvedNamespace. Used by DocumentSource construction (e.g.
+     * DocumentSourceUnionWith::createFromStageParams) to consume the resolved view info that
+     * bindViewInfo recorded, instead of looking it up again in the ExpressionContext's
+     * resolved-namespaces map.
+     */
+    const ResolvedNamespace& getWrappedNamespace() const {
+        return _wrappedNamespace;
+    }
+
+    /**
+     * Returns true if this is an empty/sentinel ViewInfo — i.e., it does not represent any
+     * actual view.
+     */
+    bool isEmpty() const {
+        return _wrappedNamespace.getNamespace().isEmpty();
+    }
+
+    /**
      * Returns the original BSON view pipeline. Note that this is the pre-desugared version of the
      * pipeline.
      */
@@ -156,11 +174,22 @@ struct MONGO_MOD_PUBLIC ViewInfo {
     // ResolvedNamespace::ViewPipelineDesugarer for why a callback is used instead of a direct call.
     void desugarViewPipeline();
 
+    // Returns a desugared owned clone of the internally-parsed view pipeline.
+    LiteParsedPipeline desugarAndCloneViewPipeline() const;
+
     ViewInfo clone() const;
 
 private:
     ResolvedNamespace _wrappedNamespace;
 };
+
+/**
+ * Returns a desugared ViewInfo for `nss` if it resolves to a view with a pre-parsed pipeline in
+ * `resolvedNamespaces`, or nullptr otherwise. Used by $unionWith and $lookup to consume the drain
+ * loop's pre-stitched LPP directly instead of re-parsing from BSON.
+ */
+std::shared_ptr<ViewInfo> tryGetPreResolvedViewInfo(const NamespaceString& nss,
+                                                    const ResolvedNamespaceMap& resolvedNamespaces);
 
 /**
  * Describes what the pipeline as a whole should do with a view on the main aggregate
@@ -271,6 +300,11 @@ public:
      */
     LiteParsedDocumentSource(const BSONElement& originalBson)
         : _originalBson(originalBson), _parseTimeName(originalBson.fieldNameStringData()) {}
+
+    LiteParsedDocumentSource(const BSONElement& originalBson, const LiteParserOptions& options)
+        : _originalBson(originalBson),
+          _ifrContext(options.ifrContext),
+          _parseTimeName(originalBson.fieldNameStringData()) {}
 
     /**
      * Constructs a LiteParsedDocumentSource that takes ownership of the provided BSONObj. The stage
@@ -404,6 +438,32 @@ public:
     virtual void bindViewInfo(const ViewInfo& viewInfo,
                               const ResolvedNamespaceMap& resolvedNamespaces) {
         // Default implementation is a no-op.
+    }
+
+    /**
+     * Returns the resolved subpipeline view bound to this stage by bindViewInfo(), if any (see
+     * LiteParsedDocumentSourceNestedPipelines for the override that populates this). Returns null
+     * when no view has been bound. ViewInfo is move-only, so the resolved view is held via
+     * shared_ptr to keep this class trivially copyable through clone().
+     */
+    virtual std::shared_ptr<const ViewInfo> getResolvedSubPipelineView() const {
+        return nullptr;
+    }
+
+    /**
+     * Returns true if PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline should
+     * recurse into this stage's subpipelines (via getMutableSubPipelines()) to apply view
+     * stitching. Defaults to true. Stages whose subpipelines are not "real" subpipelines run
+     * against a target nss but are instead consumed by stage-internal desugaring (e.g. $rankFusion
+     * / $scoreFusion, where the first input pipeline is spliced into the outer output and the rest
+     * are wrapped in $unionWith) should override to return false: their subpipeline view resolution
+     * will happen once the desugar has produced concrete $unionWith stages, on the per-stage path
+     * or on a subsequent recursive resolver pass after LP-level desugaring lands.
+     * TODO SERVER-125594 / SERVER-121091 Remove this override once $rankFusion / $scoreFusion
+     * desugar at LiteParsed time.
+     */
+    virtual bool shouldResolveSubpipelineViews() const {
+        return true;
     }
 
     /**
@@ -673,10 +733,19 @@ public:
         _originalBson = _ownedBson->firstElement();
     }
 
+    /**
+     * Returns the IFR context used to create this LPDS.
+     */
+    const std::shared_ptr<IncrementalFeatureRolloutContext>& getIfrContext() const {
+        return _ifrContext;
+    }
+
 protected:
     boost::optional<BSONObj> _ownedBson;
 
     BSONElement _originalBson;
+
+    std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
 
     void transactionNotSupported(StringData stageName) const {
         uasserted(ErrorCodes::OperationNotSupportedInTransaction,
@@ -767,6 +836,10 @@ class MONGO_MOD_OPEN LiteParsedDocumentSourceDefault : public LiteParsedDocument
 public:
     LiteParsedDocumentSourceDefault(const BSONElement& originalBson)
         : LiteParsedDocumentSource(originalBson) {}
+
+    LiteParsedDocumentSourceDefault(const BSONElement& originalBson,
+                                    const LiteParserOptions& options)
+        : LiteParsedDocumentSource(originalBson, options) {}
 
     explicit LiteParsedDocumentSourceDefault(BSONObj ownedBson)
         : LiteParsedDocumentSource(std::move(ownedBson)) {}

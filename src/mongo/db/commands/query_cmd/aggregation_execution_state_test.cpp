@@ -391,6 +391,20 @@ TEST_F(AggregationExecutionStateTest, CreateIfrContextForAggExStateAndExpression
     ASSERT_EQ(ifrContext.get(), expCtx->getIfrContext().get());
 }
 
+TEST_F(AggregationExecutionStateTest, IFRContextReachableFromCatalogState) {
+    StringData coll{"coll"};
+    createTestCollectionWithMetadata(coll, false /*sharded*/);
+
+    std::unique_ptr<AggExState> aggExState = createDefaultAggExState(coll);
+    auto ifrContext = aggExState->getIfrContext();
+    ASSERT_TRUE(ifrContext != nullptr);
+
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+
+    // Verify that AggCatalogState::getIfrContext() returns the same pointer as AggExState.
+    ASSERT_EQ(ifrContext.get(), aggCatalogState->getIfrContext().get());
+}
+
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryCollection) {
     StringData main{"main"};
     StringData secondaryColl{"secondaryColl"};

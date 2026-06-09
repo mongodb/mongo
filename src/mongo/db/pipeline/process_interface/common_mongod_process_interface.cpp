@@ -70,6 +70,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
@@ -832,7 +833,8 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     }
 
     CollectionOrViewAcquisitionMap allAcquisitions;
-    auto serializedPipeline = pipeline->serializeToBson();
+    SerializationOptions opts{.isSerializingForRemoteDispatch = true};
+    auto serializedPipeline = pipeline->serializeToBson(opts);
     bool isAnySecondaryCollectionNotLocal =
         acquireCollectionsForPipeline(expCtx, serializedPipeline, allAcquisitions);
 
@@ -892,8 +894,9 @@ std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipe
     }
 
     CollectionOrViewAcquisitionMap allAcquisitions;
-    bool isAnySecondaryCollectionNotLocal =
-        acquireCollectionsForPipeline(expCtx, pipeline->serializeToBson(), allAcquisitions);
+    SerializationOptions wireOptsForAcquire{.isSerializingForRemoteDispatch = true};
+    bool isAnySecondaryCollectionNotLocal = acquireCollectionsForPipeline(
+        expCtx, pipeline->serializeToBson(wireOptsForAcquire), allAcquisitions);
 
     return attachCursorSourceToPipelineForLocalReadImpl(std::move(pipeline),
                                                         allAcquisitions,

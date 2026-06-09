@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_graph_lookup.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -76,6 +77,8 @@ struct GraphLookUpParams {
     boost::optional<BSONObj> additionalFilter;
     boost::optional<FieldPath> depthField;
     boost::optional<long long> maxDepth;
+    boost::optional<OwnedLiteParsedPipeline>
+        fromLpp;  // set in constructor; nullopt for regular collections
 };
 
 class DocumentSourceGraphLookUp final : public DocumentSource {
@@ -244,16 +247,12 @@ private:
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
 
-    // TODO: SERVER-105521 Check if '_fromPipeline' can be moved instead of copied.
-    // The aggregation pipeline to perform against the '_from' namespace.
-    std::vector<BSONObj> _fromPipeline;
-
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
 
     // Holds variables defined both in this stage and in parent pipelines. These are copied to the
     // '_fromExpCtx' ExpressionContext's 'variables' and 'variablesParseState' for use in the
-    // '_fromPipeline' execution.
+    // '_params.fromLpp' execution.
     Variables _variables;
     VariablesParseState _variablesParseState;
 };

@@ -32,6 +32,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/aggregate_command.idl"
 
 structs:
     DocumentSourceGraphLookUpSpec:
@@ -64,3 +65,11 @@ structs:
                 type: IDLAnyType
                 optional: true
                 cpp_name: additionalFilter
+            $_internalFromPipeline:
+                description: >-
+                    Internal field: the resolved view pipeline for the 'from' namespace, added by
+                    the router when dispatching to shards.
+                optional: true
+                type: pipeline
+                stability: internal
+                cpp_name: internalFromPipeline

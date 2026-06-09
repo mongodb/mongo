@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
@@ -41,6 +42,18 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+std::shared_ptr<ViewInfo> tryGetPreResolvedViewInfo(
+    const NamespaceString& nss, const ResolvedNamespaceMap& resolvedNamespaces) {
+    auto it = resolvedNamespaces.find(nss);
+    if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView &&
+        it->second.getParsedPipeline()) {
+        auto viewInfo = std::make_shared<ViewInfo>(it->second);
+        viewInfo->desugarViewPipeline();
+        return viewInfo;
+    }
+    return nullptr;
+}
 
 using Parser = LiteParsedDocumentSource::Parser;
 using ParserMap = LiteParsedDocumentSource::ParserMap;
@@ -250,6 +263,10 @@ LiteParsedPipeline ViewInfo::getViewPipeline() const {
 
 void ViewInfo::desugarViewPipeline() {
     _wrappedNamespace.desugarViewPipeline();
+}
+
+LiteParsedPipeline ViewInfo::desugarAndCloneViewPipeline() const {
+    return _wrappedNamespace.desugarAndCloneViewPipeline();
 }
 
 ViewInfo ViewInfo::clone() const {

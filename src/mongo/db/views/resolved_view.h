@@ -169,6 +169,22 @@ public:
                         options};
     }
 
+    void setAdditionalResolvedNamespaces(std::vector<ResolvedNamespace> additional) {
+        _wrappedNamespace.setAdditionalResolvedNamespaces(std::move(additional));
+    }
+    const std::vector<ResolvedNamespace>& getAdditionalResolvedNamespaces() const {
+        return _wrappedNamespace.getAdditionalResolvedNamespaces();
+    }
+
+    // TODO SERVER-125515 Remove sentinel primary notion when last LTS can understand
+    // additionalResolvedNamespaces serialization.
+    static ResolvedView makeWithSentinelPrimary(std::vector<ResolvedNamespace> additional) {
+        return ResolvedView(ResolvedNamespace::makeWithSentinelPrimary(std::move(additional)));
+    }
+    bool hasSentinelPrimary() const {
+        return _wrappedNamespace.hasSentinelPrimary();
+    }
+
 private:
     ResolvedNamespace _wrappedNamespace;
 };

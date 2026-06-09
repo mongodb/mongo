@@ -37,6 +37,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_documents.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -97,6 +99,20 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                                                         std::move(params.unionNss),
                                                         std::move(*params.liteParsedPipeline),
                                                         std::move(params.pipeline),
+                                                        std::move(params.resolvedSubPipelineView),
+                                                        params.hasForeignDB)};
+    }
+
+    // A $unionWith with no user pipeline against a view should just forward the view's LPP
+    // directly.
+    if (auto viewInfo =
+            tryGetPreResolvedViewInfo(params.unionNss, expCtx->getResolvedNamespaces())) {
+        auto lpp = viewInfo->getViewPipeline();
+        return {make_intrusive<DocumentSourceUnionWith>(expCtx,
+                                                        std::move(params.unionNss),
+                                                        std::move(lpp),
+                                                        std::move(params.pipeline),
+                                                        std::move(viewInfo),
                                                         params.hasForeignDB)};
     }
 
@@ -116,6 +132,18 @@ DocumentSourceContainer unionWithStageParamsToDocumentSourceFn(
         ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
     if (!hybridSearchFlagEnabled) {
         return {DocumentSourceUnionWith::createFromBson(typedParams->getOriginalBson(), expCtx)};
+    }
+
+    if (hybrid_scoring_util::isHybridSearchPipeline(typedParams->pipeline)) {
+        const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
+        auto it = resolvedNamespaces.find(typedParams->unionNss);
+        bool unionNssIsView = it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView;
+        search_helpers::throwIfrKickbackIfNecessary(
+            unionNssIsView,
+            feature_flags::gFeatureFlagExtensionsInsideHybridSearch,
+            search_metrics::inUnionWithKickbackRetryCount,
+            "$unionWith with $rankFusion/$scoreFusion targeting a view is not supported with "
+            "featureFlagExtensionsInsideHybridSearch enabled.");
     }
 
     return DocumentSourceUnionWith::createFromStageParams(*typedParams, expCtx);
@@ -175,7 +203,8 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
           nullptr,
           UnionWithSharedState::ExecutionProgress::kIteratingSource)),
       _userNss(original._userNss),
-      _userPipeline(original._userPipeline) {
+      _userPipeline(original._userPipeline),
+      _fromNsIsAView(original._fromNsIsAView) {
     _sharedState->_pipeline->getContext()->setInUnionWith(true);
 
     tassert(10577700,
@@ -256,9 +285,10 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     // result.
     if (expCtx->getExplain() &&
         expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
-        resolvedUnionNs.has_value() && !resolvedUnionNs->pipeline.empty()) {
+        resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView) {
         _resolvedNsForView = resolvedUnionNs;
     }
+    _fromNsIsAView = resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView;
 
     _userNss = std::move(unionNss);
     _userPipeline = std::move(pipeline);
@@ -269,24 +299,40 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     NamespaceString unionNss,
     LiteParsedPipeline desugaredPipeline,
     std::vector<BSONObj> userPipeline,
+    std::shared_ptr<ViewInfo> resolvedSubPipelineView,
     bool hasForeignDB)
     : DocumentSource(kStageName, expCtx) {
     _hasForeignDB = hasForeignDB;
     // TODO SERVER-121094 Remove when feature flag is removed.
     auto ifrContext = expCtx->getIfrContext();
-    if (!ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+    auto hybridSearchFlagEnabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (!hybridSearchFlagEnabled) {
         LiteParsedDesugarer::desugar(&desugaredPipeline, expCtx->getIfrContext());
     }
     boost::optional<ResolvedNamespace> resolvedUnionNs;
     try {
-        auto resolvedNamespaces = expCtx->getResolvedNamespaces();
-        auto it = resolvedNamespaces.find(unionNss);
+        if (resolvedSubPipelineView) {
+            resolvedUnionNs = resolvedSubPipelineView->getWrappedNamespace();
+        } else {
+            const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
+            auto it = resolvedNamespaces.find(unionNss);
+            if (it != resolvedNamespaces.end()) {
+                resolvedUnionNs = it->second;
+            }
+        }
 
-        if (it != resolvedNamespaces.end()) {
-            resolvedUnionNs = it->second;
+        // $facet reparses its subpipeline from raw BSON, bypassing the bindViewInfo pass so we must
+        // apply the view manually in that scenario.
+        bool viewAlreadyStitched = resolvedSubPipelineView != nullptr;
+        if (resolvedUnionNs) {
             _sharedState = std::make_shared<UnionWithSharedState>(
-                parsePipelineFromLPPWithMaybeViewDefinition(
-                    expCtx, *resolvedUnionNs, desugaredPipeline, userPipeline, unionNss),
+                parsePipelineFromLPPWithMaybeViewDefinition(expCtx,
+                                                            *resolvedUnionNs,
+                                                            desugaredPipeline,
+                                                            userPipeline,
+                                                            unionNss,
+                                                            viewAlreadyStitched),
                 nullptr,
                 UnionWithSharedState::ExecutionProgress::kIteratingSource);
         } else {
@@ -315,9 +361,10 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 
     if (expCtx->getExplain() &&
         expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
-        resolvedUnionNs.has_value() && !resolvedUnionNs->pipeline.empty()) {
+        resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView) {
         _resolvedNsForView = resolvedUnionNs;
     }
+    _fromNsIsAView = resolvedUnionNs.has_value() && resolvedUnionNs->involvedNamespaceIsAView;
 
     _userNss = std::move(unionNss);
     _userPipeline = std::move(userPipeline);
@@ -448,6 +495,49 @@ Value DocumentSourceUnionWith::buildUnionWithResult(Value pipelineValue,
     return Value(DOC(getSourceName() << spec.freezeToValue()));
 }
 
+// TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
+Value DocumentSourceUnionWith::legacyUnionWithSerialize(const SerializationOptions& opts) const {
+    if (opts.isSerializingForQueryStats()) {
+        const auto serializedPipeline =
+            pipeline_factory::makePipeline(_userPipeline,
+                                           _sharedState->_pipeline->getContext(),
+                                           pipeline_factory::kOptionsMinimal)
+                ->serializeToBson(opts);
+        return buildUnionWithResult(
+            Value(serializedPipeline),
+            Value(opts.serializeIdentifier(_userNss.dbName().db(OmitTenant{}))),
+            Value(opts.serializeIdentifier(_userNss.coll())));
+    } else {
+        MutableDocument spec;
+        if (!_sharedState->_pipeline->getContext()
+                 ->getNamespaceString()
+                 .isCollectionlessAggregateNS()) {
+            const auto underlyingNss = _sharedState->_pipeline->getContext()->getNamespaceString();
+            if (_hasForeignDB) {
+                spec["db"] = Value(underlyingNss.dbName().db(OmitTenant{}));
+            }
+            spec["coll"] = Value(opts.serializeIdentifier(underlyingNss.coll()));
+        }
+        // Strip $mergeCursors if present (injected by mongos post-dispatch; invalid on re-parse).
+        const bool hasMergeCursors = !_sharedState->_pipeline->getSources().empty() &&
+            _sharedState->_pipeline->getSources().front()->getSourceName() == "$mergeCursors"_sd;
+        if (hasMergeCursors) {
+            spec["pipeline"] =
+                Value(pipeline_factory::makePipeline(_userPipeline,
+                                                     _sharedState->_pipeline->getContext(),
+                                                     pipeline_factory::kOptionsMinimal)
+                          ->serializeToBson(opts));
+        } else {
+            spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
+        }
+        bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
+        if (isHybridSearch) {
+            spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
+        }
+        return Value(DOC(getSourceName() << spec.freezeToValue()));
+    }
+}
+
 Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const {
     // The db and coll values used by most serialization paths (explain, default).
     // Query stats uses _userNss instead (see below).
@@ -547,6 +637,11 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                 logShardedViewFound(e, _sharedState->_pipeline->serializeToBson());
                 // This takes care of the case where this code is executing on mongos and we had to
                 // get the view pipeline from a shard.
+                //
+                // Update pipelineContextColl to the resolved underlying collection so that the
+                // $unionWith.coll field in the explain output reflects the actual execution
+                // namespace rather than the view name.
+                pipelineContextColl = Value(opts.serializeIdentifier(e->getNamespace().coll()));
                 auto resolvedPipeline = parsePipelineWithMaybeViewDefinition(
                     getExpCtx(),
                     ResolvedNamespace{e->getNamespace(), e->getPipeline()},
@@ -564,36 +659,55 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
 
         return buildUnionWithResult(
             Value(explainLocal.firstElement()), userDb, pipelineContextColl);
-    } else if (opts.isSerializingForQueryStats()) {
-        // Query shapes must reflect the original, unresolved and unoptimized pipeline, so we need a
-        // special case here if we are serializing the stage for that purpose. Otherwise, we should
-        // return the current (optimized) pipeline for introspection with explain, etc.
-        // TODO SERVER-94227: we don't need to do any validation as part of this parsing pass.
-        const auto serializedPipeline =
-            pipeline_factory::makePipeline(_userPipeline,
-                                           _sharedState->_pipeline->getContext(),
-                                           pipeline_factory::kOptionsMinimal)
-                ->serializeToBson(opts);
-        return buildUnionWithResult(
-            Value(serializedPipeline),
-            Value(opts.serializeIdentifier(_userNss.dbName().db(OmitTenant{}))),
-            Value(opts.serializeIdentifier(_userNss.coll())));
     } else {
+        // TODO SERVER-121094: Remove legacyUnionWithSerialize() and this gate when
+        // featureFlagExtensionsInsideHybridSearch is removed.
+        auto ifrCtx = getExpCtx()->getIfrContext();
+        if (!ifrCtx ||
+            !ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch)) {
+            return legacyUnionWithSerialize(opts);
+        }
+
+        // For query stats, use the original unresolved namespace and re-parse user pipeline.
+        if (opts.isSerializingForQueryStats()) {
+            const auto serializedPipeline =
+                pipeline_factory::makePipeline(_userPipeline,
+                                               _sharedState->_pipeline->getContext(),
+                                               pipeline_factory::kOptionsMinimal)
+                    ->serializeToBson(opts);
+            return buildUnionWithResult(
+                Value(serializedPipeline),
+                Value(opts.serializeIdentifier(_userNss.dbName().db(OmitTenant{}))),
+                Value(opts.serializeIdentifier(_userNss.coll())));
+        }
+
         MutableDocument spec;
         if (!_sharedState->_pipeline->getContext()
                  ->getNamespaceString()
                  .isCollectionlessAggregateNS()) {
-            // When serializing to BSON before sending the request from router to shard, use the
-            // underlying namespace rather than _userNss, since the pipeline is already resolved.
-            // Using _userNss here could incorrectly retain the view name, leading to duplicated
-            // view resolution and stages (e.g. $search applied twice).
-            const auto underlyingNss = _sharedState->_pipeline->getContext()->getNamespaceString();
+            // Fully resolve the namespace when serializing for shard dispatch.
+            const auto& serializeNss = _fromNsIsAView
+                ? _sharedState->_pipeline->getContext()->getNamespaceString()
+                : _userNss;
             if (_hasForeignDB) {
-                spec["db"] = Value(underlyingNss.dbName().db(OmitTenant{}));
+                spec["db"] = Value(serializeNss.dbName().db(OmitTenant{}));
             }
-            spec["coll"] = Value(opts.serializeIdentifier(underlyingNss.coll()));
+            spec["coll"] = Value(opts.serializeIdentifier(serializeNss.coll()));
         }
-        spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
+        // Strip $mergeCursors if present (injected by mongos post-dispatch; invalid on re-parse).
+        const bool hasMergeCursors = !_sharedState->_pipeline->getSources().empty() &&
+            _sharedState->_pipeline->getSources().front()->getSourceName() == "$mergeCursors"_sd;
+        if (hasMergeCursors) {
+            // Re-parse from user pipeline to get the clean optimized form without $mergeCursors.
+            // TODO SERVER-94227: we don't need to do any validation as part of this parsing pass.
+            spec["pipeline"] =
+                Value(pipeline_factory::makePipeline(_userPipeline,
+                                                     _sharedState->_pipeline->getContext(),
+                                                     pipeline_factory::kOptionsMinimal)
+                          ->serializeToBson(opts));
+        } else {
+            spec["pipeline"] = Value(_sharedState->_pipeline->serializeToBson(opts));
+        }
         bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
         if (isHybridSearch) {
             spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
@@ -692,59 +806,31 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }
 
-// TODO SERVER-118954 Move this function into LiteParsed.
+// TODO SERVER-125519 Move this function into LiteParsed.
 std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineFromLPPWithMaybeViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ResolvedNamespace& resolvedNs,
     LiteParsedPipeline& desugaredPipeline,
     const std::vector<BSONObj>& rawPipeline,
-    const NamespaceString& userNss) {
+    const NamespaceString& userNss,
+    bool viewAlreadyStitchedByDrainLoop) {
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
     subExpCtx->setInUnionWith(true);
 
-    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
-        isRawDataOperation(expCtx->getOperationContext())) {
-        // Raw Data operations on timeseries collections operate without the timeseries view.
-        // Fall back to Pipeline::parseFromLiteParsed without view resolution.
-        return Pipeline::parseFromLiteParsed(
-            desugaredPipeline, subExpCtx, assertAllStagesAllowedInUnionWith);
-    }
-
-    subExpCtx->setNamespaceString(resolvedNs.ns);
-
-    if (resolvedNs.pipeline.empty()) {
-        return Pipeline::parseFromLiteParsed(
-            desugaredPipeline, subExpCtx, assertAllStagesAllowedInUnionWith);
-    }
-
-    // For search views, fall back to the BSON-based path since search view handling
-    // requires raw BSON pipeline inspection.
-    if (search_helper_bson_obj::isMongotPipeline(subExpCtx->getIfrContext(), rawPipeline)) {
-        auto opts = pipeline_factory::kDesugarOnly;
-        opts.validator = assertAllStagesAllowedInUnionWith;
-        return pipeline_factory::makePipelineFromViewDefinition(
-            subExpCtx, resolvedNs, std::vector<BSONObj>(rawPipeline), opts, userNss);
-    }
-
-    {
-        // Add resolved namespaces from view pipeline.
-        LiteParsedPipeline viewLiteParsedPipeline(resolvedNs.ns, resolvedNs.pipeline);
-        subExpCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
-    }
-
-    // Apply the view to the desugared LPP.
-    const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
-    PipelineResolver::applyViewToLiteParsed(
-        &desugaredPipeline,
-        resolvedView,
+    auto opts = pipeline_factory::kDesugarOnly;
+    opts.validator = assertAllStagesAllowedInUnionWith;
+    // $unionWith must stitch the view onto its sub-pipeline, unless the drain loop already did so.
+    // TODO SERVER-117260 Once $facet sub-pipelines go through LP view resolution,
+    // viewAlreadyStitchedByDrainLoop can be removed entirely.
+    return pipeline_factory::makePipelineFromViewDefinitionLPP(
+        subExpCtx,
+        resolvedNs,
+        desugaredPipeline,
+        rawPipeline,
         userNss,
-        subExpCtx->getResolvedNamespaces(),
-        LiteParserOptions{.ifrContext = subExpCtx->getIfrContext()});
-
-    // Parse from the modified LiteParsedPipeline (already desugared, view already applied).
-    return Pipeline::parseFromLiteParsed(
-        desugaredPipeline, subExpCtx, assertAllStagesAllowedInUnionWith);
+        opts,
+        /*stitchViewOntoUserPipeline=*/!viewAlreadyStitchedByDrainLoop);
 }
 
 }  // namespace mongo

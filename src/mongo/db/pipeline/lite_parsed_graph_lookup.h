@@ -36,10 +36,14 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -50,9 +54,6 @@ namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
  * DocumentSourceGraphLookUp::createFromStageParams(). Carries the lite-parsed values so the
  * full parse step only needs to handle what requires an ExpressionContext (the startWith
  * Expression and MatchExpression validation for restrictSearchWithMatch).
- *
- * The 'startWith' BSONElement aliases the originalBson held by the enclosing
- * LiteParsedGraphLookUp. It is only valid as long as that LiteParsed is alive.
  */
 class GraphLookUpStageParams : public DefaultStageParams {
 public:
@@ -64,7 +65,8 @@ public:
                            boost::optional<BSONObj> additionalFilter,
                            boost::optional<FieldPath> depthField,
                            boost::optional<long long> maxDepth,
-                           BSONElement originalBson)
+                           BSONElement originalBson,
+                           boost::optional<OwnedLiteParsedPipeline> liteParsedPipeline = {})
         : DefaultStageParams(originalBson),
           from(std::move(from)),
           as(std::move(as)),
@@ -73,7 +75,8 @@ public:
           startWith(startWith),
           additionalFilter(std::move(additionalFilter)),
           depthField(std::move(depthField)),
-          maxDepth(maxDepth) {}
+          maxDepth(maxDepth),
+          liteParsedPipeline(std::move(liteParsedPipeline)) {}
 
     static const Id& id;
     Id getId() const final {
@@ -91,6 +94,11 @@ public:
     boost::optional<BSONObj> additionalFilter;
     boost::optional<FieldPath> depthField;
     boost::optional<long long> maxDepth;
+    // TODO SERVER-127884 Remove the LPP from StageParams once the LP->DS->exec pipeline translation
+    // bridges the subpipeline across phase boundaries properly.
+    // Set at lite-parse time; carries the view pipeline (nullopt for regular collections)
+    // to DocumentSourceGraphLookUp::createFromStageParams.
+    boost::optional<OwnedLiteParsedPipeline> liteParsedPipeline;
 };
 
 /**
@@ -110,15 +118,20 @@ public:
                           boost::optional<FieldPath> as,
                           boost::optional<FieldPath> connectFromField,
                           boost::optional<FieldPath> connectToField,
-                          boost::optional<BSONElement> startWith,
+                          boost::optional<BSONObj> startWith,
                           boost::optional<BSONObj> additionalFilter,
                           boost::optional<FieldPath> depthField,
-                          boost::optional<long long> maxDepth);
+                          boost::optional<long long> maxDepth,
+                          const LiteParserOptions& options,
+                          boost::optional<OwnedLiteParsedPipeline> fromPipeline = {});
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final;
 
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override;
+
+    void bindViewInfo(const ViewInfo& viewInfo,
+                      const ResolvedNamespaceMap& resolvedNamespaces) override;
 
     std::unique_ptr<StageParams> getStageParams() const override;
 
@@ -126,7 +139,7 @@ private:
     boost::optional<FieldPath> _as;
     boost::optional<FieldPath> _connectFromField;
     boost::optional<FieldPath> _connectToField;
-    boost::optional<BSONElement> _startWith;
+    boost::optional<BSONObj> _startWith;
     boost::optional<BSONObj> _additionalFilter;
     boost::optional<FieldPath> _depthField;
     boost::optional<long long> _maxDepth;

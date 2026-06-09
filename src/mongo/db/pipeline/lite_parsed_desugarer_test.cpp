@@ -545,7 +545,8 @@ TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) 
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
 
     // Create [$lookup] with subpipeline [$expandToHostParse]. With a null IFR context, subpipeline
-    // desugaring is skipped, so the subpipeline should remain unchanged.
+    // desugaring is skipped (featureFlagExtensionsInsideHybridSearch is required), so the
+    // subpipeline should remain unchanged.
     LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON(extStageName << BSONObj())})});
     ASSERT_EQ(lpp.getStages().size(), 1);
 

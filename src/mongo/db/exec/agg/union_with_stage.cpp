@@ -35,6 +35,7 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
@@ -120,7 +121,8 @@ GetNextResult UnionWithStage::doGetNext() {
 
     if (_sharedState->_executionState ==
         UnionWithSharedState::ExecutionProgress::kStartingSubPipeline) {
-        auto serializedPipeline = _sharedState->_pipeline->serializeToBson();
+        SerializationOptions wireOptsForSub{.isSerializingForRemoteDispatch = true};
+        auto serializedPipeline = _sharedState->_pipeline->serializeToBson(wireOptsForSub);
 
         // Prepare the sub pipeline. This is expected to fail if the command is not supported on a
         // sharded view.
@@ -137,7 +139,7 @@ GetNextResult UnionWithStage::doGetNext() {
             logShardedViewFound(e, *_sharedState->_pipeline);
 
             // Serialize the new pipeline.
-            serializedPipeline = _sharedState->_pipeline->serializeToBson();
+            serializedPipeline = _sharedState->_pipeline->serializeToBson(wireOptsForSub);
 
             // If this throws again, the exception will bubble up and will be caught by an outer
             // layer.

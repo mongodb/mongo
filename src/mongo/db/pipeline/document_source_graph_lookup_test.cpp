@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/graph_lookup_mock_mongo_interface.h"
 #include "mongo/db/pipeline/lite_parsed_graph_lookup.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
@@ -420,7 +421,7 @@ TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupRequiredPrivileges) {
     ASSERT_TRUE(privileges[0].getActions().contains(ActionType::find));
 }
 
-TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupHasEmptySubPipelines) {
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupHasEmptySubPipelinesWithoutViewBinding) {
     auto liteParsed = parseLiteGraphLookup(getExpCtx());
     ASSERT_TRUE(liteParsed->getMutableSubPipelines()->empty());
 }
@@ -440,6 +441,126 @@ TEST_F(DocumentSourceGraphLookUpTest, CreateFromBsonRejectsDuplicateFields) {
     ASSERT_THROWS_CODE(DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        12735700);
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupBindViewInfoPopulatesPipelines) {
+    auto liteParsed = parseLiteGraphLookup(getExpCtx());
+
+    const NamespaceString backingNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "actualColl");
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kGraphLookupForeignNs,
+                ResolvedNamespace(kGraphLookupForeignNs,
+                                  backingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("x" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    liteParsed->bindViewInfo(ViewInfo{}, map);
+
+    ASSERT_EQ(1ul, liteParsed->getMutableSubPipelines()->size());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupBindViewInfoNoOpForNonView) {
+    auto liteParsed = parseLiteGraphLookup(getExpCtx());
+
+    // Map exists but marks the namespace as NOT a view.
+    ResolvedNamespaceMap map;
+    map.emplace(kGraphLookupForeignNs,
+                ResolvedNamespace(kGraphLookupForeignNs,
+                                  std::vector<BSONObj>{},
+                                  boost::none,
+                                  false /*involvedNamespaceIsAView*/));
+
+    liteParsed->bindViewInfo(ViewInfo{}, map);
+
+    ASSERT_TRUE(liteParsed->getMutableSubPipelines()->empty());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, GraphLookUpStageParamsCarriesPipelineFromSubpipeline) {
+    auto liteParsed = parseLiteGraphLookup(getExpCtx());
+
+    const NamespaceString backingNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "actualColl");
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kGraphLookupForeignNs,
+                ResolvedNamespace(kGraphLookupForeignNs,
+                                  backingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("x" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    liteParsed->bindViewInfo(ViewInfo{}, map);
+    ASSERT_EQ(1ul, liteParsed->getMutableSubPipelines()->size());
+
+    auto stageParams = liteParsed->getStageParams();
+    auto* typedParams = dynamic_cast<GraphLookUpStageParams*>(stageParams.get());
+    ASSERT_TRUE(typedParams != nullptr);
+    ASSERT_EQ(1ul, typedParams->liteParsedPipeline.value()->getStages().size());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, CreateFromStageParamsUsesLiteParsedPipelineForFromPipeline) {
+    // Keep stageSpec alive for the entire test — BSONElements in the stage params alias into
+    // its buffer, and createFromStageParams reads them when parsing expressions.
+    auto stageSpec = BSON("$graphLookup" << BSON("from" << "foreign"
+                                                        << "startWith" << "$a"
+                                                        << "connectFromField"
+                                                        << "b"
+                                                        << "connectToField"
+                                                        << "c"
+                                                        << "as"
+                                                        << "d"));
+    auto liteParsed = LiteParsedGraphLookUp::parse(
+        getExpCtx()->getNamespaceString(), stageSpec.firstElement(), LiteParserOptions{});
+
+    // Bind a view so that getStageParams() produces a liteParsedPipeline with [{$match:{x:1}}].
+    const NamespaceString backingNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "actualColl");
+    ResolvedNamespaceViewOptions viewOpts;
+    viewOpts.involvedNamespaceIsAView = true;
+    viewOpts.shouldParseLpp = true;
+    ResolvedNamespaceMap bindMap;
+    bindMap.emplace(kGraphLookupForeignNs,
+                    ResolvedNamespace(kGraphLookupForeignNs,
+                                      backingNss,
+                                      std::vector<BSONObj>{BSON("$match" << BSON("x" << 1))},
+                                      BSONObj{},
+                                      viewOpts));
+    liteParsed->bindViewInfo(ViewInfo{}, bindMap);
+    ASSERT_EQ(1ul, liteParsed->getMutableSubPipelines()->size());
+
+    auto stageParams = liteParsed->getStageParams();
+    auto* typedParams = dynamic_cast<GraphLookUpStageParams*>(stageParams.get());
+    ASSERT_EQ(1ul, typedParams->liteParsedPipeline.value()->getStages().size());
+
+    // Set up expCtx with kGraphLookupForeignNs resolved to a simple (non-view) backing namespace.
+    // Its pipeline is empty so that any pipeline in the result must come from liteParsedPipeline.
+    auto expCtx = getExpCtx();
+    ResolvedNamespaceMap resolvedNss;
+    resolvedNss.emplace(kGraphLookupForeignNs,
+                        ResolvedNamespace(kGraphLookupForeignNs, {}, boost::none, false));
+    expCtx->setResolvedNamespaces(std::move(resolvedNss));
+
+    auto ds = DocumentSourceGraphLookUp::createFromStageParams(*typedParams, expCtx);
+    auto* glu = static_cast<DocumentSourceGraphLookUp*>(ds.get());
+
+    SerializationOptions serOpts;
+    serOpts.isSerializingForRemoteDispatch = true;
+    std::vector<Value> serialized;
+    glu->serializeToArray(serialized, serOpts);
+    ASSERT_EQ(1ul, serialized.size());
+
+    // $_internalFromPipeline must carry exactly the one view stage.
+    BSONObj glBson = serialized[0].getDocument().toBson();
+    auto stages = glBson["$graphLookup"]["$_internalFromPipeline"].Array();
+    ASSERT_EQ(1ul, stages.size());
+    ASSERT_BSONOBJ_EQ(stages[0].Obj(), fromjson("{$match: {x: 1}}"));
 }
 
 }  // namespace

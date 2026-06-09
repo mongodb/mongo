@@ -30,11 +30,14 @@
 #include "mongo/db/pipeline/lite_parsed_graph_lookup.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_graph_lookup_gen.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -103,22 +106,25 @@ LiteParsedGraphLookUp::LiteParsedGraphLookUp(const BSONElement& spec,
                                              boost::optional<FieldPath> as,
                                              boost::optional<FieldPath> connectFromField,
                                              boost::optional<FieldPath> connectToField,
-                                             boost::optional<BSONElement> startWith,
+                                             boost::optional<BSONObj> startWith,
                                              boost::optional<BSONObj> additionalFilter,
                                              boost::optional<FieldPath> depthField,
-                                             boost::optional<long long> maxDepth)
-    // TODO SERVER-125119 $graphLookup does not yet accept a user-provided sub-pipeline, but it
-    // is modeled as a LiteParsedDocumentSourceNestedPipelines so that view definitions resolved
-    // from the foreign namespace can be attached as sub-pipelines during lite parsing.
+                                             boost::optional<long long> maxDepth,
+                                             const LiteParserOptions& options,
+                                             boost::optional<OwnedLiteParsedPipeline> fromPipeline)
     : LiteParsedDocumentSourceNestedPipelines(
-          spec, std::move(foreignNss), std::vector<OwnedLiteParsedPipeline>{}),
+          spec, options, std::move(foreignNss), std::vector<OwnedLiteParsedPipeline>{}),
       _as(std::move(as)),
       _connectFromField(std::move(connectFromField)),
       _connectToField(std::move(connectToField)),
-      _startWith(startWith),
+      _startWith(std::move(startWith)),
       _additionalFilter(std::move(additionalFilter)),
       _depthField(std::move(depthField)),
-      _maxDepth(maxDepth) {}
+      _maxDepth(maxDepth) {
+    if (fromPipeline) {
+        _pipelines.push_back(std::move(*fromPipeline));
+    }
+}
 
 std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
@@ -127,10 +133,25 @@ std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
                           << typeName(spec.type()),
             spec.type() == BSONType::object);
 
+    // TODO SERVER-127881 Once IDL supports '$'-prefixed field names, $_internalFromPipeline can be
+    // declared in the IDL spec and the manual extraction/strip below can be removed.
+    //
+    // Extract $_internalFromPipeline before IDL parsing. The field starts with '$' and cannot be
+    // represented as an IDL field name. Strip it from the spec so the IDL parser (which uses
+    // strict mode) does not reject it as an unknown field.
+    const BSONObj specObj = spec.embeddedObject();
+    BSONElement internalFromPipelineElem = specObj.getField("$_internalFromPipeline"_sd);
+
+    // If $_internalFromPipeline is present, strip it before IDL parsing. removeField() returns an
+    // owned copy; parsedSpecBson must outlive parsedSpec since IDL may hold element references
+    // into the backing buffer.
+    const BSONObj parsedSpecBson =
+        internalFromPipelineElem.eoo() ? specObj : specObj.removeField("$_internalFromPipeline"_sd);
+
     DocumentSourceGraphLookUpSpec parsedSpec;
     try {
-        parsedSpec = DocumentSourceGraphLookUpSpec::parse(spec.embeddedObject(),
-                                                          IDLParserContext(kStageName));
+        parsedSpec =
+            DocumentSourceGraphLookUpSpec::parse(parsedSpecBson, IDLParserContext(kStageName));
     } catch (const ExceptionFor<ErrorCodes::IDLUnknownField>& ex) {
         uasserted(12109312, str::stream() << "unknown argument to $graphLookup: " << ex.reason());
     }
@@ -138,7 +159,7 @@ std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
     const auto fromAny = parsedSpec.getFrom();
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "missing 'from' option to $graphLookup stage specification: "
-                          << spec.embeddedObject(),
+                          << specObj,
             fromAny.has_value());
     auto foreignNss = parseFromAndResolveNamespace(fromAny->getElement(), nss.dbName());
 
@@ -176,9 +197,35 @@ std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
         additionalFilter = elem.embeddedObject().getOwned();
     }
 
-    boost::optional<BSONElement> startWith;
+    boost::optional<BSONObj> startWith;
     if (const auto& sw = parsedSpec.getStartWith()) {
-        startWith = sw->getElement();
+        startWith = sw->getElement().wrap().getOwned();
+    }
+
+    // $_internalFromPipeline is an internal field set by mongos when dispatching to shards.
+    // Reject it from external clients.
+    boost::optional<OwnedLiteParsedPipeline> fromPipeline;
+    if (!internalFromPipelineElem.eoo()) {
+        if (options.opCtx) {
+            assertAllowedInternalIfRequired(
+                options.opCtx, "$_internalFromPipeline"_sd, AllowedWithClientType::kInternal);
+        }
+        uassert(12109313,
+                str::stream() << "$graphLookup '$_internalFromPipeline' must be an array, but "
+                                 "found "
+                              << typeName(internalFromPipelineElem.type()),
+                internalFromPipelineElem.type() == BSONType::array);
+        std::vector<BSONObj> rawPipelineStages;
+        for (const auto& stage : internalFromPipelineElem.Array()) {
+            uassert(12109314,
+                    str::stream()
+                        << "$graphLookup '$_internalFromPipeline' elements must be objects, but "
+                           "found "
+                        << typeName(stage.type()),
+                    stage.type() == BSONType::object);
+            rawPipelineStages.push_back(stage.embeddedObject().getOwned());
+        }
+        fromPipeline.emplace(foreignNss, rawPipelineStages, options);
     }
 
     return std::make_unique<LiteParsedGraphLookUp>(spec,
@@ -186,17 +233,39 @@ std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
                                                    std::move(as),
                                                    std::move(connectFromField),
                                                    std::move(connectToField),
-                                                   startWith,
+                                                   std::move(startWith),
                                                    std::move(additionalFilter),
                                                    std::move(depthField),
-                                                   maxDepth);
+                                                   maxDepth,
+                                                   options,
+                                                   std::move(fromPipeline));
+}
+
+void LiteParsedGraphLookUp::bindViewInfo(const ViewInfo& viewInfo,
+                                         const ResolvedNamespaceMap& resolvedNamespaces) {
+    // Save the view's LPP as this LPDS's subpipeline.
+    if (!_foreignNss) {
+        return;
+    }
+    // _pipelines may already be pre-populated from $_internalFromPipeline when a shard receives a
+    // pre-resolved pipeline from mongos.
+    if (!_pipelines.empty()) {
+        return;
+    }
+    auto it = resolvedNamespaces.find(*_foreignNss);
+    if (it == resolvedNamespaces.end() || !it->second.involvedNamespaceIsAView) {
+        return;
+    }
+    _pipelines.emplace_back(
+        it->second.ns, it->second.pipeline, LiteParserOptions{.ifrContext = _ifrContext});
+    LiteParsedDesugarer::desugar(&(*_pipelines.back()), _ifrContext);
 }
 
 PrivilegeVector LiteParsedGraphLookUp::requiredPrivileges(bool isMongos,
                                                           bool bypassDocumentValidation) const {
-    // TODO SERVER-125119 Once $graphLookup populates `_pipelines` (e.g. via view definition
-    // resolution), this must also account for the privileges required by each pipeline in
-    // `_pipelines` in addition to `_foreignNss`.
+    // find on the 'from' namespace is the correct and complete required privilege. MongoDB's view
+    // access control model gates access at the view boundary: find on the view is sufficient, and
+    // the view's underlying pipeline stages are checked at view creation time, not query time.
     tassert(12509600, "Expected foreign namespace to be set for $graphLookup", _foreignNss);
     return {Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find)};
 }
@@ -214,15 +283,24 @@ Status LiteParsedGraphLookUp::checkShardedForeignCollAllowed(
 }
 
 std::unique_ptr<StageParams> LiteParsedGraphLookUp::getStageParams() const {
+    boost::optional<OwnedLiteParsedPipeline> lpp;
+    if (!_pipelines.empty()) {
+        lpp.emplace(_pipelines[0]);
+    }
+    boost::optional<BSONElement> startWithElem;
+    if (_startWith) {
+        startWithElem = _startWith->firstElement();
+    }
     return std::make_unique<GraphLookUpStageParams>(*_foreignNss,
                                                     _as,
                                                     _connectFromField,
                                                     _connectToField,
-                                                    _startWith,
+                                                    startWithElem,
                                                     _additionalFilter,
                                                     _depthField,
                                                     _maxDepth,
-                                                    getOriginalBson());
+                                                    getOriginalBson(),
+                                                    std::move(lpp));
 }
 
 }  // namespace mongo

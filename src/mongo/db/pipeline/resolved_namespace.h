@@ -93,10 +93,20 @@ public:
     // lite_parsed_desugarer.cpp.
     static void setViewPipelineDesugarer(ViewPipelineDesugarer fn);
 
-    // Desugars the internally-parsed view pipeline in place. Callers (e.g. applyViewToLiteParsed)
-    // must invoke this before passing the ResolvedNamespace to handleView so that extension stages
-    // in view definitions are expanded prior to stitching.
+    // (Re-)parses the raw BSON view pipeline into the internal LiteParsedPipeline using this
+    // entry's own LiteParserOptions (which carry the operation's IFR context). Always parses fresh
+    // from the raw BSON, replacing any previously-parsed pipeline. Callers that need a clean,
+    // options-consistent parse of the view definition use this instead of pulling the options out
+    // of the entry.
+    void liteParseViewPipeline();
+
+    // Desugars the internally-parsed view pipeline in place. Callers must invoke this before
+    // passing the ResolvedNamespace to handleView so that extension stages in view definitions
+    // are expanded prior to stitching.
     void desugarViewPipeline();
+
+    // Returns a desugared owned clone of the internally-parsed view pipeline.
+    LiteParsedPipeline desugarAndCloneViewPipeline() const;
 
     ResolvedNamespace();
     ResolvedNamespace(const ResolvedNamespace& other);
@@ -140,12 +150,48 @@ public:
     // Parsed view pipeline. Requires that the view pipeline was parsed (e.g. via full view
     // resolution).
     LiteParsedPipeline getViewPipeline() const;
+
+    // Mutable raw access to the parsed view pipeline. Returns nullptr if the pipeline was not
+    // parsed (e.g. shouldParseLpp was false).
+    OwnedLiteParsedPipeline* getMutableParsedPipeline();
+    // Read-only access to the parsed view pipeline.
+    const LiteParsedPipeline* getParsedPipeline() const;
+    // Set/replace the LiteParserOptions on this entry. Used by callers that received an entry over
+    // the wire (e.g. mongos harvesting additionalResolvedNamespaces from a kickback) and need to
+    // restore the operation's IFR context — the wire format doesn't carry options.
+    void setLiteParserOptions(std::shared_ptr<LiteParserOptions> opts) {
+        _lpOptions = std::move(opts);
+    }
+    // Returns the LiteParserOptions associated with this namespace, or nullptr if none were set.
+    const std::shared_ptr<LiteParserOptions>& getLiteParserOptions() const {
+        return _lpOptions;
+    }
+
     // Same as getBsonPipeline(): the view pipeline as originally specified (raw BSON).
     std::vector<BSONObj> getOriginalBson() const;
     // Desugared view pipeline as BSON (each stage serialized). Requires a parsed view pipeline.
     std::vector<BSONObj> getSerializedViewPipeline() const;
     // Returns a deep copy of this ResolvedNamespace.
     ResolvedNamespace clone() const;
+
+    void setAdditionalResolvedNamespaces(std::vector<ResolvedNamespace> additional) {
+        _additionalResolvedNamespaces = std::move(additional);
+    }
+    const std::vector<ResolvedNamespace>& getAdditionalResolvedNamespaces() const {
+        return _additionalResolvedNamespaces;
+    }
+
+    // TODO SERVER-125515 Remove sentinel primary notion when last LTS can understand
+    // additionalResolvedNamespaces serialization.
+    static ResolvedNamespace makeWithSentinelPrimary(std::vector<ResolvedNamespace> additional) {
+        ResolvedNamespace rn(NamespaceString(), std::vector<BSONObj>{});
+        rn._additionalResolvedNamespaces = std::move(additional);
+        rn._hasSentinelPrimary = true;
+        return rn;
+    }
+    bool hasSentinelPrimary() const {
+        return _hasSentinelPrimary;
+    }
 
     // ErrorExtraInfo API
     // TODO SERVER-122118 Change ResolvedNamespace to inherit from ErrorExtraInfo, to replace
@@ -168,14 +214,14 @@ public:
     // collection, NOT the view namespace.
     // TODO SERVER-122119 It would be helpful to name this _resolvedNss;
     NamespaceString ns;
-    // The view's raw BSON object pipeline (empty for collections).
+    // The view's raw BSON object pipeline (empty for collections). The constructor enforces
+    // that every stage is owned, so this map can outlive the view-catalog entry it was built
+    // from.
     std::vector<BSONObj> pipeline;
     boost::optional<UUID> uuid = boost::none;
     bool involvedNamespaceIsAView = false;
 
 private:
-    void liteParseViewPipeline();
-
     // Core member variables - these are always set, no matter what.
 
     // The namespace provided by the user - in the case of the view, this
@@ -192,6 +238,9 @@ private:
 
     std::shared_ptr<LiteParserOptions> _lpOptions = nullptr;
     std::unique_ptr<OwnedLiteParsedPipeline> _parsedPipeline;
+
+    std::vector<ResolvedNamespace> _additionalResolvedNamespaces;
+    bool _hasSentinelPrimary = false;
 
     inline static ViewPipelineDesugarer _viewPipelineDesugarer;
 };

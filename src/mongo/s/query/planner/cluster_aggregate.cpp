@@ -104,6 +104,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
@@ -450,7 +451,8 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     bool alreadyDesugared,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr) {
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
+    ResolvedNamespaceMap preResolvedNamespaces = {}) {
     // Populate the collation. If this is a change stream, take the user-defined collation if one
     // exists, or an empty BSONObj otherwise. Change streams never inherit the collection's default
     // collation, and since collectionless aggregations generally run on the 'admin'
@@ -465,6 +467,35 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                                                     request.getCollation().value_or(BSONObj()),
                                                     requiresCollationForParsingUnshardedAggregate);
 
+    bool extensionsInHybridSearchEnabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (extensionsInHybridSearchEnabled && request.getCollation() &&
+        !request.getCollation()->isEmpty()) {
+        auto* collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+        auto requestCollator =
+            uassertStatusOK(collatorFactory->makeFromBSON(*request.getCollation()));
+        for (const auto& [nss, rn] : preResolvedNamespaces) {
+            if (!rn.involvedNamespaceIsAView) {
+                continue;
+            }
+            const BSONObj& viewCollation = rn.getDefaultCollation();
+            if (viewCollation.isEmpty()) {
+                continue;
+            }
+            auto viewCollator = uassertStatusOK(collatorFactory->makeFromBSON(viewCollation));
+            uassert(ErrorCodes::OptionNotSupportedOnView,
+                    str::stream() << "Cannot override a view's default collation for view "
+                                  << nss.toStringForErrorMsg(),
+                    CollatorInterface::collatorsMatch(viewCollator.get(), requestCollator.get()));
+        }
+    }
+
+    ResolvedNamespaceMap resolvedNamespacesForExpCtx =
+        resolveInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
+    for (auto& [nss, rn] : preResolvedNamespaces) {
+        resolvedNamespacesForExpCtx.insert_or_assign(nss, std::move(rn));
+    }
+
     // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
     // includes all involved namespaces, and creates a shared MongoProcessInterface for use by
     // the pipeline's stages.
@@ -476,7 +507,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                               nsStruct.requestedNss,
                               collationObj,
                               boost::none /* uuid */,
-                              resolveInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces()),
+                              std::move(resolvedNamespacesForExpCtx),
                               hasChangeStream,
                               verbosity,
                               collationMatchesDefault,
@@ -516,51 +547,6 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                         .isEnabledUseLatestFCVWhenUninitialized(
                             VersionContext::getDecoration(opCtx),
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
-            // This step here to add the view to the ExpressionContext ResolvedNamespaceMap exists
-            // to support $unionWiths whose sub-pipelines run on a view (which is also the same view
-            // as the top-level query) on a sharded cluster, where some different stage (like
-            // $rankFusion or $scoreFusion) desugar into a $unionWith on the view.
-            //
-            // Note that there is an unintuitive expectation for any query running a $unionWith on a
-            // view in a sharded cluster (regardless if the original user query contains the
-            // $unionWith, or the query desugars into a $unionWith), where the view that the
-            // $unionWith runs on must be in ExpressionContext ResolvedNamespace map with the
-            // following mapping: {view_name -> {view_name, empty BSON pipeline}} Opposed to the
-            // intuitive / expected mapping of: {view_name -> {coll_name, view BSON pipeline
-            // definition}}, prior to Pipeline parsing.
-            //
-            // This is due to an unfortunate particular of how DocumentSourceUnionWith serializes to
-            // BSON, where it always writes the 'coll' argument as the original user namespace
-            // (instead of the resolved namespace, if it exists), regardless of if the internal
-            // Pipeline maintained in DocumentSourceUnionWith has a resolved view definition
-            // pre-pended to it or not.
-            //
-            // So if we were to include the "expected" mapping in the ResolvedNamespaceMap, both
-            // mongos and mongod would end up prepending the view definition to the unionWith
-            // sub-pipeline (as the serialized BSON of the $unionWith sent down to mongod would
-            // include both the unresolved/user namespace in the 'coll' argument and the
-            // sub-pipeline would already have the view definition pre-pended.
-            //
-            // You can observe this same insertion of {view_name -> {view_name, empty BSON
-            // pipeline}} into the ResolvedNamespaceMap in PipelineBuilder::PipelineBuilder() in
-            // 'sharding_catalog_manager.cpp'.
-            //
-            // The difference is that that the PipelineBuilder call happens before desugar, when
-            // processing a LiteParsedPipeline. So this analogous call handles the cases where the
-            // $unionWith appears after desugar, but placing the ExpressionContext
-            // ResolvedNamespaceMap into the same required state.
-            //
-            // Technically, the view that the $unionWith runs on could be different from the view of
-            // the top level query, however we currently don't have any stages that desugar in such
-            // a way. So for now, we are gating this operation to only occur when the query is a
-            // Hybrid Search, as in those desugarings the view the $unionWith will run on is
-            // guaranteed to be the same as the top-level of the query.
-            expCtx->addResolvedNamespace(viewName,
-                                         ResolvedNamespace(viewName,
-                                                           std::vector<BSONObj>(),
-                                                           boost::none,
-                                                           false /*involvedNamespaceIsAView*/));
         }
     }
 
@@ -644,7 +630,8 @@ Status _parseQueryStatsAndReturnEmptyResult(
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
-    bool alreadyDesugared = false) {
+    bool alreadyDesugared = false,
+    ResolvedNamespaceMap preResolvedNamespaces = {}) {
 
     // By forcing the validation checks to be done explicitly, instead of indirectly via a callback
     // function (runAggregateImpl) in runAggregate(...) that gets passed to
@@ -660,6 +647,10 @@ Status _parseQueryStatsAndReturnEmptyResult(
     // topologies.
     try {
         performValidationChecks(opCtx, request, liteParsedPipeline);
+    } catch (const ExceptionFor<ErrorCodes::IFRFlagRetry>&) {
+        // Let IFRFlagRetry propagate so the outer ClusterAggregate::runAggregate retry loop can
+        // disable the flag and reparse the pipeline.
+        throw;
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -682,7 +673,9 @@ Status _parseQueryStatsAndReturnEmptyResult(
                                                resolvedView,
                                                originalRequest,
                                                verbosity,
-                                               alreadyDesugared);
+                                               alreadyDesugared,
+                                               nullptr /* ifrContext */,
+                                               std::move(preResolvedNamespaces));
 
         pipeline->validateCommon(false);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
@@ -718,7 +711,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                         boost::optional<ExplainOptions::Verbosity> verbosity,
                         BSONObjBuilder* res,
                         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
-                        bool alreadyDesugared = false) {
+                        bool alreadyDesugared = false,
+                        ResolvedNamespaceMap preResolvedNamespaces = {}) {
     const auto pipelineDataSource = sharded_agg_helpers::getPipelineDataSource(liteParsedPipeline);
     if (!originalRoutingCtx.hasNss(namespaces.executionNss) &&
         sharded_agg_helpers::checkIfMustRunOnAllShards(namespaces.executionNss,
@@ -740,7 +734,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                 originalRequest,
                 verbosity,
                 res,
-                alreadyDesugared);
+                alreadyDesugared,
+                std::move(preResolvedNamespaces));
         }
     }
 
@@ -835,7 +830,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                                                originalRequest,
                                                verbosity,
                                                alreadyDesugared,
-                                               std::move(ifrContext));
+                                               std::move(ifrContext),
+                                               std::move(preResolvedNamespaces));
         const boost::intrusive_ptr<ExpressionContext>& pipelineCtx = pipeline->getContext();
 
         // If cri is valueful, then the database definitely exists and the cluster has shards. If
@@ -1199,6 +1195,8 @@ struct RetryState {
     // Tracks whether the LiteParsedPipeline that we are going to run the aggregate command against
     // has already been desugared or not.
     bool alreadyDesugared = false;
+    // The result of view resolution - contains a map containing all views resolved by the shard.
+    ResolvedNamespaceMap preResolvedNamespaces;
 };
 
 PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
@@ -1208,14 +1206,15 @@ PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
     const ClusterAggregate::Namespaces& namespaces,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    if (!state.resolvedView) {
+    if (!state.resolvedView && state.preResolvedNamespaces.empty()) {
         // We don't know if we have a view yet. Use the original command request.
         return PipelineResolver::MongosViewRequestResult(request, boost::none);
     }
 
-    // We populated a view through the kickback retry logic. Build a new resolved request
-    // from this view, handling special cases for
-    // mongot pipelines, timeseries views, and invoking bindViewInfo() for
+    // We have either a top-level view (state.resolvedView) or a transitive sub-pipeline view
+    // closure (state.preResolvedNamespaces) shipped back from a sentinel-primary kickback, or
+    // both. Build a new resolved request that handles whichever combination is present, including
+    // special cases for mongot pipelines, timeseries views, and invoking bindViewInfo() for
     // extension stages.
     PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
                                                     resolveInvolvedNamespaces};
@@ -1223,18 +1222,22 @@ PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
     const auto& requestForResolution = state.originalRequest.value_or(request);
     auto resolved = PipelineResolver::buildResolvedMongosViewRequest(opCtx,
                                                                      requestForResolution,
-                                                                     *state.resolvedView,
+                                                                     state.resolvedView,
                                                                      namespaces.requestedNss,
                                                                      verbosity,
                                                                      ifrContext,
-                                                                     helpers);
+                                                                     helpers,
+                                                                     state.preResolvedNamespaces);
 
-    state.currentNamespaces.executionNss = state.resolvedView->getNamespace();
     state.alreadyDesugared = resolved.liteParsedPipeline.has_value();
 
-    uassert(ErrorCodes::OptionNotSupportedOnView,
+    if (state.resolvedView) {
+        state.currentNamespaces.executionNss = state.resolvedView->getNamespace();
+        uassert(
+            ErrorCodes::OptionNotSupportedOnView,
             "$rankFusion and $scoreFusion are unsupported on timeseries collections",
             !(state.resolvedView->isTimeseries() && state.originalRequest->getIsHybridSearch()));
+    }
     return resolved;
 }
 
@@ -1243,7 +1246,8 @@ boost::optional<LiteParsedPipeline> maybeRebuildLiteParsedPipelineForRetry(
     AggregateCommandRequest& request,
     boost::optional<LiteParsedPipeline> userLPP,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    bool isRetrying = !state.ifrFlagsToDisableOnRetries.empty() || state.resolvedView;
+    bool isRetrying = !state.ifrFlagsToDisableOnRetries.empty() || state.resolvedView ||
+        !state.preResolvedNamespaces.empty();
     if (!isRetrying) {
         return boost::none;
     }
@@ -1255,6 +1259,15 @@ boost::optional<LiteParsedPipeline> maybeRebuildLiteParsedPipelineForRetry(
     }
 
     return LiteParsedPipeline(request, false, LiteParserOptions{.ifrContext = ifrContext});
+}
+
+// Schedules `flag` to be disabled on the next retry iteration and clears any partially-built
+// result.
+void disableIfrFlagAndResetResult(IncrementalRolloutFeatureFlag* flag,
+                                  RetryState& state,
+                                  BSONObjBuilder* result) {
+    state.ifrFlagsToDisableOnRetries.insert(flag);
+    result->resetToEmpty();
 }
 
 bool needsCollectionRouter(const LiteParsedPipeline& lpp, const RetryState& state) {
@@ -1327,7 +1340,8 @@ Status ClusterAggregate::runAggregate(
                                              verbosity,
                                              result,
                                              ifrContext,
-                                             state.alreadyDesugared);
+                                             state.alreadyDesugared,
+                                             state.preResolvedNamespaces);
             // Throw all errors so the outer retry loop can handle any retryable errors
             // accordingly, or capture any non-retryable errors.
             uassertStatusOK(status);
@@ -1400,7 +1414,8 @@ Status ClusterAggregate::runAggregate(
                                                  verbosity,
                                                  result,
                                                  ifrContext,
-                                                 state.alreadyDesugared);
+                                                 state.alreadyDesugared,
+                                                 state.preResolvedNamespaces);
 
             // If aggregation returned an error, propagate it immediately so the outer retry loop
             // can handle it.
@@ -1494,7 +1509,9 @@ Status ClusterAggregate::runAggregate(
                                                         state.resolvedView,
                                                         state.originalRequest,
                                                         verbosity,
-                                                        result);
+                                                        result,
+                                                        state.alreadyDesugared,
+                                                        state.preResolvedNamespaces);
         }
 
         // Return the final status (either from routing or aggregation).
@@ -1502,51 +1519,88 @@ Status ClusterAggregate::runAggregate(
     };
 
     // Error handler for CommandOnShardedViewNotSupportedOnMongod.
-    auto onViewError =
-        [&](const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
-            RetryState& state) {
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &hangBeforeRetryingAggregateAfterViewKickback,
-                opCtx,
-                "hangBeforeRetryingAggregateAfterViewKickback");
+    // TODO SERVER-128370 Refactor into a dedicated helper.
+    auto onViewError = [&](const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&
+                               ex,
+                           RetryState& state) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangBeforeRetryingAggregateAfterViewKickback,
+            opCtx,
+            "hangBeforeRetryingAggregateAfterViewKickback");
 
-            // Save the resolved view in the state.
-            state.resolvedView =
-                chainViews(std::move(state.resolvedView), *ex.extraInfo<ResolvedView>());
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter.onViewResolutionError(opCtx, namespaces.requestedNss);
+        }
 
-            // Pre-disable mongot extensions for views. This is an optimization, because we know
-            // these extensions are not eligible to run on views. If we do not implement this
-            // optimization, we will eventually throw the IFR flag kickback retry and end up
-            // restarting ClusterAggregate again.
-            // TODO SERVER-121094 Remove when feature flag is removed.
-            auto hybridSearchFlagEnabled = ifrContext &&
-                ifrContext->getSavedFlagValue(
-                    feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
-            if (!hybridSearchFlagEnabled) {
-                if (ifrContext->getSavedFlagValue(
-                        feature_flags::gFeatureFlagVectorSearchExtension)) {
-                    state.ifrFlagsToDisableOnRetries.insert(
-                        &feature_flags::gFeatureFlagVectorSearchExtension);
-                }
-                if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension)) {
-                    state.ifrFlagsToDisableOnRetries.insert(
-                        &feature_flags::gFeatureFlagSearchExtension);
+        // When the featureFlagExtensionsInsideHybridSearch IFR flag is on, the
+        // shard discovers that any involved namespace is a view and performs proactive
+        // involved-namespace resolution, sending back a single ResolvedView containing all view
+        // resolution information.
+        // TODO SERVER-121094 Remove when feature flag is removed.
+        auto kickedBackView = ex.extraInfo<ResolvedView>();
+        const bool hybridSearchFlagEnabled = ifrContext &&
+            ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+
+        bool foundNewViewEntry = false;
+        if (hybridSearchFlagEnabled && !kickedBackView->getAdditionalResolvedNamespaces().empty()) {
+            for (const auto& rn : kickedBackView->getAdditionalResolvedNamespaces()) {
+                auto it = state.preResolvedNamespaces.find(rn.getNamespace());
+                if (it == state.preResolvedNamespaces.end()) {
+                    foundNewViewEntry = true;
+                    auto [insertedIt, _] =
+                        state.preResolvedNamespaces.emplace(rn.getNamespace(), rn);
+                    insertedIt->second.setLiteParserOptions(std::make_shared<LiteParserOptions>(
+                        LiteParserOptions{.ifrContext = ifrContext}));
+                } else {
+                    // Already had an entry for this namespace; treat as a non-progressing
+                    // re-kickback for this entry. Keep the existing entry to preserve any
+                    // earlier work.
                 }
             }
+        }
 
-            result->resetToEmpty();
+        ScopeGuard resetResult([&result]() { result->resetToEmpty(); });
 
-            if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                txnRouter.onViewResolutionError(opCtx, namespaces.requestedNss);
+        // TODO SERVER-121094 Remove hybrid search flag check when feature flag is removed.
+        if (hybridSearchFlagEnabled && kickedBackView->hasSentinelPrimary()) {
+            uassert(12451400,
+                    "Aggregation kickback from shard did not converge: the proactive "
+                    "involved-namespace resolution closure was already known on mongos, "
+                    "so retrying would re-trigger the same kickback. This typically means "
+                    "the request was not rewritten between retries.",
+                    foundNewViewEntry);
+            return;
+        }
+
+        // Legacy single-view kickback path: save the resolved view in the state so the next
+        // retry iteration rewrites the pipeline to run against the view's backing namespace.
+        state.resolvedView = chainViews(std::move(state.resolvedView), *kickedBackView);
+
+        // Pre-disable mongot extensions for views. This is an optimization, because we know
+        // these extensions are not eligible to run on views. If we do not implement this
+        // optimization, we will eventually throw the IFR flag kickback retry and end up
+        // restarting ClusterAggregate again.
+        // TODO SERVER-121094 Remove when feature flag is removed.
+        if (!hybridSearchFlagEnabled) {
+            if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension)) {
+                state.ifrFlagsToDisableOnRetries.insert(
+                    &feature_flags::gFeatureFlagVectorSearchExtension);
             }
-        };
+            if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension)) {
+                state.ifrFlagsToDisableOnRetries.insert(
+                    &feature_flags::gFeatureFlagSearchExtension);
+            }
+        }
+    };
 
     // Error handler for IFRFlagRetry.
+    // TODO SERVER-128370 Refactor into a dedicated helper.
     auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex, RetryState& state) {
         // Save the flag to be disabled upon retry.
-        state.ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
-            ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
-        result->resetToEmpty();
+        disableIfrFlagAndResetResult(IncrementalRolloutFeatureFlag::findByName(
+                                         ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
+                                     state,
+                                     result);
     };
 
     try {
@@ -1639,7 +1693,7 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
 
     // Build the resolved request.
     auto resolved = PipelineResolver::buildResolvedMongosViewRequest(
-        opCtx, request, resolvedView, requestedNss, verbosity, ifrContext, helpers);
+        opCtx, request, resolvedView, requestedNss, verbosity, ifrContext, helpers, {});
 
     // Now call runAggregate with the resolved namespace and request.
     return runAggregate(opCtx,

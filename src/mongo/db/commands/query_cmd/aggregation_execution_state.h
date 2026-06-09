@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
@@ -44,6 +45,9 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/modules.h"
+
+#include <deque>
+#include <functional>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -405,7 +409,6 @@ public:
         return _originalAggReqDerivatives->liteParsedPipeline;
     }
 
-
     boost::optional<NamespaceString> getViewNss() const override {
         return boost::make_optional(getOriginalNss());
     }
@@ -491,10 +494,48 @@ public:
     virtual std::shared_ptr<const CollectionCatalog> getCatalog() const = 0;
 
     /**
-     * Use the acquired catalog to resolve the involved namespaces.
+     * Use the acquired catalog to resolve the involved namespaces. Prefer
+     * 'getResolvedInvolvedNamespaces()' at call sites that may run multiple times within a single
+     * '_runAggregate()' invocation, as it memoizes the result of this call.
      */
     virtual StatusWith<ResolvedNamespaceMap> resolveInvolvedNamespaces(
         OperationContext* opCtx) const = 0;
+
+    /**
+     * Resolves all referenced namespaces (potentially from views) from the initial `namespaces` set
+     * into `resolvedNamespaces`.
+     */
+    virtual Status extendResolvedNamespaces(OperationContext* opCtx,
+                                            std::deque<NamespaceString> namespaces,
+                                            ResolvedNamespaceMap& resolvedNamespaces) const = 0;
+
+    /**
+     * Memoized wrapper over 'resolveInvolvedNamespaces()'. Resolves on first call; subsequent calls
+     * return the cached result. Throws via uassert if resolution fails.
+     */
+    const ResolvedNamespaceMap& getResolvedInvolvedNamespaces(OperationContext* opCtx) const {
+        return _resolvedInvolvedNamespaces.get(this, opCtx);
+    }
+
+    /**
+     * True iff the main namespace is a view that should be expanded into its underlying pipeline
+     * during '_runAggregate()'. A view is not expanded when the request starts with '$collStats'
+     * (which is supported directly on views) except on timeseries views, where the user-facing
+     * view is abstracted over a buckets collection that must be resolved.
+     */
+    bool shouldExpandMainView() const;
+
+    /**
+     * Proactively resolve the transitive closure of sub-pipeline namespaces. If any resolve to a
+     * view, throw a 'ResolvedView' so mongos can reparse with view expansions inlined and
+     * re-dispatch. If 'shouldExpandMainView()' is also true, fold its resolution into the same
+     * kickback so a single round-trip suffices. On non-view involved namespaces this is a no-op
+     * beyond populating the cache used by 'createExpressionContext()'.
+     *
+     * Must be called exactly once from '_runAggregate()' immediately after constructing the
+     * AggCatalogState, so any ResolvedView thrown propagates up to the mongos view-handling path.
+     */
+    void maybeProactivelyResolveInvolvedNamespaces(AggExState& aggExState);
 
     /**
      * Use the acquired catalog to resolve the view.
@@ -539,6 +580,10 @@ public:
 
     BSONObj getShardKey() const;
 
+    std::shared_ptr<IncrementalFeatureRolloutContext> getIfrContext() const {
+        return _aggExState.getIfrContext();
+    }
+
     virtual ~AggCatalogState() {}
 
 protected:
@@ -554,6 +599,16 @@ protected:
     // _runAggregate(). Since AggCatalogState is always allocated from within _runAggregate(),
     // '_aggExState' will always live long enough.
     const AggExState& _aggExState;
+
+private:
+    // Lazy cache backing 'getResolvedInvolvedNamespaces()'. The initializer is a stateless lambda
+    // that dispatches into the virtual 'resolveInvolvedNamespaces()'; 'this' is passed through
+    // 'Deferred::get()' rather than captured so the cache does not hold a self-pointer (safe here
+    // regardless since AggCatalogState is non-copyable and non-movable).
+    Deferred<std::function<ResolvedNamespaceMap(const AggCatalogState*, OperationContext*)>>
+        _resolvedInvolvedNamespaces{[](const AggCatalogState* self, OperationContext* opCtx) {
+            return uassertStatusOK(self->resolveInvolvedNamespaces(opCtx));
+        }};
 };
 
 /**

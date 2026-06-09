@@ -152,12 +152,17 @@ std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
     if (!_pipelines.empty()) {
         lpp = _pipelines[0]->clone();
     }
+    // Forward the resolved-view marker that bindViewInfo populated. The
+    // const_pointer_cast is safe: the marker is owned by this LiteParsed and StageParams
+    // is consumed once at DocumentSource construction time.
+    auto resolvedView = std::const_pointer_cast<ViewInfo>(getResolvedSubPipelineView());
     return std::make_unique<UnionWithStageParams>(*_foreignNss,
                                                   _rawPipeline,
                                                   _hasForeignDB,
                                                   _isHybridSearch,
                                                   getOriginalBson(),
-                                                  std::move(lpp));
+                                                  std::move(lpp),
+                                                  std::move(resolvedView));
 }
 
 bool LiteParsedUnionWith::hasExtensionVectorSearchStage() const {
