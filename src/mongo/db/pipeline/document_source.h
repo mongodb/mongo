@@ -393,6 +393,11 @@ public:
     static Id allocateId(StringData name);
 
     /**
+     * Notifies this stage that the metadata stream has been elided and will not produce documents.
+     */
+    virtual void skipMetadataStream() {}
+
+    /**
      * Returns true if the DocumentSource has a query.
      */
     virtual bool hasQuery() const;

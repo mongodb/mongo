@@ -488,6 +488,10 @@ public:
         return _logicalStage->getDocsNeededBounds();
     }
 
+    void skipMetadataStream() override {
+        _logicalStage->skipMetadataStream();
+    }
+
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(

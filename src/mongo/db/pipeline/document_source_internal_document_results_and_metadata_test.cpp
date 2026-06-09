@@ -217,9 +217,36 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
               StageConstraints::TransactionRequirement::kNotAllowed);
 }
 
+class DocumentSourceMockSkipMetadataStream final : public DocumentSourceMock {
+public:
+    static boost::intrusive_ptr<DocumentSourceMockSkipMetadataStream> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        boost::intrusive_ptr<DocumentSourceMockSkipMetadataStream> mock(
+            new DocumentSourceMockSkipMetadataStream(expCtx));
+        mock->mockConstraints.requiredPosition = StageConstraints::PositionRequirement::kFirst;
+        mock->mockConstraints.requiresInputDocSource = false;
+        return mock;
+    }
+
+    void skipMetadataStream() override {
+        _metadataStreamSkipped = true;
+    }
+
+    bool isMetadataStreamSkipped() const {
+        return _metadataStreamSkipped;
+    }
+
+private:
+    DocumentSourceMockSkipMetadataStream(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceMock({}, expCtx) {}
+
+    bool _metadataStreamSkipped = false;
+};
+
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        OptimizeElidesMetadataWhenNoSearchMetaRef) {
-    auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
+    auto sourceStage = DocumentSourceMockSkipMetadataStream::create(getExpCtx());
+    auto* sourcePtr = sourceStage.get();
     auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
         getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
     auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
@@ -235,6 +262,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ds->optimizeAt(pipeline.begin(), &pipeline);
 
     ASSERT_FALSE(ds->getMetadata().has_value());
+    ASSERT_TRUE(sourcePtr->isMetadataStreamSkipped());
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
@@ -299,7 +327,8 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        OptimizeRetainsMetadataWhenDownstreamStageReferencesSearchMeta) {
-    auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
+    auto sourceStage = DocumentSourceMockSkipMetadataStream::create(getExpCtx());
+    auto* sourcePtr = sourceStage.get();
     auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
         getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
     auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
@@ -317,6 +346,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ds->optimizeAt(pipeline.begin(), &pipeline);
 
     ASSERT_TRUE(ds->getMetadata().has_value());
+    ASSERT_FALSE(sourcePtr->isMetadataStreamSkipped());
 }
 
 // Translation tests — verify REGISTER_AGG_STAGES_MAPPING expansion via buildPipeline.

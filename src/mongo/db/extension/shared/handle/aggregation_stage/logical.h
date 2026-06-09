@@ -126,6 +126,10 @@ public:
      */
     void skipStream(::MongoExtensionStreamType streamType);
 
+    void skipMetadataStream() {
+        skipStream(::MongoExtensionStreamType::kMongoExtensionStreamTypeMetaResult);
+    }
+
     /**
      * Returns the DocsNeededBounds info for this stage. Returns boost::none if the extension
      * does not provide bounds info.

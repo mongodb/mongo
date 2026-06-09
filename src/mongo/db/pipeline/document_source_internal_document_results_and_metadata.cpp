@@ -256,8 +256,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetada
                     4,
                     "Eliding metadata stream as no downstream stage references $$SEARCH_META.");
         _metadata = boost::none;
-        // TODO: SERVER-126183 invoke _sourceStage->skipStream(kMetadataResult) once
-        // skip_stream is added to MongoExtensionLogicalAggStageVTable in api.h.
+        _sourceStage->skipMetadataStream();
     }
     return std::next(itr);
 }
