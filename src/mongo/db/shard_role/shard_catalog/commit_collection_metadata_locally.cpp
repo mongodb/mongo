@@ -532,19 +532,14 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
     // upsert, but because it writes an identical document the two operations do not conflict.
     upsertCollectionEntryLocally(opCtx, nss, coll);
 
-    // Replicate an invalidation so that secondaries drop their cached filtering metadata for this
-    // collection, regardless of what they currently hold in memory.
-    invalidateCollectionMetadataOnSecondaries(
-        opCtx, nss, coll.getUuid(), false /* forDroppedCollection */, false /* authoritative */);
-
-    // On the primary, only evict a stale leftover, for example an UNTRACKED entry left behind from
-    // before the collection became tracked. If the shard already holds tracked filtering metadata
-    // (e.g. because it is concurrently receiving a chunk migration for this collection), clearing
-    // it would abort that migration, so leave it untouched.
-    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    const auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
-    if (currentMetadata && !currentMetadata->hasRoutingTable())
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+    // There is no need to invalidate or clear the in-memory filtering metadata here, neither on the
+    // primary nor on the secondaries: the current CSS state is always either unknown or already
+    // correct, and never a stale "untracked" entry that would have to be evicted.
+    //   - If this shard owns chunks, its CSS is tracked (or unknown if it has not been refreshed
+    //     yet).
+    //   - If this shard owns no chunks, its CSS is still tracked or unknown, but never untracked,
+    //     because movePrimary is responsible for handling untracked collections when cloning and
+    //     for cleaning them up on the old primary shard.
 }
 
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
