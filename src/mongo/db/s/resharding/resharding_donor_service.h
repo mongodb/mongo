@@ -356,11 +356,6 @@ private:
     void _removeDonorDocument(
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    // Initializes the _cancelState and generates an abort token. If an
-    // abort was reported prior to the initialization, automatically cancels the _cancelState before
-    // returning. Note: Should only be called once per lifetime.
-    void _initCancelState(const CancellationToken& stepdownToken);
-
     /**
      * Creates a new span with the resharding UUID set as an attribute.
      */
@@ -403,9 +398,8 @@ private:
     // Protects the state below
     mutable std::mutex _mutex;
 
-    // Manages abort state and provides cancellation tokens for async operations. Initialized in
-    // _initCancelState().
-    std::unique_ptr<primary_only_service_helpers::CancelState> _cancelState;
+    // Manages abort state and provides cancellation tokens for async operations.
+    primary_only_service_helpers::CancelState _cancelState;
 
     // The identifier associated to the recoverable critical section.
     const BSONObj _critSecReason;

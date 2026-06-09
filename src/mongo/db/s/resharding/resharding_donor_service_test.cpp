@@ -1079,82 +1079,22 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
     }
 }
 
-TEST_F(ReshardingDonorServiceTest, AbortRacesWithInitCancelStateOnStepUp) {
-    auto fpBeforeInit = globalFailPointRegistry().find("reshardingPauseDonorBeforeInitCancelState");
-    auto fpAfterInit = globalFailPointRegistry().find("reshardingPauseDonorAfterInitCancelState");
-    auto fpInAbort = globalFailPointRegistry().find("reshardingPauseDonorInAbortBeforePromiseSet");
+TEST_F(ReshardingDonorServiceTest, StepDownBeforeRunFulfillsCompletionPromise) {
+    auto& fp = repl::PrimaryOnlyServiceHangBeforeRunningInstance;
+    auto timesEntered = fp.setMode(FailPoint::alwaysOn);
 
-    for (auto& testOptions : makeAllTestOptions()) {
-        LOGV2(11513900,
-              "Running case",
-              "test"_attr = unittest::getTestName(),
-              "testOptions"_attr = testOptions);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
+    auto opCtx = makeOperationContext();
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        auto doc = makeStateDocument(testOptions);
-        auto instanceId =
-            BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+    fp.waitForTimesEntered(timesEntered + 1);
+    stepDown();
 
-        auto opCtx = makeOperationContext();
-        createSourceCollection(opCtx.get(), doc);
-        if (testOptions.isAlsoRecipient) {
-            createTemporaryReshardingCollection(opCtx.get(), doc);
-        }
+    ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
 
-        DonorStateMachine::insertStateDocument(opCtx.get(), doc);
-        auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-
-        // Drive instance 1 to kDonatingInitialData so stepDown() interrupts a
-        // fully-initialized run(). Calling stepDown() directly after getOrCreate races
-        // with run() scheduling and the completion future does not resolve.
-        notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-        stepDown();
-        ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
-                  ErrorCodes::InterruptedDueToReplStateChange);
-        donor.reset();
-
-        // Arm failpoints before stepUp so instance 2's run() pauses at the start of
-        // _initCancelState the moment it is scheduled.
-        auto fpBeforeBaseline = fpBeforeInit->setMode(FailPoint::alwaysOn);
-        auto fpAfterBaseline = fpAfterInit->setMode(FailPoint::alwaysOn);
-        auto fpAbortBaseline = fpInAbort->setMode(FailPoint::alwaysOn);
-
-        stepUp(opCtx.get());
-
-        auto [maybeDonor, isPausedOrShutdown] =
-            DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
-        ASSERT_TRUE(maybeDonor);
-        ASSERT_FALSE(isPausedOrShutdown);
-        donor = *maybeDonor;
-
-        // Instance 2's run() paused at the start of _initCancelState; _cancelState is null.
-        fpBeforeInit->waitForTimesEntered(fpBeforeBaseline + 1);
-
-        // abort() will observe _cancelState == nullptr, skip the fast-path cancel, and
-        // pause before setting _coordinatorHasDecisionPersisted.
-        stdx::thread abortThread([&] { donor->abort(false); });
-        ON_BLOCK_EXIT([&] {
-            if (abortThread.joinable()) {
-                abortThread.join();
-            }
-        });
-        fpInAbort->waitForTimesEntered(fpAbortBaseline + 1);
-
-        // Let _initCancelState publish _cancelState. Its isReady() safety-net check sees
-        // the promise is not yet set (abort is paused), so it skips the safety-net cancel.
-        fpBeforeInit->setMode(FailPoint::off);
-        fpAfterInit->waitForTimesEntered(fpAfterBaseline + 1);
-
-        // Release abort() and let it finish its late cancel.
-        fpInAbort->setMode(FailPoint::off);
-        abortThread.join();
-
-        fpAfterInit->setMode(FailPoint::off);
-
-        // The donor must complete the abort path even though abort() and _initCancelState
-        // raced; a regression would leave _cancelState uncanceled and hang here.
-        ASSERT_OK(donor->getCompletionFuture().getNoThrow());
-        checkStateDocumentRemoved(opCtx.get());
-    }
+    fp.setMode(FailPoint::off);
 }
 
 TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
