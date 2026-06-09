@@ -336,7 +336,13 @@ void updateShardCatalogCache(OperationContext* opCtx,
 
     scopedCsr->setFilteringMetadata_authoritative(
         opCtx, std::move(ownedMetadata), CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+
+    // Update allowChunkOperations and write an oplog 'c' entry to send the new allowChunkOperations
+    // value to secondaries, since its value could have potentially changed.
+    // TODO (SERVER-127444): remove these lines.
     scopedCsr->setAllowChunkOperations(coll.getAllowChunkOperations());
+    setAllowChunkOperationsOnSecondaries(
+        opCtx, nss, coll.getUuid(), coll.getAllowChunkOperations());
 }
 
 void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
@@ -517,12 +523,6 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
     invalidateCollectionMetadataOnSecondaries(
         opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-
-    if (expectedAllowChunkOperations) {
-        // Write an oplog 'c' entry to send the new allowChunkOperations value to secondaries.
-        setAllowChunkOperationsOnSecondaries(
-            opCtx, nss, coll.getUuid(), *expectedAllowChunkOperations);
-    }
 }
 
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
