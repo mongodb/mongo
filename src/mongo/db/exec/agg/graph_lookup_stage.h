@@ -202,7 +202,6 @@ private:
 
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
-    boost::optional<SpillableDocumentMap::Iterator> _unwindIterator;
 
     // Holds variables defined both in this stage and in parent pipelines. These are copied to the
     // '_fromExpCtx' ExpressionContext's 'variables' and 'variablesParseState' for use in the
@@ -230,6 +229,10 @@ private:
     // Contains visited or already enqueued values of "connectFromField" to avoid duplicated
     // queries.
     SpillableValueSet _visitedFromValues;
+
+    // Keeps track of the current position in the _visitedDocuments when processing an absorbed
+    // $unwind.
+    boost::optional<SpillableDocumentMap::Iterator> _unwindIterator;
 
     // Caches query results to avoid repeating any work. This structure is maintained across calls
     // to getNext().

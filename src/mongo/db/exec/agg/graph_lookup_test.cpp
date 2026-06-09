@@ -565,6 +565,52 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, CanForceSpill) {
 }
 
 
+TEST_F(DocumentSourceGraphLookUpSpillingTest,
+       ShouldNotCrashWhenDestroyedWhileUnwindIteratorHasDiskDocuments) {
+    auto expCtx = getExpCtx();
+    auto inputMock = exec::agg::MockStage::createForTest({Document{{"startPoint", 0}}}, expCtx);
+
+    std::deque<DocumentSource::GetNextResult> fromContents;
+    for (long long i = 0; i < 3; ++i) {
+        fromContents.push_back(Document{{{"_id", Value{i}}, {"to", 0}, {"from", 1}}});
+    }
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(
+        std::make_shared<GraphLookUpMockMongoInterface>(std::move(fromContents)));
+    expCtx->setAllowDiskUse(true);
+
+    auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
+    auto graphLookupDS = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::createPathFromString(
+            expCtx.get(), "startPoint", expCtx->variablesParseState),
+        boost::none,
+        boost::none,
+        boost::none,
+        unwindStage);
+
+    {
+        auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
+
+        // Call getNext() to populate _visitedDocuments and start unwinding.
+        auto next = graphLookupStage->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+
+        // Spill to disk to populate the unwind iterator with disk documents.
+        graphLookupStage->forceSpill();
+
+        // Stage destroyed mid-iteration with unwind iterator populated.
+        ASSERT_TRUE(graphLookupStage->usedDisk());
+    }
+}
+
 TEST_F(GraphLookUpTest, GraphLookupWithComparisonExpressionForStartWith) {
     auto expCtx = getExpCtx();
 
