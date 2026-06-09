@@ -12,7 +12,6 @@
  * ]
  */
 import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName1 = "test1";
 const dbName2 = "test2";
@@ -134,14 +133,10 @@ withAbortAndRetryOnTransientTxnError(session, () => {
     // collection on this namespace (even as it exist at latest). A collection will be
     // implicitly created and we will fail to commit this transaction with a WriteConflict
     // error.
-    const expectedErrorCodes = [ErrorCodes.WriteConflict];
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateCollectionInPreparedTransactions")) {
-        // If collection A and collection B live on different shards, this transaction would
-        // require two phase commit. And if this feature flag is not enabled, the transaction
-        // would fail with a OperationNotSupportedInTransaction error instead of a WriteConflict
-        // error.
-        expectedErrorCodes.push(ErrorCodes.OperationNotSupportedInTransaction);
-    }
+    // If collection A and collection B live on different shards, this transaction would
+    // require two phase commit and would fail with a OperationNotSupportedInTransaction error
+    // instead of a WriteConflict error.
+    const expectedErrorCodes = [ErrorCodes.WriteConflict, ErrorCodes.OperationNotSupportedInTransaction];
 
     assert.commandWorked(sessionCollB.insert({}));
     assert.commandFailedWithCode(session.commitTransaction_forTesting(), expectedErrorCodes);

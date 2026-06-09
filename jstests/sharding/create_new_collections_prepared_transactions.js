@@ -6,8 +6,6 @@
 //   uses_transactions,
 // ]
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbNameShard0 = "test";
@@ -53,18 +51,10 @@ withRetryOnTransientTxnError(
         assert.commandWorked(sessionDBShard0.createCollection(newCollName));
         assert.commandWorked(sessionDBShard2.createCollection(newCollName));
 
-        // TODO SERVER-77915: Remove when deleting the feature flag.
-        if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CreateCollectionInPreparedTransactions")) {
-            assert.commandWorked(session.commitTransaction_forTesting());
-
-            assertDropCollection(st.s.getDB(dbNameShard0), newCollName);
-            assertDropCollection(st.s.getDB(dbNameShard2), newCollName);
-        } else {
-            assert.commandFailedWithCode(
-                session.commitTransaction_forTesting(),
-                ErrorCodes.OperationNotSupportedInTransaction,
-            );
-        }
+        assert.commandFailedWithCode(
+            session.commitTransaction_forTesting(),
+            ErrorCodes.OperationNotSupportedInTransaction,
+        );
     },
     () => {
         session.abortTransaction();

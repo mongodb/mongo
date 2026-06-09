@@ -1007,38 +1007,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                   first.type() == BSONType::string);
           BSONObj indexSpec = cmd.removeField("createIndexes");
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-          boost::optional<Lock::CollectionLock> collLock;
-          if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
-                  VersionContext::getDecoration(opCtx),
-                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-              opCtx->inMultiDocumentTransaction()) {
-              // During initial sync we could have the following three scenarios:
-              // * The collection is uncommitted and the index doesn't exist
-              // * The collection already exists and the index doesn't exist
-              // * Both exist
-              //
-              // The latter will cause us to return an IndexAlreadyExists error, which is an
-              // acceptable error. The first one is the happy expected path so let's focus on the
-              // other one. This case can only occur if the node is performing an initial sync and
-              // the source node collection performed an index drop during a later part of the
-              // oplog. In this scenario the index creation can early return since it knows the
-              // index will be deleted at a later point.
-              if (mode == OplogApplication::Mode::kInitialSync &&
-                  !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, nss)) {
-                  return Status::OK();
-              }
-
-              // Multi-document transactions only allow createIndexes to implicitly create a
-              // collection. In this case, the collection must be empty and uncommitted. We can
-              // then relax the locking requirements (i.e. acquire the collection lock in MODE_IX)
-              // to allow a prepared transaction with the uncommitted catalog write to stash its
-              // resources before committing. This wouldn't be possible if we held the collection
-              // lock in exclusive mode.
-              invariant(UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, nss));
-              collLock.emplace(opCtx, nss, MODE_IX);
-          } else {
-              collLock.emplace(opCtx, nss, MODE_X);
-          }
+          Lock::CollectionLock collLock(opCtx, nss, MODE_X);
           createIndexForApplyOps(opCtx, indexSpec, entry.getObject2(), nss, mode);
           return Status::OK();
       },
@@ -3273,18 +3242,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
         if (op->shouldPrepare() ||
             op->getCommandType() == OplogEntry::CommandType::kCommitTransaction ||
             op->getCommandType() == OplogEntry::CommandType::kAbortTransaction) {
-            return false;
-        }
-
-        if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
-            // Do not assign timestamps to non-replicated commands that have a wrapping
-            // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include
-            // secondary oplog application of prepared transactions.
-            const auto cmdName = o.firstElementFieldNameStringData();
-            invariant(cmdName == "create" || cmdName == "createIndexes");
             return false;
         }
 
