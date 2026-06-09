@@ -689,6 +689,21 @@ TEST_F(WiredTigerKVEngineTest, SetOldestTimestampBackwardsWithoutForceIsNoop) {
     ASSERT_EQ(initTs + 1, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 }
 
+TEST_F(WiredTigerKVEngineTest, ForceStableTimestampBackwardsMovesOldestTimestampBack) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+
+    // Advance the oldest timestamp to a high value.
+    const Timestamp highTs = Timestamp(100, 0);
+    engine->setOldestTimestamp(highTs, false);
+    ASSERT_EQ(highTs, engine->getOldestTimestamp());
+
+    // Force the stable timestamp backwards. This also sets WiredTiger's oldest_timestamp to the
+    // lower value, so the cached oldest timestamp must follow.
+    const Timestamp lowTs = Timestamp(50, 0);
+    engine->setStableTimestamp(lowTs, true);
+    ASSERT_EQ(lowTs, engine->getOldestTimestamp());
+}
+
 /**
  * Test the various cases for the relationship between oldestTimestamp and stableTimestamp at the
  * end of startup recovery.

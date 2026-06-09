@@ -2477,8 +2477,9 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     _stableTimestamp.store(stableTimestamp.asULL());
 
     // If 'force' is set, then we have already set the oldest timestamp equal to the stable
-    // timestamp, so there is nothing left to do.
+    // timestamp in WiredTiger, but still need to update our cached value.
     if (force) {
+        _oldestTimestamp.store(stableTimestamp.asULL());
         return;
     }
 
