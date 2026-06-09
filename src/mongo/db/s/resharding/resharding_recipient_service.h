@@ -200,6 +200,7 @@ public:
      * making forward progress.
      */
     SharedSemiFuture<void> getCompletionFuture() const {
+        // coverity[missing_lock]
         return _completionPromise.getFuture();
     }
 

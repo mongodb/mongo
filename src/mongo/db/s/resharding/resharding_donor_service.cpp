@@ -451,7 +451,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
         })
         .runOn(**executor, _cancelState->getAbortOrStepdownToken())
         .then([this] {
-            std::lock_guard<std::mutex> lk(_mutex);
+            // coverity[missing_lock]
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
                                                  _cancelState->getAbortOrStepdownToken());
         });
@@ -877,13 +877,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    SharedSemiFuture<void> allRecipientsDoneApplyingFuture;
-    {
-        std::lock_guard<std::mutex> lk(_mutex);
-        allRecipientsDoneApplyingFuture = _promises.getAllRecipientsDoneApplyingFuture();
-    }
-
-    return future_util::withCancellation(std::move(allRecipientsDoneApplyingFuture),
+    return future_util::withCancellation(_promises.getAllRecipientsDoneApplyingFuture(),
                                          _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .then([this, factory] {
@@ -1041,6 +1035,7 @@ ReshardingDonorService::DonorStateMachine::createAndStartChangeStreamsMonitor(
         auto startAtOperationTime = cloneTimestamp + 1;
         ensureFulfilledPromise(lk, _changeStreamMonitorStartTimeSelected, startAtOperationTime);
     }
+    // coverity[missing_lock]
     return _changeStreamsMonitorStarted.getFuture();
 }
 
@@ -1051,6 +1046,7 @@ ReshardingDonorService::DonorStateMachine::awaitChangeStreamsMonitorStarted() {
                       "Cannot wait for the change streams monitor to start when verification is "
                       "not enabled. The monitor only exists when verification is enabled"};
     }
+    // coverity[missing_lock]
     return _changeStreamsMonitorStarted.getFuture();
 }
 
@@ -1062,24 +1058,20 @@ ReshardingDonorService::DonorStateMachine::awaitChangeStreamsMonitorCompleted() 
                       "not enabled. The monitor only exists when verification is enabled"};
     }
 
+    // coverity[missing_lock]
     return _changeStreamsMonitorCompleted.getFuture();
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartChangeStreamsMonitor(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    // coverity[missing_lock]
     if (!_metadata.getPerformVerification() || _changeStreamsMonitorStarted.getFuture().isReady()) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    SharedSemiFuture<Timestamp> changeStreamMonitorStartTimeSelectedFuture;
-    {
-        std::lock_guard<std::mutex> lk(_mutex);
-        changeStreamMonitorStartTimeSelectedFuture =
-            _changeStreamMonitorStartTimeSelected.getFuture();
-    }
-
-    return future_util::withCancellation(std::move(changeStreamMonitorStartTimeSelectedFuture),
+    // coverity[missing_lock]
+    return future_util::withCancellation(_changeStreamMonitorStartTimeSelected.getFuture(),
                                          _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .then([this, executor, factory](const Timestamp& startAtOperationTime) {
@@ -1190,6 +1182,7 @@ void ReshardingDonorService::DonorStateMachine::_createChangeStreamsMonitor(
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStreamsMonitorCompleted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    // coverity[missing_lock]
     if (!_metadata.getPerformVerification() ||
         _changeStreamsMonitorCompleted.getFuture().isReady()) {
         return ExecutorFuture<void>(**executor, Status::OK());
@@ -1546,6 +1539,7 @@ void ReshardingDonorService::DonorStateMachine::_initCancelState(
         _cancelState->abort();
     }
 
+    // coverity[missing_lock]
     if (auto future = _coordinatorHasDecisionPersisted.getFuture(); future.isReady()) {
         if (auto status = future.getNoThrow(); !status.isOK()) {
             // An abort was signaled (via _coordinatorHasDecisionPersisted error)

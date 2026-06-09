@@ -756,6 +756,7 @@ ReshardingRecipientService::RecipientStateMachine::awaitChangeStreamsMonitorStar
             "the recipient does not need to clone any documents or fetch/apply any oplog entries."};
     }
 
+    // coverity[missing_lock]
     return _changeStreamsMonitorStarted.getFuture();
 }
 
@@ -772,6 +773,7 @@ ReshardingRecipientService::RecipientStateMachine::awaitChangeStreamsMonitorComp
         return SemiFuture<int64_t>::makeReady(int64_t{0}).share();
     }
 
+    // coverity[missing_lock]
     return _changeStreamsMonitorCompleted.getFuture();
 }
 
@@ -1027,6 +1029,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
 void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStreamsMonitor(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    // coverity[missing_lock]
     if (!_metadata.getPerformVerification() || _skipCloningAndApplying ||
         inPotentialAbortScenario(_recipientCtx.getState()) ||
         _changeStreamsMonitorStarted.getFuture().isReady() ||
@@ -1114,6 +1117,7 @@ ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCompleted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    // coverity[missing_lock]
     if (!_metadata.getPerformVerification() || _skipCloningAndApplying ||
         inPotentialAbortScenario(_recipientCtx.getState()) ||
         _changeStreamsMonitorCompleted.getFuture().isReady()) {

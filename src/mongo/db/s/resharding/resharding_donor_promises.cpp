@@ -109,26 +109,32 @@ void ReshardingDonorPromises::emplaceCritSecWasPromoted(WithLock lk) {
 }
 
 SharedSemiFuture<void> ReshardingDonorPromises::getAllRecipientsDoneCloningFuture() const {
+    // coverity[missing_lock]
     return _allRecipientsDoneCloning.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingDonorPromises::getAllRecipientsDoneApplyingFuture() const {
+    // coverity[missing_lock]
     return _allRecipientsDoneApplying.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingDonorPromises::getInDonatingOplogEntriesFuture() const {
+    // coverity[missing_lock]
     return _inDonatingOplogEntries.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingDonorPromises::getInBlockingWritesOrErrorFuture() const {
+    // coverity[missing_lock]
     return _inBlockingWritesOrError.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingDonorPromises::getCritSecWasAcquiredFuture() const {
+    // coverity[missing_lock]
     return _critSecWasAcquired.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingDonorPromises::getCritSecWasPromotedFuture() const {
+    // coverity[missing_lock]
     return _critSecWasPromoted.getFuture();
 }
 

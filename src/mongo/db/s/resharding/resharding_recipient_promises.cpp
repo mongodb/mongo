@@ -110,14 +110,17 @@ void ReshardingRecipientPromises::onRecipientStateAdvanced(WithLock lk,
 
 SharedSemiFuture<ReshardingRecipientPromises::CloneDetails>
 ReshardingRecipientPromises::getAllDonorsPreparedToDonateFuture() const {
+    // coverity[missing_lock]
     return _allDonorsPreparedToDonate.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingRecipientPromises::getCoordinatorBlockingWritesFuture() const {
+    // coverity[missing_lock]
     return _coordinatorBlockingWrites.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingRecipientPromises::getCoordinatorCommittedFuture() const {
+    // coverity[missing_lock]
     return _coordinatorCommitted.getFuture();
 }
 
@@ -126,14 +129,17 @@ void ReshardingRecipientPromises::fulfillCoordinatorCommit(WithLock lk) {
 }
 
 SharedSemiFuture<void> ReshardingRecipientPromises::getInApplyingOrErrorFuture() const {
+    // coverity[missing_lock]
     return _inApplyingOrError.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingRecipientPromises::getInStrictConsistencyOrErrorFuture() const {
+    // coverity[missing_lock]
     return _inStrictConsistencyOrError.getFuture();
 }
 
 SharedSemiFuture<void> ReshardingRecipientPromises::getInCreatingCollectionFuture() const {
+    // coverity[missing_lock]
     return _inCreatingCollection.getFuture();
 }
 
