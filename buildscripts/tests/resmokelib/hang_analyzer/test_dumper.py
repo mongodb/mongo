@@ -1,10 +1,43 @@
 """Unit tests for the buildscripts.resmokelib.hang_analyzer.dumper package"""
 
+import os
 import platform
+import tempfile
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from buildscripts.resmokelib.hang_analyzer.dumper import GDBDumper
+from buildscripts.resmokelib.hang_analyzer.dumper import GDBDumper, _has_mz_magic
+
+
+class TestHasMzMagic(unittest.TestCase):
+    def test_valid_mz_header(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".exe") as f:
+            f.write(b"MZ" + b"\x00" * 512)
+            path = f.name
+        try:
+            self.assertTrue(_has_mz_magic(path))
+        finally:
+            os.unlink(path)
+
+    def test_stub_file_no_header(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".exe") as f:
+            f.write(b"\x00\x00\x00\x00")
+            path = f.name
+        try:
+            self.assertFalse(_has_mz_magic(path))
+        finally:
+            os.unlink(path)
+
+    def test_empty_file(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".exe") as f:
+            path = f.name
+        try:
+            self.assertFalse(_has_mz_magic(path))
+        finally:
+            os.unlink(path)
+
+    def test_nonexistent_file(self):
+        self.assertFalse(_has_mz_magic("/nonexistent/path/cdb.exe"))
 
 
 @unittest.skipUnless(platform.system() == "Linux", "GDBDumper is only for linux.")

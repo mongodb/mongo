@@ -29,6 +29,20 @@ Dumpers = namedtuple("Dumpers", ["dbg", "jstack"])
 TRACER = trace.get_tracer("resmoke")
 
 
+def _has_mz_magic(path: str) -> bool:
+    """Return True if the file at path starts with the DOS MZ magic bytes (0x4D 0x5A).
+
+    Some Windows SDK installations place stub/placeholder files that pass os.path.exists() but
+    cannot be executed by CreateProcess (WinError 2). Real executables have the MZ header; stubs
+    typically do not.
+    """
+    try:
+        with open(path, "rb") as f:
+            return f.read(2) == b"MZ"
+    except OSError:
+        return False
+
+
 def get_dumpers(root_logger: logging.Logger, dbg_output: str):
     """
     Return OS-appropriate dumpers.
@@ -180,8 +194,9 @@ class WindowsDumper(Dumper):
 
         for dbg_path in debugger_paths:
             self._root_logger.info("Checking for debugger in %s", dbg_path)
-            if os.path.exists(dbg_path):
-                return os.path.join(dbg_path, debugger)
+            cdb = os.path.join(dbg_path, debugger)
+            if _has_mz_magic(cdb):
+                return cdb
 
         return None
 
