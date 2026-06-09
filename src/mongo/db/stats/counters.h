@@ -105,7 +105,7 @@ public:
 
 private:
     // Physical byte counters — not OTel-exported.
-    // TODO SERVER-95666: Replace these with OTel-exported counters.
+    // TODO SERVER-127423: Replace these with OTel-exported counters.
     CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesIn{0};
     CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesOut{0};
     CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesIn{0};
@@ -125,7 +125,7 @@ private:
     otel::metrics::Counter<int64_t>& _numSlowSSLOperations;
 
     // Counter of inbound connections at runtime.
-    // TODO SERVER-95666: Replace this with an OTel-exported counter.
+    // TODO SERVER-127423: Replace this with an OTel-exported counter.
     CacheExclusive<AtomicWord<std::int64_t>> _tfoAccepted{0};
 
     // TFO info determined at startup.
