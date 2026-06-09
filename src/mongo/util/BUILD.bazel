@@ -564,7 +564,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "signal_handlers",
     srcs = [
-        "signal_handlers_mongod.cpp",
+        "log_rotation_signal_handler.cpp",
     ],
     deps = [
         "signal_handlers_base",
