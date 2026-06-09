@@ -69,6 +69,17 @@ MONGO_MOD_FILE_PRIVATE [[noreturn]] void throwExceptionFor(std::string reason) {
 }
 
 /**
+ * `WriteConflictRetryLimitExceeded` is thrown by `PlanExecutorImpl::_handleNeedYield()` when an
+ * operation exceeds its adaptive cap on consecutive WriteConflictException retries. Tagged
+ * `[SystemOverloadedError, RetriableError]` so retryable-writes-aware drivers auto-backoff and
+ * retry the op. Clients MUST retry with backoff: zero-delay retry re-enters the limit and creates
+ * a positive feedback loop. See `internalQueryWriteConflictRetryLimitMax`.
+ */
+[[noreturn]] inline void throwWriteConflictRetryLimitExceededException(std::string context) {
+    throwExceptionFor<ErrorCodes::WriteConflictRetryLimitExceeded>(std::move(context));
+}
+
+/**
  * A `TransactionTooLargeForCache` is thrown if it has been determined that it is unlikely to
  * ever complete the operation because the configured cache is insufficient to hold all the
  * transaction state. This helps to avoid retrying, maybe indefinitely, a transaction which would

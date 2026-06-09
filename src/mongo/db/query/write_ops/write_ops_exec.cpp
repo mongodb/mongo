@@ -712,6 +712,14 @@ bool handleError(OperationContext* opCtx,
         throw;  // These have always failed the whole batch.
     }
 
+    if (ex.code() == ErrorCodes::WriteConflictRetryLimitExceeded) {
+        // Surface as command-level ok:0 so drivers' RetryableWriteError /
+        // TransientTransactionError label attachment fires. Per-doc framing in writeErrors does
+        // not trigger driver retry. For ordered:false batches this aborts the whole batch;
+        // drivers re-send with stmtId idempotency.
+        throw;
+    }
+
     if (ErrorCodes::WouldChangeOwningShard == ex.code()) {
         if (analyze_shard_key::supportsPersistingSampledQueries(opCtx) && sampleId) {
             // Sample the diff before rethrowing the error since mongos will handle this update by

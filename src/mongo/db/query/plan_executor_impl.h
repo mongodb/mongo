@@ -90,6 +90,8 @@ template <typename F, typename H>
     invariant(shard_role_details::getRecoveryUnit(opCtx));
     invariant(!expCtx->getTemporarilyUnavailableException());
 
+    // We do not catch ErrorCodes::WriteConflictRetryLimitExceeded. It is thrown to escape
+    // this template so the adaptive retry limit can fire.
     try {
         return f();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
@@ -133,6 +135,20 @@ template <typename F, typename H>
 class CappedInsertNotifier;
 class CollectionScan;
 struct CappedInsertNotifierData;
+
+/**
+ * Pure helper used by PlanExecutorImpl::_handleNeedYield() to compute the effective max number
+ * of consecutive WriteConflictException retries given the configured upper bound (limitMax),
+ * lower bound (limitMin), waiter threshold, and current waiter count. Exposed in the header so
+ * the formula can be unit-tested directly.
+ *
+ *   - limitMax <= 0  -> limit disabled, return 0 (caller treats as "no limit").
+ *   - threshold <= 0 -> no adaptive scaling; always return limitMax.
+ *   - waiters >= threshold -> return limitMin (saturated pressure).
+ *   - otherwise: linear interpolation. Integer-division floor biases slightly toward more
+ *     retries at mid-load; exercised in unit tests.
+ */
+int adaptiveWriteConflictRetryLimit(int limitMax, int limitMin, int threshold, int waiters);
 
 class PlanExecutorImpl : public PlanExecutor {
     PlanExecutorImpl(const PlanExecutorImpl&) = delete;
@@ -218,6 +234,65 @@ public:
     }
 
     /**
+     * RAII guard tracking this operation's contribution to the process-wide gauge of plan
+     * executors currently in a WriteConflictException retry streak. `acquire()` is idempotent
+     * and is called when a new streak begins; `release()` is called when the streak ends
+     * (work succeeds, function returns, or an exception unwinds the stack).
+     *
+     * Not thread-safe on a single instance. The intended usage is one guard per
+     * `_getNextImpl` / `getNextBatch` invocation, owned by the calling thread. Sharing a guard
+     * across threads would race on `_held`. The underlying atomic gauge is thread-safe; the
+     * guard's per-instance state is not.
+     *
+     * Public so unit tests can construct it and exercise the RAII contract. Move ops are
+     * deleted explicitly to defend against future refactors that would otherwise silently
+     * break double-decrement-on-destruction.
+     */
+    class WriteConflictStreakGuard {
+    public:
+        WriteConflictStreakGuard() = default;
+        // Destructor: short-circuit when not held so the (extremely common) "no streak"
+        // exit path pays only an inlined bool check, no function call into release().
+        ~WriteConflictStreakGuard() {
+            if (_held) {
+                releaseSlow();
+            }
+        }
+        WriteConflictStreakGuard(const WriteConflictStreakGuard&) = delete;
+        WriteConflictStreakGuard& operator=(const WriteConflictStreakGuard&) = delete;
+        WriteConflictStreakGuard(WriteConflictStreakGuard&&) = delete;
+        WriteConflictStreakGuard& operator=(WriteConflictStreakGuard&&) = delete;
+
+        // Inline fast paths. release() is called on every non-NEED_YIELD work() result, so
+        // the _held check must inline; the gauge update lives in the .cpp slow path.
+        void acquire() {
+            if (!_held) {
+                acquireSlow();
+            }
+        }
+        void release() noexcept {
+            if (_held) {
+                releaseSlow();
+            }
+        }
+        [[nodiscard]] bool held() const noexcept {
+            return _held;
+        }
+
+    private:
+        void acquireSlow();
+        void releaseSlow() noexcept;
+
+        bool _held = false;
+    };
+
+    /**
+     * Returns the current value of the process-wide WCE-retry-streak waiter gauge. Test-only
+     * accessor; production code reads the gauge via `Atomic64Metric` through serverStatus.
+     */
+    static int32_t getWriteConflictRetryWaiterCount_forTest();
+
+    /**
      * It is used to detect if the plan executor obtained after multiplanning is using a distinct
      * scan stage. That's because in this scenario modifications to the pipeline in the context of
      * aggregation need to be made.
@@ -268,6 +343,14 @@ public:
     }
 
 private:
+    // Co-locates per-call state passed between the two work loops and _handleNeedYield.
+    // Non-copyable/non-movable because it owns a WriteConflictStreakGuard.
+    struct WriteConflictRetryState {
+        size_t writeConflictsInARow = 0;
+        size_t tempUnavailErrorsInARow = 0;
+        WriteConflictStreakGuard streakGuard;
+    };
+
     const QuerySolution* getQuerySolution() const {
         if (_qs) {
             return _qs.get();
@@ -290,7 +373,7 @@ private:
     void _handleResponseDeadline(PlanStage::StageState& code);
 
     // Helper for handling the NEED_YIELD stage state.
-    void _handleNeedYield(size_t& writeConflictsInARow, size_t& tempUnavailErrorsInARow);
+    void _handleNeedYield(WriteConflictRetryState& retryState);
 
     // Helper for handling the EOF stage state. Returns whether or not to stop doing work().
     bool _handleEOFAndExit(PlanStage::StageState code,

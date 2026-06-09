@@ -1015,11 +1015,62 @@ server_parameters:
             backoff is used for up to this many WriteConflicts-in-a-row per operation. After the
             threshold is crossed, the operation falls back to sleeping while holding its ticket.
             Holding the ticket throttles concurrent writers in a write-conflict storm. A very
-            large value disables the fallback (pure release-ticket behavior).
+            large value disables the fallback (pure release-ticket behavior). When
+            internalQueryWriteConflictRetryLimitMax is enabled with a smaller value than this knob,
+            the limit fires first and this fallback becomes dead code for limit-enabled ops; that
+            is intentional and not a misconfiguration.
         set_at: [startup, runtime]
         cpp_varname: gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles
         cpp_vartype: AtomicWord<int>
         default: 2147483647
+        validator:
+            gte: 0
+        redact: false
+
+    internalQueryWriteConflictRetryLimitMax:
+        description: >-
+            Maximum consecutive WriteConflictException retries per plan execution. 0 disables
+            the limit. limitMax = N means "shed on retry N+1". Recommended floor when enabled:
+            limitMax >= 5. Clients must retry the resulting WriteConflictRetryLimitExceeded
+            with backoff -- zero-delay retry re-enters the limit. Only covers the
+            classic PlanExecutorImpl path; PlanExecutorExpress fast paths are not subject to
+            this limit.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryWriteConflictRetryLimitMax
+        cpp_vartype: AtomicWord<int>
+        default: 0
+        validator:
+            gte: 0
+        redact: false
+
+    internalQueryWriteConflictRetryLimitMin:
+        description: >-
+            Floor on the adaptive consecutive WCE retry limit when adaptive scaling is fully
+            engaged (i.e. when the concurrent-waiter count reaches
+            internalQueryWriteConflictRetryLimitWaitersThreshold). Only used when the limit is
+            enabled and the threshold knob is non-zero. Must be >= 1: a value of 0 would cause
+            the effective limit to collapse to "no limit at all" under saturated pressure
+            (the throw site short-circuits when effectiveLimit == 0). 3 is a sensible default
+            that still absorbs single-doc transient conflicts.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryWriteConflictRetryLimitMin
+        cpp_vartype: AtomicWord<int>
+        default: 3
+        validator:
+            gte: 1
+        redact: false
+
+    internalQueryWriteConflictRetryLimitWaitersThreshold:
+        description: >-
+            Concurrent-waiter count at which the adaptive retry limit reaches its minimum.
+            Linear interpolation between limitMax (at 0 waiters) and limitMin (at this value
+            or higher). 0 disables adaptive scaling (the effective limit stays at limitMax
+            regardless of pressure). A "waiter" is an operation currently in a WCE streak in
+            its plan executor.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryWriteConflictRetryLimitWaitersThreshold
+        cpp_vartype: AtomicWord<int>
+        default: 0
         validator:
             gte: 0
         redact: false

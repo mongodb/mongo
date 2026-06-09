@@ -1288,5 +1288,13 @@ error_codes:
       categories: [IndexKeyExtractionError],
     }
 
+  # Retry with backoff only; zero-delay retry re-enters the limit and creates a positive
+  # feedback loop. See `internalQueryWriteConflictRetryLimitMax` for the configuration knob.
+  - {
+      code: 512,
+      name: WriteConflictRetryLimitExceeded,
+      categories: [SystemOverloadedError, RetriableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

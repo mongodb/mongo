@@ -30,7 +30,10 @@
 
 #include "mongo/db/query/plan_executor_impl.h"
 
+#include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/cached_plan.h"
 #include "mongo/db/exec/classic/collection_scan.h"
@@ -56,6 +59,7 @@
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/aligned.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -79,12 +83,64 @@ namespace {
 const BSONObj kEmptyPBRT;
 const std::vector<NamespaceStringOrUUID> kEmptyNssVector;
 
+// Count of user-connection plan executors currently in a WCE retry streak while the adaptive
+// retry limit is enabled. Internal-client streaks and limit-disabled paths do not acquire the
+// guard, so they are not counted. int32_t is enough (bounded by active user connections).
+// CacheExclusive puts the gauge on its own cache line.
+CacheExclusive<AtomicWord<int32_t>> gWriteConflictRetryWaiters{};
+
+// serverStatus / FTDC mirror. Updated alongside the source gauge by WriteConflictStreakGuard.
+auto& writeConflictRetryWaitersGauge =
+    *MetricBuilder<Atomic64Metric>("operation.writeConflictRetryWaiters");
+
+// Monotonic counter incremented once per op that exceeds its adaptive retry limit.
+auto& writeConflictRetryLimitHitMetric =
+    *MetricBuilder<Counter64>("operation.writeConflictRetryLimitHit");
+
 // Avoid logging the same message about long-running collection scans from different queries too
 // frequently.
 logv2::SeveritySuppressor longCollectionScanLogSeveritySuppressor{
     Seconds(300), logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(3)};
 
 }  // namespace
+
+// Exposed in the header so unit tests can call the formula without a live PlanExecutor.
+int adaptiveWriteConflictRetryLimit(int limitMax, int limitMin, int threshold, int waiters) {
+    if (limitMax <= 0) {
+        return 0;
+    }
+    if (limitMin < 0) {
+        limitMin = 0;
+    }
+    if (limitMin > limitMax) {
+        limitMin = limitMax;
+    }
+    if (threshold <= 0) {
+        return limitMax;
+    }
+    // Saturate at limitMin once waiters reaches threshold.
+    const int clampedWaiters = waiters > threshold ? threshold : waiters;
+    return limitMax - (limitMax - limitMin) * clampedWaiters / threshold;
+}
+
+int32_t PlanExecutorImpl::getWriteConflictRetryWaiterCount_forTest() {
+    return gWriteConflictRetryWaiters->loadRelaxed();
+}
+
+// Slow-path helpers for the guard. The inline acquire() / release() in the header gate on _held
+// before calling these.
+void PlanExecutorImpl::WriteConflictStreakGuard::acquireSlow() {
+    // Pass `old + 1` to set() instead of reloading the gauge.
+    const int32_t newVal = gWriteConflictRetryWaiters->fetchAndAddRelaxed(1) + 1;
+    writeConflictRetryWaitersGauge.set(newVal);
+    _held = true;
+}
+
+void PlanExecutorImpl::WriteConflictStreakGuard::releaseSlow() noexcept {
+    const int32_t newVal = gWriteConflictRetryWaiters->fetchAndSubtractRelaxed(1) - 1;
+    writeConflictRetryWaitersGauge.set(newVal);
+    _held = false;
+}
 
 const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKnownCommittedOpTime =
     OperationContext::declareDecoration<boost::optional<repl::OpTime>>();
@@ -426,10 +482,11 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
         return PlanExecutor::ADVANCED;
     }
 
-    // The below are incremented on every WriteConflict or TemporarilyUnavailable error accordingly,
-    // and reset to 0 on any successful call to _root->work.
-    size_t writeConflictsInARow = 0;
-    size_t tempUnavailErrorsInARow = 0;
+    // Per-call retry state: streak counters and the RAII gauge guard. Counters are incremented
+    // on every WriteConflict or TemporarilyUnavailable error accordingly, and reset to 0 on any
+    // successful call to _root->work. The guard's destructor releases the gauge if still held on
+    // any function-exit path (return / EOF / exception).
+    WriteConflictRetryState retryState;
 
     // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
     // insert notifier the entire time we are in the loop.  Holding a shared pointer to the
@@ -469,8 +526,11 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
         code = _root->work(&id);
 
         if (code != PlanStage::NEED_YIELD) {
-            writeConflictsInARow = 0;
-            tempUnavailErrorsInARow = 0;
+            // A successful work() step (or NEED_TIME / IS_EOF) ends any WCE streak. release()
+            // is idempotent and is a no-op if no streak was active.
+            retryState.streakGuard.release();
+            retryState.writeConflictsInARow = 0;
+            retryState.tempUnavailErrorsInARow = 0;
         }
 
         if (PlanStage::ADVANCED == code) {
@@ -520,7 +580,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
             // This result didn't have the data the caller wanted, try again.
 
         } else if (PlanStage::NEED_YIELD == code) {
-            _handleNeedYield(writeConflictsInARow, tempUnavailErrorsInARow);
+            _handleNeedYield(retryState);
 
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
@@ -617,8 +677,7 @@ void PlanExecutorImpl::_handleResponseDeadline(PlanStage::StageState& code) {
     }
 }
 
-void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
-                                        size_t& tempUnavailErrorsInARow) {
+void PlanExecutorImpl::_handleNeedYield(WriteConflictRetryState& retryState) {
     invariant(shard_role_details::getRecoveryUnit(_opCtx));
 
     if (_expCtx->getTemporarilyUnavailableException()) {
@@ -631,17 +690,19 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
                 "auto-yield");
         }
 
-        tempUnavailErrorsInARow++;
+        retryState.tempUnavailErrorsInARow++;
         handleTemporarilyUnavailableException(
             _opCtx,
-            tempUnavailErrorsInARow,
+            retryState.tempUnavailErrorsInARow,
             "plan executor",
             NamespaceStringOrUUID(_nss),
             Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable"),
-            writeConflictsInARow);
+            retryState.writeConflictsInARow);
     } else if (!_oplogWaitConfig || !_oplogWaitConfig->waitedForOplogVisiblity()) {
-        // If we didn't wait for oplog visiblity, then we must be yielding because of a
-        // WriteConflictException.
+        // If we didn't wait for oplog visibility, then we must be yielding because of a
+        // WriteConflictException. Oplog-visibility yields and TUE yields (handled above) do
+        // not contribute to the retry-limit gauge -- only the WCE path below acquires the
+        // streak guard.
         if (!_yieldPolicy->canAutoYield() ||
             MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
             throwWriteConflictException(
@@ -649,7 +710,38 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
                 "disabled.");
         }
 
-        writeConflictsInARow++;
+        retryState.writeConflictsInARow++;
+
+        // Adaptive per-op retry limit. Only applies to user-connection ops while the feature
+        // is on; internal clients (mongos -> mongod, cross-shard, __system peers) and
+        // sessionless threads are exempt.
+        const int limitMax = internalQueryWriteConflictRetryLimitMax.loadRelaxed();
+        auto* const client = _opCtx->getClient();
+        if (limitMax > 0 && client && client->isFromUserConnection() &&
+            !client->isInternalClient()) {
+            retryState.streakGuard.acquire();
+            const int limitMin = internalQueryWriteConflictRetryLimitMin.loadRelaxed();
+            const int threshold =
+                internalQueryWriteConflictRetryLimitWaitersThreshold.loadRelaxed();
+            const int waiters = gWriteConflictRetryWaiters->loadRelaxed();
+            const int effectiveLimit =
+                adaptiveWriteConflictRetryLimit(limitMax, limitMin, threshold, waiters);
+            // We use > instead of >= because writeConflictsInARow is already increased above.
+            if (effectiveLimit > 0 &&
+                retryState.writeConflictsInARow > static_cast<size_t>(effectiveLimit)) {
+                std::string msg = fmt::format(
+                    "Aborting after {} consecutive WriteConflictExceptions; adaptive limit "
+                    "was {} (limitMax={}, limitMin={}, threshold={}, waiters={}).",
+                    retryState.writeConflictsInARow,
+                    effectiveLimit,
+                    limitMax,
+                    limitMin,
+                    threshold,
+                    waiters);
+                writeConflictRetryLimitHitMetric.increment();
+                throwWriteConflictRetryLimitExceededException(std::move(msg));
+            }
+        }
 
         // Fall back to the legacy hold-ticket sleep path once the op has hit the threshold.
         // Holding the ticket during the sleep throttles concurrent ops entering the conflict
@@ -657,15 +749,15 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
         const bool releaseTicketEnabled =
             internalQueryEnableWriteConflictBackoffWithoutTicket.loadRelaxed();
         const bool fallbackToHoldTicket = releaseTicketEnabled &&
-            static_cast<int64_t>(writeConflictsInARow) >
+            static_cast<int64_t>(retryState.writeConflictsInARow) >
                 gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles.loadRelaxed();
 
         if (releaseTicketEnabled && !fallbackToHoldTicket) {
             // Defer the logAndBackoff() call to the yield handler.
-            _writeConflictsInARowToLog = writeConflictsInARow;
+            _writeConflictsInARowToLog = retryState.writeConflictsInARow;
         } else {
             // Do the log and backoff immediately, while we're holding the ticket.
-            logWriteConflictAndBackoff(writeConflictsInARow);
+            logWriteConflictAndBackoff(retryState.writeConflictsInARow);
         }
     }
 
@@ -717,10 +809,11 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
 
     WorkingSetID id = WorkingSet::INVALID_ID;
 
-    // The below are incremented on every WriteConflict or TemporarilyUnavailable error
-    // accordingly, and reset to 0 on any successful call to _root->work.
-    size_t writeConflictsInARow = 0;
-    size_t tempUnavailErrorsInARow = 0;
+    // Per-call retry state: streak counters and the RAII gauge guard. Counters are incremented
+    // on every WriteConflict or TemporarilyUnavailable error accordingly, and reset to 0 on any
+    // successful call to _root->work. The guard's destructor releases the gauge if still held on
+    // any function-exit path (return / EOF / exception / stashResult-break).
+    WriteConflictRetryState retryState;
 
     size_t numResults = 0;
     BSONObj objOut;
@@ -741,8 +834,11 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
         PlanStage::StageState code = _root->work(&id);
 
         if (code != PlanStage::NEED_YIELD) {
-            writeConflictsInARow = 0;
-            tempUnavailErrorsInARow = 0;
+            // A successful work() step (or NEED_TIME / IS_EOF) ends any WCE streak. release()
+            // is idempotent and is a no-op if no streak was active.
+            retryState.streakGuard.release();
+            retryState.writeConflictsInARow = 0;
+            retryState.tempUnavailErrorsInARow = 0;
         }
 
         if (code == PlanStage::ADVANCED) {
@@ -788,7 +884,7 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
             _checkIfKilled();
 
         } else if (code == PlanStage::NEED_YIELD) {
-            _handleNeedYield(writeConflictsInARow, tempUnavailErrorsInARow);
+            _handleNeedYield(retryState);
 
         } else if (code == PlanStage::NEED_TIME) {
             // Do nothing except reset counters; need more time.
