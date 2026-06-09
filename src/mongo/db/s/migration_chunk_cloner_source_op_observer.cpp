@@ -336,6 +336,25 @@ void MigrationChunkClonerSourceOpObserver::onTransactionPrepareNonPrimaryForChun
             lsid, *statements, *prepareOpTime));
 }
 
+bool MigrationChunkClonerSourceOpObserver::shouldLogBatchedWriteForSessionMigration(
+    const OpStateAccumulator* opAccumulator,
+    WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+    bool hasTxnNumber,
+    bool hasLogicalSessionId) {
+    // No oplog entries were written.
+    if (!opAccumulator ||
+        (opAccumulator->batchOpTimes.empty() && opAccumulator->opTime.writeOpTime.isNull())) {
+        return false;
+    }
+    // Only retryable batched writes need their session history migrated.
+    if (oplogGroupingFormat != WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
+        oplogGroupingFormat != WriteUnitOfWork::kGroupForAtomicWrite) {
+        return false;
+    }
+    // A retryable write must carry both a session id and a txnNumber.
+    return hasTxnNumber && hasLogicalSessionId;
+}
+
 void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
     OperationContext* opCtx,
     WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
@@ -346,11 +365,11 @@ void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
         return;
     }
 
-    // Return early if this isn't a retryable batched write, or if no oplog entries were written.
-    if (!opAccumulator ||
-        (opAccumulator->batchOpTimes.empty() && opAccumulator->opTime.writeOpTime.isNull()) ||
-        oplogGroupingFormat != WriteUnitOfWork::kGroupForPossiblyRetryableOperations ||
-        !opCtx->getTxnNumber() || !opCtx->getLogicalSessionId()) {
+    if (!shouldLogBatchedWriteForSessionMigration(
+            opAccumulator,
+            oplogGroupingFormat,
+            static_cast<bool>(opCtx->getTxnNumber()),
+            static_cast<bool>(opCtx->getLogicalSessionId()))) {
         return;
     }
 

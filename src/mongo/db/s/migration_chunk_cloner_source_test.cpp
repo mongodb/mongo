@@ -55,6 +55,7 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -64,6 +65,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
+#include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -1951,6 +1953,61 @@ TEST_F(MigrationChunkClonerSourceTest, NextCloneBatchNonDeprioritizableAfterComm
     }
 
     ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+TEST(MigrationChunkClonerSourceOpObserverTest, ShouldLogBatchedWriteForSessionMigrationGating) {
+    using Observer = MigrationChunkClonerSourceOpObserver;
+
+    // An accumulator that recorded oplog entries for a multi-op (applyOps) batched write.
+    OpStateAccumulator withBatchOpTimes;
+    withBatchOpTimes.batchOpTimes = {repl::OpTime(Timestamp(1, 1), 1)};
+
+    // An accumulator that recorded a single-op batched write (uses opTime, not batchOpTimes).
+    OpStateAccumulator withSingleOpTime;
+    withSingleOpTime.opTime.writeOpTime = repl::OpTime(Timestamp(1, 1), 1);
+
+    // An accumulator that recorded no oplog entries.
+    OpStateAccumulator empty;
+
+    // Both retryable grouping formats are logged when oplog entries exist and session info is
+    // present.
+    for (auto format : {WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+                        WriteUnitOfWork::kGroupForAtomicWrite}) {
+        EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
+            &withBatchOpTimes, format, true /* hasTxnNumber */, true /* hasLogicalSessionId */));
+        EXPECT_TRUE(Observer::shouldLogBatchedWriteForSessionMigration(
+            &withSingleOpTime, format, true /* hasTxnNumber */, true /* hasLogicalSessionId */));
+    }
+
+    // Non-retryable grouping formats are never logged.
+    for (auto format : {WriteUnitOfWork::kDontGroup, WriteUnitOfWork::kGroupForTransaction}) {
+        EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
+            &withBatchOpTimes, format, true /* hasTxnNumber */, true /* hasLogicalSessionId */));
+    }
+
+    // Missing session info (either txnNumber or lsid) is never logged.
+    EXPECT_FALSE(
+        Observer::shouldLogBatchedWriteForSessionMigration(&withBatchOpTimes,
+                                                           WriteUnitOfWork::kGroupForAtomicWrite,
+                                                           false /* hasTxnNumber */,
+                                                           true /* hasLogicalSessionId */));
+    EXPECT_FALSE(
+        Observer::shouldLogBatchedWriteForSessionMigration(&withBatchOpTimes,
+                                                           WriteUnitOfWork::kGroupForAtomicWrite,
+                                                           true /* hasTxnNumber */,
+                                                           false /* hasLogicalSessionId */));
+
+    // No oplog entries (null accumulator or no recorded op times) is never logged.
+    EXPECT_FALSE(
+        Observer::shouldLogBatchedWriteForSessionMigration(nullptr,
+                                                           WriteUnitOfWork::kGroupForAtomicWrite,
+                                                           true /* hasTxnNumber */,
+                                                           true /* hasLogicalSessionId */));
+    EXPECT_FALSE(
+        Observer::shouldLogBatchedWriteForSessionMigration(&empty,
+                                                           WriteUnitOfWork::kGroupForAtomicWrite,
+                                                           true /* hasTxnNumber */,
+                                                           true /* hasLogicalSessionId */));
 }
 
 }  // namespace

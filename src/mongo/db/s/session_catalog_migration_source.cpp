@@ -561,8 +561,7 @@ void SessionCatalogMigrationSource::_extractOplogEntriesForRetryableApplyOps(
     const repl::OplogEntry& applyOpsOplogEntry,
     std::vector<repl::OplogEntry>* oplogBuffer) {
     invariant(isInternalSessionForRetryableWrite(*applyOpsOplogEntry.getSessionId()) ||
-              applyOpsOplogEntry.getMultiOpType() ==
-                  repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+              applyOpsOplogEntry.applyOpsIsMarkedRetryable());
     invariant(applyOpsOplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
 
     auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsOplogEntry.getObject());
@@ -621,8 +620,7 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
             // Determine if this oplog entry should be migrated. If so, add the oplog entry or the
             // oplog entries derived from it to the oplog buffer.
             if (isInternalSessionForRetryableWrite(*nextOplog->getSessionId()) ||
-                nextOplog->getMultiOpType() ==
-                    repl::MultiOplogEntryType::kApplyOpsAppliedSeparately) {
+                nextOplog->applyOpsIsMarkedRetryable()) {
                 if (nextOplog->getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
                     // Derive retryable write oplog entries from this retryable internal transaction
                     // or retryable write applyOps oplog entry, and add them to the oplog buffer.
@@ -778,8 +776,7 @@ void SessionCatalogMigrationSource::_tryFetchNextNewWriteOplog(std::unique_lock<
     };
 
     if (entryAtOpTimeType == EntryAtOpTimeType::kRetryableWrite) {
-        if (nextNewWriteOplog.getMultiOpType() ==
-            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately) {
+        if (nextNewWriteOplog.applyOpsIsMarkedRetryable()) {
             invariant(nextNewWriteOplog.getCommandType() ==
                       repl::OplogEntry::CommandType::kApplyOps);
             handleRetryableApplyOps();

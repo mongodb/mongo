@@ -122,6 +122,15 @@ public:
         }
     }
 
+    // Helpers for the DeriveOplogEntriesForMultiApplyOps* tests; defined just above them.
+    void assertTransfersUnrolledOps(SessionCatalogMigrationSource& migrationSource,
+                                    const LogicalSessionId& sessionId,
+                                    TxnNumber txnNumber,
+                                    const std::vector<repl::DurableReplOperation>& expectedOps);
+    void checkMultiApplyOpsTransfer(repl::MultiOplogEntryType multiOpType,
+                                    bool isPartial,
+                                    bool viaNewWrite);
+
 private:
     boost::optional<RAIIServerParameterControllerForTest> _disallowImageCollectionFeatureFlag;
 };
@@ -3966,7 +3975,29 @@ TEST_F(SessionCatalogMigrationSourceTest, DiscardOplogEntryForNonRetryableWrite)
     ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 0);
 }
 
-TEST_F(SessionCatalogMigrationSourceTest, DeriveOplogEntriesForMultiApplyOpsBasic) {
+void SessionCatalogMigrationSourceTest::assertTransfersUnrolledOps(
+    SessionCatalogMigrationSource& migrationSource,
+    const LogicalSessionId& sessionId,
+    TxnNumber txnNumber,
+    const std::vector<repl::DurableReplOperation>& expectedOps) {
+    // Each expected op is transferred in order as an individual retryable write entry carrying the
+    // parent session/txnNumber with the multiOpType tag cleared.
+    for (const auto& op : expectedOps) {
+        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), sessionId);
+        ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), txnNumber);
+        ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(), op.toBSON());
+        ASSERT_FALSE(nextOplogResult.oplog->getMultiOpType());
+    }
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+}
+
+void SessionCatalogMigrationSourceTest::checkMultiApplyOpsTransfer(
+    repl::MultiOplogEntryType multiOpType, bool isPartial, bool viaNewWrite) {
+    // Drives a retryable applyOps (5 inner ops, two outside the migrated chunk) through either the
+    // write-history catch-up path (viaNewWrite=false) or the new-write path (viaNewWrite=true).
     const auto sessionId = makeLogicalSessionIdForTest();
     const auto txnNumber = TxnNumber{1};
 
@@ -3988,37 +4019,76 @@ TEST_F(SessionCatalogMigrationSourceTest, DeriveOplogEntriesForMultiApplyOpsBasi
                                         sessionId,
                                         txnNumber,
                                         false,  // isPrepare
-                                        true,   // isPartial
-                                        repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+                                        isPartial,
+                                        multiOpType);
     insertOplogEntry(entry);
 
-    SessionTxnRecord txnRecord;
-    txnRecord.setSessionId(sessionId);
-    txnRecord.setTxnNum(txnNumber);
-    txnRecord.setLastWriteOpTime(applyOpsOpTime);
-    txnRecord.setLastWriteDate(Date_t::now());
-
-    DBDirectClient client(opCtx());
-    client.insert(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
-
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
-    migrationSource.init(opCtx(), kMigrationLsid);
 
-    const std::vector<repl::DurableReplOperation> expectedOps{op5, op3, op1};
+    if (viaNewWrite) {
+        // The applyOps arrives as a new write while migration is in flight.
+        migrationSource.init(opCtx(), kMigrationLsid);
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        migrationSource.notifyNewWriteOpTime(
+            {applyOpsOpTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite});
+    } else {
+        // The applyOps is part of the session's write history discovered at init.
+        SessionTxnRecord txnRecord;
+        txnRecord.setSessionId(sessionId);
+        txnRecord.setTxnNum(txnNumber);
+        txnRecord.setLastWriteOpTime(applyOpsOpTime);
+        txnRecord.setLastWriteDate(Date_t::now());
 
-    for (const auto& op : expectedOps) {
-        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
-        ASSERT_TRUE(migrationSource.hasMoreOplog());
-        auto nextOplogResult = migrationSource.getLastFetchedOplog();
-        ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), sessionId);
-        ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), txnNumber);
-        ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(), op.toBSON());
-        ASSERT_FALSE(nextOplogResult.oplog->getMultiOpType());
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+
+        migrationSource.init(opCtx(), kMigrationLsid);
     }
 
-    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+    // Only the ops touching the migrated chunk are transferred, in reverse order.
+    assertTransfersUnrolledOps(migrationSource, sessionId, txnNumber, {op5, op3, op1});
     ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 3);
     ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 2);
+}
+
+struct MultiApplyOpsTransferParams {
+    repl::MultiOplogEntryType multiOpType;
+    bool isPartial;
+    bool viaNewWrite;
+    std::string testName;
+};
+
+class SessionCatalogMigrationSourceMultiApplyOpsTest
+    : public SessionCatalogMigrationSourceTest,
+      public testing::WithParamInterface<MultiApplyOpsTransferParams> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    DeriveOplogEntriesForMultiApplyOps,
+    SessionCatalogMigrationSourceMultiApplyOpsTest,
+    testing::Values(
+        MultiApplyOpsTransferParams{repl::MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                    true /* isPartial */,
+                                    false /* viaNewWrite */,
+                                    "AppliedSeparately"},
+        MultiApplyOpsTransferParams{repl::MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                    true /* isPartial */,
+                                    true /* viaNewWrite */,
+                                    "AppliedSeparatelyNewWrite"},
+        MultiApplyOpsTransferParams{repl::MultiOplogEntryType::kApplyOpsAppliedAtomically,
+                                    false /* isPartial */,
+                                    false /* viaNewWrite */,
+                                    "AppliedAtomically"},
+        MultiApplyOpsTransferParams{repl::MultiOplogEntryType::kApplyOpsAppliedAtomically,
+                                    false /* isPartial */,
+                                    true /* viaNewWrite */,
+                                    "AppliedAtomicallyNewWrite"}),
+    [](const testing::TestParamInfo<MultiApplyOpsTransferParams>& info) {
+        return info.param.testName;
+    });
+
+TEST_P(SessionCatalogMigrationSourceMultiApplyOpsTest, TransfersRetryableWriteHistory) {
+    const auto& params = GetParam();
+    checkMultiApplyOpsTransfer(params.multiOpType, params.isPartial, params.viaNewWrite);
 }
 
 TEST_F(SessionCatalogMigrationSourceTest,

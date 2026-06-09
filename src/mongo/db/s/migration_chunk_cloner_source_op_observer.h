@@ -84,6 +84,17 @@ public:
      */
     static void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss);
 
+
+    /**
+     * Returns whether a committed batched write should be logged for session migration. A batched
+     * write qualifies only if it produced oplog entries and is a retryable write.
+     */
+    static bool shouldLogBatchedWriteForSessionMigration(
+        const OpStateAccumulator* opAccumulator,
+        WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+        bool hasTxnNumber,
+        bool hasLogicalSessionId);
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,
