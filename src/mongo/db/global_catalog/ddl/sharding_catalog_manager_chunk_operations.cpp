@@ -1468,17 +1468,6 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                 continue;
             }
 
-            // The allowMigrations flag is updated without bumping the placement version, so it
-            // must be re-read under the chunk-op lock to be sure no concurrent setAllowMigrations
-            // has just disallowed migrations.
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    str::stream()
-                        << "Can't execute mergeAllChunksOnShard because chunk operations for this "
-                           "collection are disallowed. 'allowMigrations' flag is "
-                        << collUnderLock.getAllowMigrations() << "; 'allowChunkOperations' flag is "
-                        << collUnderLock.getAllowChunkOperations(),
-                    collUnderLock.getAllowMigrations() && collUnderLock.getAllowChunkOperations());
-
             // 4. Commit the new routing table changes to the sharding catalog.
             mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
         }

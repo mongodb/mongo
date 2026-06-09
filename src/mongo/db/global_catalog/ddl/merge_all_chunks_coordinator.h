@@ -59,12 +59,15 @@ public:
      */
     MergeAllChunksOnShardResponse getResponse(OperationContext* opCtx) {
         getCompletionFuture().get(opCtx);
-        tassert(12117910, "Expected _response to be set", _response);
-        return *_response;
+        auto doc = _copyDoc();
+        tassert(12117910, "Expected response to be set", doc.getResponse());
+        return doc.getResponse().get();
     }
 
 protected:
     bool isInCriticalSection(Phase phase) const override;
+
+    bool _mustAlwaysMakeProgress() override;
 
 private:
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
@@ -76,9 +79,15 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
     const ShardsvrMergeAllChunksOnShardRequest _request;
-    boost::optional<MergeAllChunksOnShardResponse> _response;
     boost::optional<ScopedSplitMergeChunk> _scopedSplitMergeChunk;
+
+    // Reason document used to acquire and release the recoverable critical section.
+    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo

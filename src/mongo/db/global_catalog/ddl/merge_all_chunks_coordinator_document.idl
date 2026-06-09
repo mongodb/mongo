@@ -36,6 +36,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
     - "mongo/db/global_catalog/ddl/merge_chunk_request.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
 
 enums:
     MergeAllChunksCoordinatorPhase:
@@ -43,7 +44,11 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kMergeAllChunks: "mergeAllChunks"
+            kCheckPreconditions: "checkPreconditions"
+            kAcquireCriticalSection: "acquireCriticalSection"
+            kGlobalCatalogCommit: "globalCatalogCommit"
+            kShardCatalogCommit: "shardCatalogCommit"
+            kReleaseCriticalSection: "releaseCriticalSection"
 
 structs:
     MergeAllChunksCoordinatorDocument:
@@ -57,3 +62,9 @@ structs:
             phase:
                 type: MergeAllChunksCoordinatorPhase
                 default: kUnset
+            response:
+                type: MergeAllChunksOnShardResponse
+                description: >-
+                    Result of the global-catalog commit. Persisted so it survives a failover that 
+                    occurs after the global catalog commit phase.
+                optional: true

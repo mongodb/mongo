@@ -34,11 +34,16 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/merge_chunk_request_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/type_chunk_range.h"
-#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
-#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
@@ -54,12 +59,91 @@ namespace mongo {
 
 namespace {
 static inline IDLParserContext kIdlParserCtx{"MergeAllChunksOnShardResponse"};
+
+// Reason document attached to the recoverable critical section that brackets the authoritative
+// commit. Must be stable across phases so that recovery releases the same section it acquired.
+BSONObj makeCriticalSectionReason(const NamespaceString& nss) {
+    return BSON(
+        "command" << "mergeAllChunksOnShard"
+                  << "ns"
+                  << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+}
+
+void checkPreconditions(OperationContext* opCtx, const NamespaceString& nss) {
+    const bool allowChunkOps =
+        CollectionShardingRuntime::acquireShared(opCtx, nss)->allowChunkOperations();
+
+    auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
+
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
+            metadata.isSharded());
+
+    uassert(
+        ErrorCodes::ConflictingOperationInProgress,
+        str::stream() << "Can't execute mergeAllChunksOnShard because chunk operations for this "
+                         "collection are disallowed. 'allowChunkOperations' flag is "
+                      << allowChunkOps << "; 'allowMigrations' flag is "
+                      << metadata.allowMigrations(),
+        allowChunkOps && metadata.allowMigrations());
+}
+
+void acquireCriticalSection(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const BSONObj& critSecReason) {
+    auto svc = ShardingRecoveryService::get(opCtx);
+    svc->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx, nss, critSecReason, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+    svc->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx, nss, critSecReason, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+}
+
+void releaseCriticalSection(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const BSONObj& critSecReason) {
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+        opCtx,
+        nss,
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        ShardingRecoveryService::NoCustomAction());
+}
+
+MergeAllChunksOnShardResponse commitToGlobalCatalog(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const ShardId& shard,
+                                                    std::int32_t maxNumberOfChunksToMerge,
+                                                    std::int32_t maxTimeProcessingChunksMS,
+                                                    OperationSessionInfo session) {
+    ConfigSvrCommitMergeAllChunksOnShard configRequest(nss);
+    configRequest.setDbName(DatabaseName::kAdmin);
+    configRequest.setShard(shard);
+    configRequest.setMaxNumberOfChunksToMerge(maxNumberOfChunksToMerge);
+    configRequest.setMaxTimeProcessingChunksMS(maxTimeProcessingChunksMS);
+    generic_argument_util::setMajorityWriteConcern(configRequest);
+    generic_argument_util::setOperationSessionInfo(configRequest, session);
+
+    auto cmdResponse =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin,
+            configRequest.toBSON(),
+            Shard::RetryPolicy::kIdempotent));
+
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+    return MergeAllChunksOnShardResponse::parse(cmdResponse.response, kIdlParserCtx);
+}
+
 }  // namespace
 
 MergeAllChunksCoordinator::MergeAllChunksCoordinator(ShardingCoordinatorService* service,
                                                      const BSONObj& initialStateDoc)
     : ChunkOperationShardingCoordinator(service, "MergeAllChunksCoordinator", initialStateDoc),
-      _request(_doc.getShardsvrMergeAllChunksOnShardRequest()) {}
+      _request(_doc.getShardsvrMergeAllChunksOnShardRequest()),
+      _critSecReason(makeCriticalSectionReason(nss())) {}
 
 void MergeAllChunksCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc = MergeAllChunksCoordinatorDocument::parse(
@@ -81,7 +165,28 @@ void MergeAllChunksCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder
 }
 
 bool MergeAllChunksCoordinator::isInCriticalSection(Phase phase) const {
-    return false;
+    return _doc.getPhase() >= Phase::kAcquireCriticalSection;
+}
+
+bool MergeAllChunksCoordinator::_mustAlwaysMakeProgress() {
+    // Once the critical section has been (or is about to be) acquired, the coordinator must
+    // either finish committing or release the critical section via _cleanupOnAbort. Force the retry
+    // loop to keep running so transient failures in either path cannot leave the critical section
+    // held.
+    return _doc.getPhase() >= Phase::kAcquireCriticalSection;
+}
+
+ExecutorFuture<void> MergeAllChunksCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this()] {
+        auto opCtxHolder = makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+        if (_doc.getPhase() >= Phase::kAcquireCriticalSection) {
+            releaseCriticalSection(opCtx, nss(), _critSecReason);
+        }
+    });
 }
 
 ExecutorFuture<void> MergeAllChunksCoordinator::_acquireLocksAsync(
@@ -101,11 +206,14 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_acquireLocksAsync(
            })
         .until([this, anchor = shared_from_this()](Status status) {
             if (!status.isOK()) {
-                LOGV2_WARNING(12117914,
+                LOGV2_WARNING(12578601,
                               "ActiveMigrationsRegistry lock acquisition attempt failed",
                               logv2::DynamicAttributes{getCoordinatorLogAttrs(),
                                                        "error"_attr = redact(status)});
             }
+            // If this coordinator is recovering after a failover, acquiring the
+            // ActiveMigrationsRegistry must succeed regardless of the current state, since the
+            // operation may have been left half-complete.
             return !_recoveredFromDisk || status.isOK();
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
@@ -119,57 +227,107 @@ void MergeAllChunksCoordinator::_releaseLocks(OperationContext* opCtx) {
 ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
-    return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this()] {
-        auto opCtxHolder = makeOperationContext(/*deprioritizable=*/true);
-        auto* opCtx = opCtxHolder.get();
-        LOGV2(12118000,
-              "Running merge all chunks on shard operation",
-              logAttrs(nss()),
-              "shard"_attr = _request.getShard());
+    return ExecutorFuture<void>(**executor)
+        .then(_buildPhaseHandler(
+            Phase::kCheckPreconditions,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                tassert(12578602,
+                        "Chunk operation coordinator must not run without authoritative metadata "
+                        "access",
+                        _doc.getAuthoritativeMetadataAccessLevel() !=
+                            AuthoritativeMetadataAccessLevelEnum::kNone);
 
-        // Because this is a non-authoritative update, we must mark the CSR metadata as
-        // kNonAuthoritative so that the following refresh will fetch the metadata from the config
-        // server. Leaving it kAuthoritative would short-circuit the refresh against the durable
-        // shard catalog and keep the CSR pinned to the pre-mergeAllChunks version. This must be
-        // done before starting the operation to ensure the CSR is left as kNonAuthoritative in case
-        // of an unexpected failure.
-        // TODO (SERVER-125786) The clearFilteringMetadata_nonAuthoritative should go away
-        // once mergeAllChunks becomes authoritative.
-        {
-            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss());
-            scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
-        }
+                LOGV2(12578603,
+                      "Checking preconditions for merge all chunks on shard operation",
+                      logAttrs(nss()),
+                      "shard"_attr = _request.getShard());
 
-        ConfigSvrCommitMergeAllChunksOnShard configRequest(nss());
-        configRequest.setDbName(DatabaseName::kAdmin);
-        configRequest.setShard(_request.getShard());
-        configRequest.setMaxNumberOfChunksToMerge(_request.getMaxNumberOfChunksToMerge());
-        configRequest.setMaxTimeProcessingChunksMS(_request.getMaxTimeProcessingChunksMS());
-        configRequest.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
+                checkPreconditions(opCtx, nss());
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kAcquireCriticalSection,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                LOGV2(12578604,
+                      "Acquiring critical section for merge all chunks on shard operation",
+                      logAttrs(nss()),
+                      "shard"_attr = _request.getShard());
 
-        auto cmdResponse =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                configRequest.toBSON(),
-                Shard::RetryPolicy::kIdempotent));
+                acquireCriticalSection(opCtx, nss(), _critSecReason);
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kGlobalCatalogCommit,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                LOGV2(12578605,
+                      "Committing merge all chunks on shard operation to the global catalog",
+                      logAttrs(nss()),
+                      "shard"_attr = _request.getShard());
 
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+                auto response = commitToGlobalCatalog(opCtx,
+                                                      nss(),
+                                                      _request.getShard(),
+                                                      _request.getMaxNumberOfChunksToMerge(),
+                                                      _request.getMaxTimeProcessingChunksMS(),
+                                                      getNewSession(opCtx));
 
-        _response = MergeAllChunksOnShardResponse::parse(cmdResponse.response, kIdlParserCtx);
+                // Persist the response into the state document so it survives a failover after
+                // this phase.
+                StateDoc newDoc(_doc);
+                newDoc.setResponse(std::move(response));
+                _updateStateDocument(opCtx, std::move(newDoc));
 
-        // Update the shard catalog filtering metadata to reflect the new shard
-        // version produced by the config server merge.
-        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-            opCtx, nss(), _response->getShardVersion()));
+                // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
+                // primary will start-up from a configTime that is inclusive of the metadata update
+                // that has been committed.
+                VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kShardCatalogCommit,
+            [this, executor, token, anchor = shared_from_this()](auto* opCtx) {
+                LOGV2(12578607,
+                      "Installing new chunk layout into the shard catalog after merge all chunks",
+                      logAttrs(nss()),
+                      "shard"_attr = _request.getShard());
 
-        LOGV2(12118001,
-              "Completed merge all chunks on shard operation",
-              logAttrs(nss()),
-              "shard"_attr = _request.getShard(),
-              "numMergedChunks"_attr = _response->getNumMergedChunks());
-    });
+                // Install the new chunk layout into the local shard catalog.
+                sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                    opCtx,
+                    nss(),
+                    {ShardingState::get(opCtx)->shardId()},
+                    getNewSession(opCtx),
+                    executor,
+                    token);
+            }))
+        .then(_buildPhaseHandler(Phase::kReleaseCriticalSection,
+                                 [this, anchor = shared_from_this()](auto* opCtx) {
+                                     LOGV2(
+                                         12578608,
+                                         "Releasing critical section for merge all chunks on shard "
+                                         "operation",
+                                         logAttrs(nss()),
+                                         "shard"_attr = _request.getShard());
+
+                                     releaseCriticalSection(opCtx, nss(), _critSecReason);
+                                 }))
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            // Retry in case of getting a retryable error.
+            if (_isRetriableErrorForDDLCoordinator(status)) {
+                return status;
+            }
+
+            const auto phase = _doc.getPhase();
+
+            // Before the kGlobalCatalogCommit phase the merge has not been committed anywhere, so
+            // a non-retryable error is safe to abort on. Persist an abort reason so the critical
+            // section (if already held) is released via _cleanupOnAbort.
+            if (phase < Phase::kGlobalCatalogCommit) {
+                auto opCtxHolder = makeOperationContext();
+                triggerCleanup(opCtxHolder.get(), status);
+                MONGO_UNREACHABLE_TASSERT(12578610);
+            }
+
+            // Retry the operation when kGlobalCatalogCommit or a greater phase fails.
+            return status;
+        });
 }
 
 }  // namespace mongo
