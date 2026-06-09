@@ -147,10 +147,12 @@ public:
     /**
      * Helper for running an applyOps through the pipeline, and getting all of the results.
      */
-    std::vector<Document> getApplyOpsResults(const Document& applyOpsDoc,
-                                             const LogicalSessionFromClient& lsid,
-                                             BSONObj spec = change_stream_test_helper::kDefaultSpec,
-                                             bool hasTxnNumber = true);
+    std::vector<Document> getApplyOpsResults(
+        const Document& applyOpsDoc,
+        const LogicalSessionFromClient& lsid,
+        BSONObj spec = change_stream_test_helper::kDefaultSpec,
+        bool hasTxnNumber = true,
+        boost::optional<repl::MultiOplogEntryType> multiOpType = boost::none);
 
     Document makeExpectedUpdateEvent(Timestamp ts,
                                      const NamespaceString& nss,

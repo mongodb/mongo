@@ -291,7 +291,8 @@ std::vector<Document> ChangeStreamStageTest::getApplyOpsResults(
     const Document& applyOpsDoc,
     const LogicalSessionFromClient& lsid,
     BSONObj spec,
-    bool hasTxnNumber) {
+    bool hasTxnNumber,
+    boost::optional<repl::MultiOplogEntryType> multiOpType) {
     BSONObj applyOpsObj = applyOpsDoc.toBson();
 
     // Create an oplog entry and then glue on an lsid and optionally a txnNumber
@@ -306,6 +307,9 @@ std::vector<Document> ChangeStreamStageTest::getApplyOpsResults(
     builder.append("lsid", lsid.toBSON());
     if (hasTxnNumber) {
         builder.append("txnNumber", 0LL);
+    }
+    if (multiOpType) {
+        builder.append("multiOpType", static_cast<int>(*multiOpType));
     }
     BSONObj oplogEntry = builder.done();
 

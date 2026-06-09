@@ -166,13 +166,18 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
     Value multiOpTypeValue = input[repl::OplogEntry::kMultiOpTypeFieldName];
     DocumentSourceChangeStream::checkValueTypeOrMissing(
         multiOpTypeValue, repl::OplogEntry::kMultiOpTypeFieldName, BSONType::numberInt);
-    const bool applyOpsAppliedSeparately = !multiOpTypeValue.missing() &&
-        multiOpTypeValue.getInt() == int(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+    const boost::optional<repl::MultiOplogEntryType> multiOpType = multiOpTypeValue.missing()
+        ? boost::none
+        : boost::make_optional(static_cast<repl::MultiOplogEntryType>(multiOpTypeValue.getInt()));
+    const bool applyOpsAppliedSeparately =
+        multiOpType == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately;
+    const bool isRetryableApplyOps = applyOpsAppliedSeparately ||
+        multiOpType == repl::MultiOplogEntryType::kApplyOpsAppliedAtomically;
 
-    // The lsid and txnNumber can be missing in case of batched writes, and are ignored when
-    // multiOpType is kApplyOpsAppliedSeparately.  The latter indicates an applyOps that is part of
-    // a retryable write and not a multi-document transaction.
-    if (!applyOpsAppliedSeparately) {
+    // lsid and txnNumber identify the transaction an operation belongs to and are surfaced on its
+    // change event so clients can correlate events from the same transaction. They are not parsed
+    // for retryable-write applyOps, which are not transactions.
+    if (!isRetryableApplyOps) {
         Value lsidValue = input[DocumentSourceChangeStream::kLsidField];
         DocumentSourceChangeStream::checkValueTypeOrMissing(
             lsidValue, DocumentSourceChangeStream::kLsidField, BSONType::object);
@@ -226,15 +231,15 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::TransactionOpIterator
         }
     }
 
-    // We need endOfTransaction only for unprepared transactions: so this must be an applyOps with
-    // set lsid and txnNumber but not a retryable write.
+    // We need endOfTransaction only for unprepared multi-document transactions: so this must be an
+    // applyOps with set lsid and txnNumber, but not a retryable-write applyOps.
     _needEndOfTransaction = feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !applyOps.missing() && !applyOpsAppliedSeparately && _lsid.has_value() &&
-        _txnNumber.has_value();
+        !applyOps.missing() && !isRetryableApplyOps && _lsid.has_value() && _txnNumber.has_value();
 
-    // If there's no previous optime, or if this applyOps is of the kApplyOpsAppliedSeparately
-    // multiOptype, we don't need to collect other apply ops operations.
+    // When operations span multiple applyOps entries linked by 'prevOpTime', walk that chain to
+    // gather them all. kApplyOpsAppliedSeparately entries are standalone, so there is no chain to
+    // follow.
     if (!applyOpsAppliedSeparately &&
         BSONType::object ==
             input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getType()) {

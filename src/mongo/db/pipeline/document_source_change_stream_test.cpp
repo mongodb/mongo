@@ -2312,6 +2312,82 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
     }
 }
 
+TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyOmitsSessionInfo) {
+    // A kApplyOpsAppliedAtomically applyOps is a retryable write, not a multi-document transaction.
+    // Its inner operations are unwound into individual change events, but those events must not
+    // carry session info (lsid/txnNumber) -- that is reserved for multi-document transactions so
+    // clients can correlate their operations. Even though this oplog entry carries an lsid and
+    // txnNumber, the unwind stage should not surface them on the events.
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 1}}}}},
+             Document{{"op", "i"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 2}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results =
+        getApplyOpsResults(applyOpsDoc,
+                           lsid,
+                           kDefaultSpec,
+                           true /* hasTxnNumber */,
+                           repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+
+    // Both inner operations are unwound into insert events.
+    EXPECT_EQ(results.size(), 2u);
+
+    int i = 1;
+    for (const auto& nextDoc : results) {
+        EXPECT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kInsertOpType);
+        EXPECT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), i++);
+        // Session info is not surfaced for a retryable-write applyOps.
+        EXPECT_TRUE(nextDoc.getField("lsid").missing());
+        EXPECT_TRUE(nextDoc.getField("txnNumber").missing());
+    }
+}
+
+TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyDoesNotEmitEndOfTransaction) {
+    // endOfTransaction events are emitted only for multi-document transactions. A
+    // kApplyOpsAppliedAtomically applyOps is a retryable write, so even with the feature flag and
+    // expanded events enabled (the conditions under which a transaction would emit one) it must not
+    // produce an endOfTransaction event.
+    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
+    Document applyOpsDoc{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 1}}}}},
+             Document{{"op", "i"_sd},
+                      {"ns", nss.ns_forTest()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 2}}}}},
+         }}},
+    };
+    LogicalSessionFromClient lsid = testLsid();
+    std::vector<Document> results =
+        getApplyOpsResults(applyOpsDoc,
+                           lsid,
+                           kShowExpandedEventsSpec,
+                           true /* hasTxnNumber */,
+                           repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+
+    // Only the two inserts are emitted -- there is no trailing endOfTransaction event.
+    EXPECT_EQ(results.size(), 2u);
+    for (const auto& nextDoc : results) {
+        EXPECT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+                  DSChangeStream::kInsertOpType);
+    }
+}
+
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
