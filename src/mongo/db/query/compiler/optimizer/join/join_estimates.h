@@ -129,11 +129,11 @@ public:
     BSONObj toBSON() const;
 
     auto operator<=>(const JoinCostEstimate& other) const {
-        return _totalCost <=> other._totalCost;
+        return approxCompare(_totalCost, other._totalCost);
     }
 
     JoinCostEstimate operator*(const CardinalityEstimate& cardEst) const {
-        return JoinCostEstimate(_totalCost * cardEst.toDouble());
+        return JoinCostEstimate(_totalCost * cardEst);
     }
 
 private:

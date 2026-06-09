@@ -177,7 +177,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     // Estimate the cost of CBR to generate a sample and estimate all plans against that sample.
     // This is done before we move 'solutions' into the new MultiPlanner below.
     const auto cbrCost = estimateCBRCost(query, solutions);
-    tassert(11306808, "CBR cannot have 0 cost", cbrCost > zeroCost);
+    tassert(11306808, "CBR cannot have 0 cost", approxGt(cbrCost, zeroCost));
 
     auto mp = classic_runtime_planner::MultiPlanner(
         std::move(plannerData), std::move(solutions), PlanExplainerData{});
@@ -285,7 +285,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
 
     double minRequiredImprovementRatio =
         internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice.load();
-    double maxAchievableImprovementRatio = remMPCost.toDouble() / cbrCost.toDouble();
+    double maxAchievableImprovementRatio = ratio(remMPCost, cbrCost);
     LOGV2_INFO(11306803,
                "Comparing MP with CBR:",
                "remMPCost"_attr = remMPCost.toString(),

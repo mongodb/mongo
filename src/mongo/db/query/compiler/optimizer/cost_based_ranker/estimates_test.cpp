@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::cost_based_ranker {
@@ -64,22 +65,22 @@ TEST(EstimatesFramework, BinaryOp) {
     const CardinalityEstimate ce2(c2, defaultSrc);
     ASSERT_EQUALS(ce1a, ce2);
     ASSERT_EQUALS(ce1b, ce2);
-    ASSERT_TRUE(ce1a <= ce2);
-    ASSERT_TRUE(ce1a >= ce2);
-    ASSERT_FALSE(ce1a > ce2);
-    ASSERT_FALSE(ce1a < ce2);
+    ASSERT_TRUE(approxLtEq(ce1a, ce2));
+    ASSERT_TRUE(approxGtEq(ce1a, ce2));
+    ASSERT_FALSE(approxGt(ce1a, ce2));
+    ASSERT_FALSE(approxLt(ce1a, ce2));
 
     // Check the consistency of comparison operations with two estimates just different
     // enough not to compare equal.
     const CardinalityEstimate ce3(c3, defaultSrc);
     const CardinalityEstimate ce4(c4, defaultSrc);
     ASSERT_NOT_EQUALS(ce3, ce4);
-    ASSERT_TRUE(ce3 < ce4);
-    ASSERT_TRUE(ce3 <= ce4);
-    ASSERT_TRUE(ce4 > ce3);
-    ASSERT_TRUE(ce4 >= ce3);
-    ASSERT_FALSE(ce4 < ce3);
-    ASSERT_FALSE(ce4 <= ce3);
+    ASSERT_TRUE(approxLt(ce3, ce4));
+    ASSERT_TRUE(approxLtEq(ce3, ce4));
+    ASSERT_TRUE(approxGt(ce4, ce3));
+    ASSERT_TRUE(approxGtEq(ce4, ce3));
+    ASSERT_FALSE(approxLt(ce4, ce3));
+    ASSERT_FALSE(approxLtEq(ce4, ce3));
 
     // Arithmetic operations
     const auto ce5 = zeroCE + ce3;
@@ -136,8 +137,8 @@ TEST(EstimatesFramework, BinaryOp) {
     // Combine two selectivities
     auto sel2 = SelectivityEstimate(SelectivityType{0.00314}, EstimationSource::Sampling);
     auto sel3 = sel1 * sel2;
-    ASSERT_TRUE(sel3 < sel1);
-    ASSERT_TRUE(sel3 < sel2);
+    ASSERT_TRUE(approxLt(sel3, sel1));
+    ASSERT_TRUE(approxLt(sel3, sel2));
 
     SelectivityEstimate selMax(SelectivityType{1.0}, defaultSrc);
     auto sel4 = selMax * sel3;
@@ -239,6 +240,180 @@ TEST(EstimatesFramework, SourceMerge) {
     SelectivityEstimate s2_me{SelectivityType{0}, EstimationSource::Heuristics};
     ASSERT_EQ((s1_me + s2_me).source(), EstimationSource::Heuristics);
     ASSERT_EQ((s2_me + s1_me).source(), EstimationSource::Heuristics);
+}
+
+// Subtraction must reconcile the estimates library's approximate comparison with its exact
+// arithmetic. When the subtrahend is approximately equal to (but, in raw double terms, slightly
+// larger than) the minuend, the result is clamped to the lower bound instead of tripping a tassert.
+// This protects every '-' / '-=' call site (e.g. $not, $skip, XOR) from the comparison/arithmetic
+// asymmetry.
+TEST(EstimatesFramework, SubtractionClampsOnEpsilonEqualCardinality) {
+    const CardinalityEstimate smaller = makeCE(1.0e6);
+    const CardinalityEstimate larger = makeCE(1.0e6 + 50.0);
+    // Approximately equal under the library's comparison, but exactly ordered the "wrong" way for
+    // a safe subtraction.
+    ASSERT_EQUALS(smaller, larger);
+    ASSERT_TRUE(smaller.toDouble() < larger.toDouble());
+    ASSERT_EQUALS(smaller - larger, zeroCE);
+}
+
+TEST(EstimatesFramework, SubtractionClampsOnEpsilonEqualSelectivity) {
+    const SelectivityEstimate smaller{SelectivityType{0.5}, defaultSrc};
+    const SelectivityEstimate larger{SelectivityType{0.5 + 0.001}, defaultSrc};
+    ASSERT_EQUALS(smaller, larger);
+    ASSERT_TRUE(smaller.toDouble() < larger.toDouble());
+    ASSERT_EQUALS(smaller - larger, zeroSel);
+}
+
+// A genuine underflow (operands not approximately equal) is a real logic error and must still trip
+// the tripwire assertion rather than being silently masked.
+DEATH_TEST(EstimatesFrameworkDeathTest, SubtractionUnderflowStillAsserts, "12552500") {
+    const CardinalityEstimate small = makeCE(10.0);
+    const CardinalityEstimate big = makeCE(1000.0);
+    [[maybe_unused]] auto bad = small - big;
+}
+
+// Symmetric upper-bound clamping. When the exact sum lands just past the maximum
+// (within epsilon) the result clamps to the upper bound instead of tripping a tassert.
+TEST(EstimatesFramework, AdditionClampsOnEpsilonOverMaxSelectivity) {
+    const SelectivityEstimate a{SelectivityType{1.0}, defaultSrc};
+    const SelectivityEstimate b{SelectivityType{0.005}, defaultSrc};
+    ASSERT_EQUALS(a + b, oneSel);
+}
+
+DEATH_TEST(EstimatesFrameworkDeathTest, AdditionOverflowStillAsserts, "12552501") {
+    const SelectivityEstimate a{SelectivityType{0.6}, defaultSrc};
+    const SelectivityEstimate b{SelectivityType{0.6}, defaultSrc};
+    [[maybe_unused]] auto bad = a + b;
+}
+
+// The upper-bound epsilon clamp masks only finite overshoots (e.g. selectivity 1.0 + 0.005). For a
+// tag whose maximum is DBL_MAX (Cardinality), a sum that exceeds the maximum can only become +inf —
+// never a finite value epsilon-above the max — and +inf is not nearlyEqual to DBL_MAX by any
+// epsilon, so a genuine overflow still trips the assertion rather than being clamped.
+DEATH_TEST(EstimatesFrameworkDeathTest, AdditionOverflowToInfinityStillAsserts, "12552501") {
+    const CardinalityEstimate big = makeCE(std::numeric_limits<double>::max());
+    [[maybe_unused]] auto bad = big + big;
+}
+
+// exactMin()/exactMax() compare the underlying values EXACTLY, so the result is guaranteed to be
+// the not-greater (min) / not-smaller (max) operand regardless of argument order. This is unlike
+// std::min/std::max, which derive from the approximate operator<=> and return their first argument
+// on a fuzzy tie.
+TEST(EstimatesFramework, ExactMinMaxBreakTiesByRawValue) {
+    const auto larger = makeCE(1.0e6 + 50.0);
+    const auto smaller = makeCE(1.0e6);
+    // Approximately equal, but exactly ordered.
+    ASSERT_EQUALS(larger, smaller);
+    ASSERT_TRUE(smaller.toDouble() < larger.toDouble());
+
+    // Compare the raw doubles exactly: exactMin must always return the smaller value, exactMax the
+    // larger, independent of argument order.
+    ASSERT_EQ(exactMin(larger, smaller).toDouble(), smaller.toDouble());
+    ASSERT_EQ(exactMin(smaller, larger).toDouble(), smaller.toDouble());
+    ASSERT_EQ(exactMax(larger, smaller).toDouble(), larger.toDouble());
+    ASSERT_EQ(exactMax(smaller, larger).toDouble(), larger.toDouble());
+}
+
+// approxMin/approxMax are epsilon-tolerant and PAIRWISE. On a tie they return the second argument
+// (mirroring the '(a < b) ? a : b' ternaries they replace), and unlike exactMin/exactMax they do
+// not guarantee the result bounds both operands.
+TEST(EstimatesFramework, ApproxMinMaxAreEpsilonTolerant) {
+    const auto a = makeCE(1.0e6);
+    const auto b = makeCE(1.0e6 + 50.0);  // within epsilon of 'a'
+    ASSERT_EQUALS(a, b);
+    // Tie -> returns the second argument, for both min and max.
+    ASSERT_EQ(approxMin(a, b).toDouble(), b.toDouble());
+    ASSERT_EQ(approxMax(a, b).toDouble(), b.toDouble());
+    // Genuinely ordered operands behave like a normal min/max.
+    const auto small = makeCE(10.0);
+    const auto big = makeCE(1000.0);
+    ASSERT_EQ(approxMin(big, small).toDouble(), small.toDouble());
+    ASSERT_EQ(approxMax(small, big).toDouble(), big.toDouble());
+}
+
+// exactCompare distinguishes values that approxCompare treats as equivalent.
+TEST(EstimatesFramework, ExactVsApproxCompare) {
+    const auto a = makeCE(1.0e6);
+    const auto b = makeCE(1.0e6 + 50.0);
+    // approx: equivalent; exact: strictly ordered.
+    ASSERT_TRUE(std::is_eq(approxCompare(a, b)));
+    ASSERT_TRUE(std::is_lt(exactCompare(a, b)));
+    ASSERT_TRUE(exactLt(a, b));
+    ASSERT_FALSE(approxLt(a, b));
+    ASSERT_TRUE(approxLtEq(a, b));
+    ASSERT_TRUE(exactGt(b, a));
+    ASSERT_TRUE(approxGtEq(a, b));
+}
+
+// Non-transitivity of approximate equivalence: a ~ b and b ~ c, yet a is NOT ~ c. A strict weak
+// ordering requires transitive equivalence, so approxCompare is unsafe for ordered algorithms;
+// exactCompare (a real ordering) is what std::sort must use.
+TEST(EstimatesFramework, ApproxEquivalenceIsNotTransitive) {
+    // Cardinality epsilon is 1e-4 (relative). With a ~1e6 baseline, an adjacent gap of 150 is
+    // within epsilon (~7.5e-5) but the endpoint gap of 300 is not (~1.5e-4).
+    const auto a = makeCE(1.0e6);
+    const auto b = makeCE(1.0e6 + 150.0);
+    const auto c = makeCE(1.0e6 + 300.0);
+    ASSERT_TRUE(std::is_eq(approxCompare(a, b)));
+    ASSERT_TRUE(std::is_eq(approxCompare(b, c)));
+    ASSERT_FALSE(std::is_eq(approxCompare(a, c)));  // transitivity broken
+    // The exact ordering has no such defect.
+    ASSERT_TRUE(std::is_lt(exactCompare(a, c)));
+}
+
+// product() combines two cardinalities into a count x count product (e.g. nested-loop rows).
+TEST(EstimatesFramework, ProductOfCardinalities) {
+    ASSERT_EQUALS(product(makeCE(20.0), makeCE(50.0)), makeCE(1000.0));
+}
+
+// A cost scaled by a repetition count yields a cost; the operation is commutative.
+TEST(EstimatesFramework, CostScaledByCardinality) {
+    const CostEstimate c{CostType{2.5}, defaultSrc};
+    const auto reps = makeCE(4.0);
+    const CostEstimate expected{CostType{10.0}, defaultSrc};
+    ASSERT_EQUALS(c * reps, expected);
+    ASSERT_EQUALS(reps * c, expected);
+}
+
+// ratio() of two costs is a unitless double, not an estimate.
+TEST(EstimatesFramework, CostRatioIsDimensionlessDouble) {
+    const CostEstimate a{CostType{30.0}, defaultSrc};
+    const CostEstimate b{CostType{10.0}, defaultSrc};
+    ASSERT_EQ(ratio(a, b), 3.0);
+}
+
+// toCount() converts a cardinality to an integer by flooring (truncating toward zero).
+TEST(EstimatesFramework, ToCountFloors) {
+    ASSERT_EQ(makeCE(7.8).toCount(), 7);
+    ASSERT_EQ(makeCE(7.0).toCount(), 7);
+}
+
+// saturatingSubtract() is a saturating ("truncated") subtraction for domains where the subtrahend
+// legitimately exceeding the minuend means zero (e.g. $skip skipping past the end of the input). It
+// never asserts, unlike operator-.
+TEST(EstimatesFramework, SaturatingSubtractToZero) {
+    // Subtrahend much larger than minuend (a genuine, non-epsilon difference): clamps to zero.
+    ASSERT_EQUALS(saturatingSubtract(makeCE(10.0), makeCE(1000.0)), zeroCE);
+    // Normal case subtracts exactly.
+    ASSERT_EQUALS(saturatingSubtract(makeCE(1000.0), makeCE(10.0)), makeCE(990.0));
+}
+
+// operator/(CE, CE) must reconcile its approximate-equality callers with its exact precondition:
+// when the numerator is exactly larger than the denominator but within epsilon, it yields a
+// selectivity of 1.0 instead of tripping the exact precondition tassert.
+TEST(EstimatesFramework, DivideEpsilonEqualCardinalitiesReturnsOne) {
+    const auto numer = makeCE(1000.05);
+    const auto denom = makeCE(1000.0);
+    ASSERT_EQUALS(numer, denom);
+    ASSERT_TRUE(numer.toDouble() > denom.toDouble());
+    ASSERT_EQUALS(numer / denom, oneSel);
+}
+
+// A genuinely-larger numerator (not within epsilon) is a real logic error and still trips the
+// exact precondition.
+DEATH_TEST(EstimatesFrameworkDeathTest, DivideGenuinelyLargerStillAsserts, "9274202") {
+    [[maybe_unused]] auto bad = makeCE(2000.0) / makeCE(1000.0);
 }
 
 }  // unnamed namespace

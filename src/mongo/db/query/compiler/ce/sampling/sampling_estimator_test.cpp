@@ -603,8 +603,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
         LTMatchExpression lt("a"_sd, operand["$lt"]);
         auto cardinalityEstimate = samplingEstimator.estimateCardinality(&lt);
 
-        CardinalityEstimate expectedEstimate =
-            makeCardinalityEstimate(samplingEstimator.getCollCard());
+        CardinalityEstimate expectedEstimate = samplingEstimator.getCollCard();
         ASSERT_TRUE(cardinalityEstimate == expectedEstimate);
     }
 
@@ -670,8 +669,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
         auto cardinalityEstimateWithProjection =
             samplingEstimatorWithProjection.estimateCardinality(&lt);
 
-        CardinalityEstimate expectedEstimate =
-            makeCardinalityEstimate(samplingEstimator.getCollCard());
+        CardinalityEstimate expectedEstimate = samplingEstimator.getCollCard();
         ASSERT_TRUE(cardinalityEstimate == expectedEstimate);
         ASSERT_TRUE(cardinalityEstimate == cardinalityEstimateWithProjection);
     }
@@ -874,7 +872,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
     samplingEstimatorWithProjection.generateSample(StringSet{"nil"});
 
     // 1 doc that does not have field "nil".
-    auto expectedEstimate = makeCardinalityEstimate(samplingEstimator.getCollCard() - 1);
+    auto expectedEstimate = samplingEstimator.getCollCard() - cost_based_ranker::oneCE;
 
     ExistsMatchExpression exists("nil"_sd);
 
@@ -1851,7 +1849,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityAndOfEqualitiesFastPath) {
             children.push_back(std::move(eq));
         }
         AndMatchExpression andExpr(std::move(children));
-        return samplingEstimator.estimateCardinality(&andExpr).cardinality().v();
+        return samplingEstimator.estimateCardinality(&andExpr).toDouble();
     };
 
     // $all:[1,2] -> only docs 0..49 match (50 docs).
@@ -1980,7 +1978,7 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithNonEqChildInMiddle) {
     andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq2["x"]));
 
     // Expected: 50 docs (f0=[1,2,3] satisfies both equalities and the GT predicate).
-    auto ce = samplingEstimator.estimateCardinality(&andExpr).cardinality().v();
+    auto ce = samplingEstimator.estimateCardinality(&andExpr).toDouble();
     ASSERT_EQ(ce, 50.0);
 }
 
@@ -2028,7 +2026,7 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithDifferentPathEqChildInMiddle) 
     andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq2["x"]));
 
     // Expected: 50 docs (f0=[1,2,3] and other=5 for docs 0..49).
-    auto ce = samplingEstimator.estimateCardinality(&andExpr).cardinality().v();
+    auto ce = samplingEstimator.estimateCardinality(&andExpr).toDouble();
     ASSERT_EQ(ce, 50.0);
 }
 
@@ -2100,6 +2098,53 @@ TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {
 
     auto ndv = estimator.estimateNDV({{.path = "a"}});
     ASSERT_LT(ndv.toDouble(), static_cast<double>(card));
+}
+
+TEST_F(SamplingEstimatorTest, EstimateKeysScannedEmptySampleReturnsZero) {
+    // An empty sample must not divide by '_sampleSize' (== 0). estimateKeysScanned should report
+    // zero keys scanned (mirroring estimateCardinality's empty-sample handling) rather than
+    // producing NaN/inf and tripping assertValid().
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          kSampleSize,
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(5000));
+    estimator.setSampleForTesting({});  // empty sample
+
+    OrderedIntervalList list("a");
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 30), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds bounds;
+    bounds.fields.push_back(list);
+
+    ASSERT_EQ(estimator.estimateKeysScanned(bounds).toDouble(), 0.0);
+}
+
+DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasserts, "12552502") {
+    // NDV over an empty sample is undefined. The non-bounded multikey path must fail with an
+    // explicit precondition rather than divide by an empty sample and return NaN.
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          kSampleSize,
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(5000));
+    estimator.setSampleForTesting({});  // empty sample
+
+    estimator.estimateNDVMultiKey({{.path = "a"}}, boost::none /* non-bounded */);
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {

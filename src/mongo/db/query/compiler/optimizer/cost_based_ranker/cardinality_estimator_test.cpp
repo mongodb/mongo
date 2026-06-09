@@ -105,7 +105,8 @@ TEST(CardinalityEstimator, PointMoreSelectiveThanRange) {
         BSON("" << 5 << " " << 6), BoundInclusion::kIncludeBothStartAndEndKeys, indexFields[0]);
     auto rangePlan = makeIndexScanFetchPlan(testNss, std::move(rangeBounds), indexFields);
 
-    ASSERT_LT(getPlanHeuristicCE(*pointPlan, 100.0), getPlanHeuristicCE(*rangePlan, 100.0));
+    ASSERT_TRUE(
+        approxLt(getPlanHeuristicCE(*pointPlan, 100.0), getPlanHeuristicCE(*rangePlan, 100.0)));
 }
 
 TEST(CardinalityEstimator, CompoundBoundsMoreSelectiveThanSingleField) {
@@ -126,8 +127,8 @@ TEST(CardinalityEstimator, CompoundBoundsMoreSelectiveThanSingleField) {
     auto compoundBoundsPlan =
         makeIndexScanFetchPlan(testNss, std::move(compoundBounds), indexFields);
 
-    ASSERT_LT(getPlanHeuristicCE(*compoundBoundsPlan, 100.0),
-              getPlanHeuristicCE(*singleFieldPlan, 100.0));
+    ASSERT_TRUE(approxLt(getPlanHeuristicCE(*compoundBoundsPlan, 100.0),
+                         getPlanHeuristicCE(*singleFieldPlan, 100.0)));
 }
 
 TEST(CardinalityEstimator, PointIntervalSelectivityDependsOnInputCard) {
@@ -399,7 +400,7 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinal
     CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collInfo);
     CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collInfo);
     ASSERT_EQ(e1, e2);
-    ASSERT_GT(e1, zeroCE);
+    ASSERT_TRUE(approxGt(e1, zeroCE));
 }
 
 TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveSameCardinality) {
@@ -421,7 +422,7 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveS
     CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collInfo);
     CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collInfo);
     ASSERT_EQ(e1, e2);
-    ASSERT_GT(e1, zeroCE);
+    ASSERT_TRUE(approxGt(e1, zeroCE));
 }
 
 TEST(CardinalityEstimator, NoHistogramForPath) {
@@ -454,7 +455,7 @@ TEST(CardinalityEstimator, HistogramConjunctionOverMultikey) {
     CardinalityEstimate multikeyEst = getPlanHistogramCE(*plan, multikeyCollInfo);
     ASSERT_EQ(nonMultikeyEst.source(), EstimationSource::Histogram);
     ASSERT_EQ(multikeyEst.source(), EstimationSource::Histogram);
-    ASSERT_LT(nonMultikeyEst, multikeyEst);
+    ASSERT_TRUE(approxLt(nonMultikeyEst, multikeyEst));
 }
 
 TEST(CardinalityEstimator, NorEstimatesNegateOr) {
@@ -476,7 +477,7 @@ TEST(CardinalityEstimator, NorWithEqGreaterEstiamteThanNorWithInequality) {
     auto inEqPlan = makeCollScanPlan(parse(norInequalities));
     CardinalityEstimate eqEst = getPlanHeuristicCE(*eqPlan, 1000);
     CardinalityEstimate inEqEst = getPlanHeuristicCE(*inEqPlan, 1000);
-    ASSERT_GT(eqEst, inEqEst);
+    ASSERT_TRUE(approxGt(eqEst, inEqEst));
 }
 
 TEST(CardinalityEstimator, ElemMatchNonMultiKey) {
@@ -505,7 +506,7 @@ TEST(CardinalityEstimator, ElemMatchMultikeyComparedToAndNonMultikey) {
         auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
         andEst = getPlanHeuristicCE(*andPlan, collInfo);
     }
-    ASSERT_LT(elemMatchEst, andEst);
+    ASSERT_TRUE(approxLt(elemMatchEst, andEst));
 }
 
 TEST(CardinalityEstimator, NestedElemMatchMoreSelectiveThanSingle) {
@@ -517,7 +518,7 @@ TEST(CardinalityEstimator, NestedElemMatchMoreSelectiveThanSingle) {
     auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
     auto elemMatchEst = getPlanHeuristicCE(*elemMatchPlan, collInfo);
     auto nestedElemMatchEst = getPlanHeuristicCE(*nestedElemMatchPlan, collInfo);
-    ASSERT_GT(elemMatchEst, nestedElemMatchEst);
+    ASSERT_TRUE(approxGt(elemMatchEst, nestedElemMatchEst));
 }
 
 TEST(CardinalityEstimator, NAryXOR) {
@@ -1047,8 +1048,8 @@ public:
         boost::optional<std::span<const OrderedIntervalList>>) const override {
         return makeCard(10.0);
     }
-    double getCollCard() const override {
-        return 100.0;
+    CardinalityEstimate getCollCard() const override {
+        return makeCard(100.0);
     }
     size_t getSampleSize() const override {
         return 100;
@@ -1467,7 +1468,7 @@ public:
         boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
         return makeCard(bounds ? _ndvMultiKeyBounded : _ndvMultiKey);
     }
-    double getCollCard() const override {
+    CardinalityEstimate getCollCard() const override {
         MONGO_UNIMPLEMENTED;
     }
     size_t getSampleSize() const override {

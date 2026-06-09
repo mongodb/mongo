@@ -95,7 +95,7 @@ public:
     std::pair<CardinalityEstimate, CardinalityEstimate> confidenceInterval(double card,
                                                                            double z = 1.96) {
         auto moe = marginOfError(z);
-        double collCard = getCollCard();
+        double collCard = getCollCard().toDouble();
 
         double minCard = std::max(card - moe * collCard, 0.0);
         // maxCard could be greater than collCard if we're estimating the index keys scanned.
@@ -111,15 +111,16 @@ public:
     bool assertEstimateInConfidenceInterval(CardinalityEstimate estimate, double expectedCard) {
         auto expectedInterval = confidenceInterval(expectedCard);
         bool estimateInInterval =
-            (estimate >= expectedInterval.first && estimate <= expectedInterval.second);
+            (cost_based_ranker::approxGtEq(estimate, expectedInterval.first) &&
+             cost_based_ranker::approxLtEq(estimate, expectedInterval.second));
         if (!estimateInInterval) {
             // This is a functionality test. Print the error in case the estimate is outside of the
             // confidence interval.
-            double error = abs(estimate.cardinality().v() - expectedCard) / getCollCard();
+            double error = abs(estimate.toDouble() - expectedCard) / getCollCard().toDouble();
             std::cout << "=== " << estimate.toString() << ", Interval = ("
-                      << expectedInterval.first.cardinality().v() << ", "
-                      << expectedInterval.second.cardinality().v() << "), Error " << error * 100
-                      << "%" << std::endl;
+                      << expectedInterval.first.toDouble() << ", "
+                      << expectedInterval.second.toDouble() << "), Error " << error * 100 << "%"
+                      << std::endl;
             return false;
         }
         return true;

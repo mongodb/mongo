@@ -619,7 +619,7 @@ CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, boo
         ? _samplingEstimator->estimateNDVMultiKey(fieldAndEqs, oilSpan)
         : _samplingEstimator->estimateNDV(fieldAndEqs, oilSpan);
 
-    ndv = std::max(oneCE, ndv);
+    ndv = exactMax(oneCE, ndv);
     seekEstimate *= ndv.toDouble();
 
     tassert(10061109, "IndexBounds should always have >=1 seek estimate", seekEstimate >= 1.0);
@@ -835,7 +835,7 @@ CEResult CardinalityEstimator::limitNodeCard(const QuerySolutionNode* node, size
     }
     auto limitCE = CardinalityEstimate{CardinalityType{static_cast<double>(limit)},
                                        EstimationSource::Metadata};
-    auto est = std::min(limitCE, ceRes.getValue());
+    auto est = exactMin(limitCE, ceRes.getValue());
     _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(est));
     return est;
 }
@@ -1048,13 +1048,9 @@ CEResult CardinalityEstimator::estimate(const SkipNode* node) {
     auto skip =
         CardinalityEstimate{CardinalityType{static_cast<double>(node->skip)}, childEst.source()};
 
-    // If the skip node skips more than the estimate of the child, then this node will return no
-    // results. CardinalityEstimate comparators use approximate equality, so skip must be strictly
-    // less than childEst (as opposed to <=) in order for it to be safe to subtract.
-    CardinalityEstimate card{CardinalityType{0}, childEst.source()};
-    if (skip < childEst) {
-        card = childEst - skip;
-    }
+    // If the skip node skips at least as many documents as its child is estimated to produce, this
+    // node returns no results; otherwise it returns the remainder.
+    CardinalityEstimate card = saturatingSubtract(childEst, skip);
     _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(card));
     _conjSels.push_back(card / _inputCard);
     return card;
@@ -1461,7 +1457,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
         }
     }
 
-    resultCard = resultCard < _inputCard ? resultCard : _inputCard;
+    resultCard = exactMin(resultCard, _inputCard);
     return resultCard;
 }
 
@@ -1471,7 +1467,7 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
     const auto limitCE =
         CardinalityEstimate{CardinalityType{double(limit)}, EstimationSource::Metadata};
 
-    if (limitCE >= outCE) {
+    if (approxGtEq(limitCE, outCE)) {
         // Stage estimated to be exhausted before the limit, no need to reduce CE of it or children.
         return;
     }
@@ -1512,7 +1508,7 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
             // If we have an estimate for index seeks, naively scale this
             // down by the limit fraction.
             if (auto& indexSeekEst = _qsnEstimates[node]->indexSeekCE) {
-                *indexSeekEst = std::max(*indexSeekEst * limitFraction, oneCE);
+                *indexSeekEst = exactMax(*indexSeekEst * limitFraction, oneCE);
             }
             break;
         }
@@ -1523,7 +1519,7 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
             }
             // scale children proportionally.
             applyLimitToSelf();
-            propagateToChildren(size_t((limitFraction * inCE).toDouble()));
+            propagateToChildren((limitFraction * inCE).toCount());
             break;
         }
         case STAGE_AND_HASH:
@@ -1566,7 +1562,7 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
                 if (childCE == zeroCE) {
                     continue;
                 }
-                propagateLimit(child.get(), size_t((limitFraction * childCE).toDouble()));
+                propagateLimit(child.get(), (limitFraction * childCE).toCount());
             }
             applyLimitToSelf();
             break;

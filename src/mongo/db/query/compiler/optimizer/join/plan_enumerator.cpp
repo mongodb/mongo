@@ -82,8 +82,8 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(JoinMethod method,
     bool eligibleToPrune = _strategy.enableHJOrderPruning && method == JoinMethod::HJ &&
         (_strategy.planShape == PlanTreeShape::ZIG_ZAG || bothBaseColls);
     if (eligibleToPrune &&
-        _estimator->getOrEstimateSubsetCardinality(left.subset) >
-            _estimator->getOrEstimateSubsetCardinality(right.subset)) {
+        approxGt(_estimator->getOrEstimateSubsetCardinality(left.subset),
+                 _estimator->getOrEstimateSubsetCardinality(right.subset))) {
         return false;
     }
 

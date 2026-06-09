@@ -81,18 +81,18 @@ bool heuristicIsEstimable(const MatchExpression* expr) {
 }
 
 SelectivityEstimate heuristicClosedRangeSel(CardinalityEstimate inputCard) {
-    if (inputCard < kSmallLimit) {
+    if (approxLt(inputCard, kSmallLimit)) {
         return kSmallCardClosedRangeSel;
-    } else if (inputCard < kMediumLimit) {
+    } else if (approxLt(inputCard, kMediumLimit)) {
         return kMediumCardClosedRangeSel;
     }
     return kLargeCardClosedRangeSel;
 }
 
 SelectivityEstimate heuristicOpenRangeSel(CardinalityEstimate inputCard) {
-    if (inputCard < kSmallLimit) {
+    if (approxLt(inputCard, kSmallLimit)) {
         return kSmallCardOpenRangeSel;
-    } else if (inputCard < kMediumLimit) {
+    } else if (approxLt(inputCard, kMediumLimit)) {
         return kMediumCardOpenRangeSel;
     }
     return kLargeCardOpenRangeSel;
@@ -108,7 +108,11 @@ SelectivityEstimate heuristicOpenRangeSel(CardinalityEstimate inputCard) {
  * others.
  */
 SelectivityEstimate heuristicScaledPredSel(CardinalityEstimate inputCard, double scalingFactor) {
-    return SelectivityEstimate{SelectivityType{1 / std::pow(inputCard.toDouble(), scalingFactor)},
+    // Clamp the input cardinality to at least 1: with 'scalingFactor' > 0, a sub-1 cardinality
+    // would make 'pow' return a value < 1, so '1 / pow(...)' would exceed 1 and violate the
+    // [0, 1] selectivity invariant.
+    const double card = std::max(1.0, inputCard.toDouble());
+    return SelectivityEstimate{SelectivityType{1 / std::pow(card, scalingFactor)},
                                EstimationSource::Heuristics};
 }
 
@@ -223,7 +227,7 @@ SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstima
         return oneSelHeuristic;
     }
     if (interval.isPoint()) {
-        if (inputCard <= oneCE) {
+        if (approxLtEq(inputCard, oneCE)) {
             return oneSelHeuristic;
         }
         return heuristicScaledPredSel(inputCard, kEqualityScalingFactor);

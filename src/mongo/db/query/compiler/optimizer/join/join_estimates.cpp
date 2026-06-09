@@ -119,7 +119,7 @@ JoinCostEstimate::JoinCostEstimate(CostEstimate totalCost)
       _totalCost(totalCost) {}
 
 std::string JoinCostEstimate::toString() const {
-    return str::stream() << _totalCost.cost().v();
+    return str::stream() << _totalCost.toDouble();
 }
 
 BSONObj JoinCostEstimate::toBSON() const {

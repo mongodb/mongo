@@ -128,7 +128,7 @@ public:
         return estimateNDVMultiKey(fields, boost::none);
     }
 
-    virtual double getCollCard() const = 0;
+    virtual CardinalityEstimate getCollCard() const = 0;
 
     virtual size_t getSampleSize() const = 0;
 

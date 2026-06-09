@@ -100,7 +100,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId,
             // Scale NDV by selectivity of the scan.
             // Guard against division by 0 and 0 NDV, in both cases fallback to estimating a random
             // IO per output document.
-            if (ndv.toDouble() > 0 && collCard > 0) {
+            if (cost_based_ranker::exactGt(ndv, cost_based_ranker::zeroCE) && collCard > 0) {
                 numLogicalPageRequests = ndv.toDouble() * numDocsOutput.toDouble() / collCard;
             }
         }
@@ -269,7 +269,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costNLJFragment(const JoinPlanNode& left
     CardinalityEstimate rightDocs =
         _cardinalityEstimator.getOrEstimateSubsetCardinality(rightSubset);
 
-    CardinalityEstimate numDocsProcessed = leftDocs * rightDocs.toDouble();
+    CardinalityEstimate numDocsProcessed = cost_based_ranker::product(leftDocs, rightDocs);
     CardinalityEstimate numDocsOutput =
         _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset | rightSubset);
 

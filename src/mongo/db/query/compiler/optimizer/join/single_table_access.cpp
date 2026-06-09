@@ -101,9 +101,9 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
         auto& nss = node.accessPath->nss();
 
         const auto& samplingEstimator = samplingEstimators.at(nss);
-        collCardinalities.push_back(cost_based_ranker::CardinalityEstimate{
-            cost_based_ranker::CardinalityType{samplingEstimator->getCollCard()},
-            cost_based_ranker::EstimationSource::Metadata});
+        collCardinalities.push_back(
+            cost_based_ranker::CardinalityEstimate{samplingEstimator->getCollCard().cardinality(),
+                                                   cost_based_ranker::EstimationSource::Metadata});
 
         // Re-construct MultipleCollectionAccessor so that this collection is treated as the "main"
         // collection during query planning (and CE).

@@ -301,8 +301,8 @@ public:
         }
     }
 
-    double getCollCard() const override {
-        return _collectionCard.toDouble();
+    CardinalityEstimate getCollCard() const override {
+        return _collectionCard;
     }
 
     /*

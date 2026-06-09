@@ -224,8 +224,8 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    double getCollCard() const override {
-        return _collCard.toDouble();
+    CardinalityEstimate getCollCard() const override {
+        return _collCard;
     }
 
     size_t getSampleSize() const override {

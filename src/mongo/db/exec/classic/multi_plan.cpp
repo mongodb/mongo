@@ -773,7 +773,7 @@ StatusWith<MultiPlanStage::EstimationResult> MultiPlanStage::estimateAllPlans() 
             bestProductivity = planProductivity;
         }
     }
-    tassert(11306809, "Total MP cost must be > 0", totalCost > zeroCost);
+    tassert(11306809, "Total MP cost must be > 0", approxGt(totalCost, zeroCost));
     return StatusWith<EstimationResult>({totalCost, bestProductivity, bestPlanNumResults});
 }
 

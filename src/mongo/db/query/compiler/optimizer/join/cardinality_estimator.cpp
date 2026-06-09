@@ -130,7 +130,7 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
     // For the purposes of estimation, we assume that this edge represents a "primary key" to
     // "foreign key" join, despite these concepts not existing in MongoDB. We also assume that the
     // node with the small CE is the primary key side.
-    bool smallerCardIsLeft = leftCard <= rightCard;
+    bool smallerCardIsLeft = cost_based_ranker::exactLtEq(leftCard, rightCard);
     auto& primaryKeyNode = smallerCardIsLeft ? leftNode : rightNode;
 
     // Accumulate the field names of the "primary key" of the join edge. Note that we track $expr
@@ -157,7 +157,7 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
         fieldsAreUnique(fieldNames, ctx.uniqueFieldInfo.at(primaryKeyNode.collectionName));
     CardinalityEstimate ndv = [&samplingEstimator, &fields, &ndvFieldsAreUnique]() {
         if (ndvFieldsAreUnique) {
-            return CardinalityEstimate(CardinalityType(samplingEstimator->getCollCard()),
+            return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
                                        EstimationSource::Metadata);
         }
         return samplingEstimator->estimateNDV(fields);
@@ -165,7 +165,7 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
 
     cost_based_ranker::SelectivityEstimate res{cost_based_ranker::oneSel};
     // Ensure we don't accidentally produce a selectivity > 1
-    if (ndv.toDouble() > 1) {
+    if (cost_based_ranker::exactGt(ndv, cost_based_ranker::oneCE)) {
         res = cost_based_ranker::oneCE / ndv;
     }
     LOGV2_DEBUG(11352504,
@@ -218,7 +218,7 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     // Finally, note that we have the pre-computed combination of (2) and (3) in '_nodeCEs'.
     cost_based_ranker::CardinalityEstimate ce = cost_based_ranker::oneCE;
     for (auto nodeIdx : iterable(nodes, _ctx.joinGraph.numNodes())) {
-        ce = ce * _ctx.singleTableAccess.nodeCardinalities[nodeIdx].toDouble();
+        ce = cost_based_ranker::product(ce, _ctx.singleTableAccess.nodeCardinalities[nodeIdx]);
     }
 
     auto edges = _cycleBreaker.breakCycles(_ctx.joinGraph.getEdgesForSubgraph(nodes));

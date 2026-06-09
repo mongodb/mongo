@@ -32,23 +32,6 @@
 namespace mongo::cost_based_ranker {
 
 /**
- * Comparator for optimizer estimate types which uses the underlying double for comparison instead
- * of using the epsilon based comparison. This is useful for sorting containers of estimates using
- * the STL, which requires that comparators establish an equivalence relationship (if a == b and b
- * == c, then a == c). The epsilon based implementation of operator== breaks this assumption.
- * See https://en.cppreference.com/w/cpp/named_req/Compare.
- */
-template <typename T, bool less = true>
-struct ExactEstimateComparator {
-    bool operator()(const T& lhs, const T& rhs) const {
-        if constexpr (less) {
-            return lhs.toDouble() < rhs.toDouble();
-        }
-        return lhs.toDouble() > rhs.toDouble();
-    }
-};
-
-/**
  * Conditionally negate selectivity.
  */
 template <bool negate>
@@ -65,19 +48,25 @@ constexpr SelectivityEstimate maybeNegate(const SelectivityEstimate s) {
  * (inverting them for disjunction), and then for disjunction we invert the result, applying
  * increasing decay factor for each larger/smaller selectivity.
  */
-template <bool isConjunction,
-          class Comparator =
-              typename std::conditional_t<isConjunction,
-                                          ExactEstimateComparator<SelectivityEstimate>,
-                                          ExactEstimateComparator<SelectivityEstimate, false>>>
+template <bool isConjunction>
 SelectivityEstimate expBackoffInternal(std::span<SelectivityEstimate> sels) {
     if (sels.size() == 1) {
         return sels[0];
     }
 
     const size_t actualMaxBackoffElements = std::min(sels.size(), kMaxBackoffElements);
-    std::partial_sort(
-        sels.begin(), sels.begin() + actualMaxBackoffElements, sels.end(), Comparator());
+    // Sort with an exact comparison: the estimates' approximate equivalence is non-transitive, so
+    // it is not a strict weak ordering and would make std::partial_sort undefined behavior.
+    std::partial_sort(sels.begin(),
+                      sels.begin() + actualMaxBackoffElements,
+                      sels.end(),
+                      [](const SelectivityEstimate& a, const SelectivityEstimate& b) {
+                          if constexpr (isConjunction) {
+                              return exactLt(a, b);
+                          } else {
+                              return exactGt(a, b);
+                          }
+                      });
 
     SelectivityEstimate sel{SelectivityType{1.0}, EstimationSource::Code};
     double f = 1.0;

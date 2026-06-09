@@ -243,9 +243,10 @@ boost::optional<bool> tryMatchesBSON(const MatchExpression* expr, const BSONObj&
 CardinalityEstimate makeScaledEstimate(double matchCount,
                                        size_t errorCount,
                                        size_t sampleSize,
-                                       double collCard) {
+                                       CardinalityEstimate collCard) {
     size_t effectiveSampleSize = sampleSize - errorCount;
-    double estimate = effectiveSampleSize > 0 ? (matchCount * collCard) / effectiveSampleSize : 0.0;
+    double estimate =
+        effectiveSampleSize > 0 ? (matchCount * collCard.toDouble()) / effectiveSampleSize : 0.0;
     // The estimate is authoritative (tagged 'Code' rather than 'Sampling') when either:
     // * the expression errored for every sampled document - the zero is not an approximation
     // * the sample covers the entire collection - 'matchCount' is the true match count and
@@ -253,7 +254,7 @@ CardinalityEstimate makeScaledEstimate(double matchCount,
     // Tagging these as Code prevents CardinalityEstimator::clampZeroEstimates from inflating
     // the estimates.
     const bool isAuthoritative =
-        effectiveSampleSize == 0 || static_cast<double>(effectiveSampleSize) >= collCard;
+        effectiveSampleSize == 0 || static_cast<double>(effectiveSampleSize) >= collCard.toDouble();
     return CardinalityEstimate{CardinalityType{estimate},
                                isAuthoritative ? EstimationSource::Code
                                                : EstimationSource::Sampling};
@@ -592,7 +593,7 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
         // This is only used for testing purposes when a repeatable sample is needed.
         _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kStrides;
         generateSampleForTesting(cost_based_ranker::SamplingTechnique::kStrides);
-    } else if (_sampleSize >= _collectionCard.cardinality().v()) {
+    } else if (_sampleSize >= _collectionCard.toDouble()) {
         // If the required sample is larger than the collection, the sample is generated from all
         // the documents on the collection.
         _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kFullCollScan;
@@ -643,7 +644,7 @@ void SamplingEstimatorImpl::generateSampleForTesting(
             break;
         }
         case cost_based_ranker::SamplingTechnique::kStrides: {
-            const auto collCard = static_cast<size_t>(_collectionCard.cardinality().v());
+            const auto collCard = static_cast<size_t>(_collectionCard.toDouble());
             tassert(12433206,
                     "Sample size must be greater than zero for stride sampling",
                     _sampleSize > 0);
@@ -909,6 +910,11 @@ CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds
     tassert(10981502,
             "Sample must be generated before calling estimateKeysScanned()",
             _isSampleGenerated);
+    // An empty sample (e.g. an empty collection) means zero keys were scanned. Return early to
+    // avoid the divide-by-'_sampleSize' below. Mirrors the guard in estimateCardinality().
+    if (_sampleSize == 0) {
+        return cost_based_ranker::zeroCE;
+    }
     if (bounds.isSimpleRange) {
         MONGO_UNIMPLEMENTED_TASSERT(9811500);
     }
@@ -920,7 +926,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds
 
     forNumberKeysMatch(bounds, _sample, [&](size_t matchCnt) { count += matchCnt; });
 
-    CardinalityEstimate estimate{CardinalityType{(count * getCollCard()) / _sampleSize},
+    CardinalityEstimate estimate{CardinalityType{(count * getCollCard().toDouble()) / _sampleSize},
                                  EstimationSource::Sampling};
     LOGV2_DEBUG(9756605,
                 5,
@@ -1193,7 +1199,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
                 "sampleNDV"_attr = sampleNDV,
                 "estimate"_attr = estimate);
 
-    if (estimate > _collectionCard) {
+    if (cost_based_ranker::exactGt(estimate, _collectionCard)) {
         LOGV2_DEBUG(11158507,
                     5,
                     "SamplingCE ndv exceeds collection size, rounding down",
@@ -1229,6 +1235,10 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDVMultiKey(
         return cost_based_ranker::zeroCE;
     }
 
+    // NDV over an empty sample is undefined (there is no sensible default), and dividing by
+    // '_sample.size()' of 0 below would yield NaN. This is a precondition violation: callers must
+    // not request NDV when the sample is empty. (estimateNDV() enforces the analogous invariant)
+    tassert(12552502, "Multikey NDV estimation requires a non-empty sample", !_sample.empty());
     const auto avgKeysPerDoc = (double(totalSampleKeys) / _sample.size());
     const auto estimatedIndexKeys = _collectionCard * avgKeysPerDoc;
     if (totalUniqueKeys == totalMatchingKeys) {
@@ -1249,7 +1259,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDVMultiKey(
                 "sampleNDV"_attr = totalUniqueKeys,
                 "estimate"_attr = estimate);
 
-    if (estimate > estimatedIndexKeys) {
+    if (cost_based_ranker::exactGt(estimate, estimatedIndexKeys)) {
         LOGV2_DEBUG(10061107,
                     5,
                     "SamplingCE ndv exceeds estimated index size, rounding down",

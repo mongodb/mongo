@@ -1806,9 +1806,9 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
             }
         } else {
             CostEstimate curCost = costEstimator.estimatePlan(*soln);
-            // Note that the cost comparison operators used here are approximate within some
-            // epsilon as implemented by the overloaded comparisons for estimates.
-            if (curCost < bestCost) {
+            // The cost comparison here is epsilon-approximate (approxLt), so plans whose costs are
+            // within epsilon of the best are treated as tied.
+            if (approxLt(curCost, bestCost)) {
                 if (bestSoln) {
                     rejectedSoln.push_back(std::move(bestSoln));
                 }

@@ -128,9 +128,9 @@ public:
 
                     const auto& left = ctx.registry().getBitset(plan.left);
                     const auto& right = ctx.registry().getBitset(plan.right);
-                    ASSERT(
-                        ctx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(left) <=
-                        ctx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(right));
+                    ASSERT(cost_based_ranker::approxLtEq(
+                        ctx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(left),
+                        ctx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(right)));
                 }
             }
         }

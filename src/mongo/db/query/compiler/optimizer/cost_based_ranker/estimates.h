@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 
 #include <chrono>
+#include <cmath>
 #include <compare>
 #include <limits>
 
@@ -236,10 +237,6 @@ public:
         return TypeTag::kName;
     }
 
-    double v() const {
-        return _v;
-    }
-
     void assertValid() const {
         tassert(9274201,
                 str::stream() << "Invalid " << name() << " value < minValue: (" << _v << " < "
@@ -264,6 +261,13 @@ public:
                                          const SelectivityEstimate& s);
 
 private:
+    // Raw value accessor, private on purpose: estimates expose their value only through
+    // OptimizerEstimate::toDouble(), the single intentional escape hatch. Befriended operators and
+    // OptimizerEstimate access this (and _v) directly.
+    double v() const {
+        return _v;
+    }
+
     double _v;
 };
 
@@ -333,7 +337,10 @@ public:
         _estimate.assertValid();
     }
 
-    // Cast the estimate to double
+    // Escape hatch returning the raw underlying value. Use ONLY for transcendental / numeric-model
+    // math (pow/log, byte/page computations) and serialization. Do NOT use it for comparison or
+    // arithmetic the library already supports - prefer the exact*/approx* comparisons, product(),
+    // ratio(), saturatingSubtract(), exactMin/exactMax, etc., so intent stays explicit.
     double toDouble() const {
         return _estimate._v;
     }
@@ -376,11 +383,6 @@ public:
         return !(*this == e);
     }
 
-    auto operator<=>(const OptimizerEstimate<ValueType, EstimateType>& e) const {
-        return *this == e ? std::partial_ordering::equivalent
-                          : this->_estimate._v <=> e._estimate._v;
-    }
-
     // Arithmetic operators.
     // Addition and subtraction are applicable to most kinds of optimizer estimates.
     // They are deleted explicitly wherever they are not applicable.
@@ -389,7 +391,26 @@ public:
     // of estimate subtypes.
     EstimateType& operator+=(const EstimateType& e) {
         this->mergeSources(e);
-        this->_estimate._v += e._estimate._v;
+        double newV = this->_estimate._v + e._estimate._v;
+        // Comparison on estimates is approximate while arithmetic is exact, so a sum whose true
+        // value is at most the maximum can land just above it due to floating-point rounding.
+        // Clamp such epsilon overshoots to the maximum; a larger overflow is a real logic error
+        // and still trips the assertion.
+        //
+        // Note this finite epsilon overshoot is only possible when the maximum is a small value
+        // (e.g. SelectivityTag's 1.0). When the maximum is DBL_MAX (CardinalityTag), a sum that
+        // exceeds it cannot be epsilon-above the max — it can only round to +inf — and +inf is not
+        // nearlyEqual to DBL_MAX by any epsilon, so for that tag a genuine overflow always asserts.
+        const double maxV = ValueType::maxValue().v();
+        if (MONGO_unlikely(newV > maxV)) {
+            tassert(12552501,
+                    str::stream() << "Addition of " << ValueType::name() << " overflowed to "
+                                  << newV << " from " << this->_estimate._v << " and "
+                                  << e._estimate._v,
+                    nearlyEqual(newV, maxV, ValueType::epsilon()));
+            newV = maxV;
+        }
+        this->_estimate._v = newV;
         assertValid();
         return *static_cast<EstimateType*>(this);
     }
@@ -402,7 +423,26 @@ public:
 
     EstimateType& operator-=(const EstimateType& e) {
         this->mergeSources(e);
-        this->_estimate._v -= e._estimate._v;
+        double newV = this->_estimate._v - e._estimate._v;
+        // Comparison on estimates is approximate while arithmetic is exact, so subtracting a value
+        // that is approximately equal to (but exactly larger than) this estimate can dip just below
+        // the minimum. Clamp such epsilon underflows to the minimum; a larger underflow is a
+        // real logic error and still trips the assertion.
+        //
+        // Unlike the addition overshoot above, this underflow clamp applies to every current tag:
+        // all minimums are 0.0, and doubles are dense near 0, so an epsilon underflow is a finite,
+        // representable value just below 0 (not -inf). The guard tests whether the two operands are
+        // nearlyEqual (their difference is then ~0), which is the right check given a 0.0 minimum.
+        const double minV = ValueType::minValue().v();
+        if (MONGO_unlikely(newV < minV)) {
+            tassert(12552500,
+                    str::stream() << "Subtraction of " << ValueType::name() << " underflowed to "
+                                  << newV << " from " << this->_estimate._v << " and "
+                                  << e._estimate._v,
+                    nearlyEqual(this->_estimate._v, e._estimate._v, ValueType::epsilon()));
+            newV = minV;
+        }
+        this->_estimate._v = newV;
         assertValid();
         return *static_cast<EstimateType*>(this);
     }
@@ -412,6 +452,20 @@ public:
         result -= e;
         return static_cast<EstimateType>(result);
     }
+
+private:
+    // Epsilon-approximate three-way comparison. Private on purpose: epsilon-equality is not
+    // transitive, so this is not a strict weak ordering and must never back the relational
+    // operators or std::min/std::max/std::sort. 'approxCompare' is the sole sanctioned entry point;
+    // callers choose an explicit exact*/approx* helper (see the comparison utilities below).
+    auto operator<=>(const OptimizerEstimate<ValueType, EstimateType>& e) const {
+        return *this == e ? std::partial_ordering::equivalent
+                          : this->_estimate._v <=> e._estimate._v;
+    }
+
+    template <class V, class E>
+    friend std::partial_ordering approxCompare(const OptimizerEstimate<V, E>& a,
+                                               const OptimizerEstimate<V, E>& b);
 
 protected:
     std::string sourceName() const {
@@ -437,6 +491,13 @@ public:
 
     CardinalityType cardinality() const {
         return _estimate;
+    }
+
+    // Convert this cardinality to an integer count by flooring it (which, since cardinalities are
+    // non-negative, matches a plain 'size_t(toDouble())' truncation). Prefer this over casting
+    // toDouble() so the intent is explicit at the call site.
+    size_t toCount() const {
+        return static_cast<size_t>(std::floor(toDouble()));
     }
 
     // Multiplication is undefined for two CEs - this operation has no meaning - the unit of the
@@ -577,6 +638,138 @@ CardinalityEstimate operator*(const SelectivityEstimate& s, const CardinalityEst
 CardinalityEstimate operator*(const CardinalityEstimate& ce, const SelectivityEstimate& s);
 
 /**
+ * Product of two cardinalities (count x count -> count). Dimensionally unusual, so it is a named
+ * function rather than operator*: use it only where a combinatorial product is genuinely intended
+ * (e.g. the rows examined by a nested-loop join, or seeks = NDV x seeks-per-distinct-value).
+ */
+CardinalityEstimate product(const CardinalityEstimate& a, const CardinalityEstimate& b);
+
+/**
+ * Scale a cost by a repetition count (cost x count -> cost), e.g. the total cost of performing an
+ * operation 'ce' times.
+ */
+CostEstimate operator*(const CostEstimate& c, const CardinalityEstimate& ce);
+CostEstimate operator*(const CardinalityEstimate& ce, const CostEstimate& c);
+
+/**
+ * Dimensionless ratio of two costs (cost / cost -> double). Returns a plain double on purpose: the
+ * result is unitless and is not itself an estimate.
+ */
+double ratio(const CostEstimate& a, const CostEstimate& b);
+
+/**
+ * Comparison utilities for estimates.
+ *
+ * Estimates intentionally do NOT expose the relational operators (<, <=, >, >=) publicly: the
+ * underlying operator<=> is epsilon-approximate, and epsilon-equality is not transitive, so it is
+ * not a strict weak ordering and must never back std::min/std::max/std::sort (that is undefined
+ * behavior). Callers pick an explicit comparison instead:
+ *
+ *   - exact*  : compares the underlying values bit-exactly. Use when you need a true ordering
+ *               (e.g. std::sort with an exactLt/exactGt comparator), a hard bound
+ *               (exactMin/exactMax are guaranteed <= / >= BOTH operands), or to reproduce a
+ *               former raw-double comparison.
+ *   - approx* : epsilon-tolerant, consistent with operator==. Use for pairwise decisions where two
+ *               estimates within epsilon should count as tied (e.g. plan-ranking cost comparisons).
+ *               PAIRWISE ONLY -- never pass approx* into an ordered algorithm. On an epsilon tie
+ *               approxMin/approxMax may return a value up to epsilon larger/smaller than the other
+ *               operand; use exactMin/exactMax when a guaranteed bound matters.
+ */
+template <class ValueType, class EstimateType>
+std::partial_ordering exactCompare(const OptimizerEstimate<ValueType, EstimateType>& a,
+                                   const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return a.toDouble() <=> b.toDouble();
+}
+
+template <class ValueType, class EstimateType>
+std::partial_ordering approxCompare(const OptimizerEstimate<ValueType, EstimateType>& a,
+                                    const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return a <=> b;
+}
+
+template <class ValueType, class EstimateType>
+bool exactLt(const OptimizerEstimate<ValueType, EstimateType>& a,
+             const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_lt(exactCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+bool exactLtEq(const OptimizerEstimate<ValueType, EstimateType>& a,
+               const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_lteq(exactCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+bool exactGt(const OptimizerEstimate<ValueType, EstimateType>& a,
+             const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_gt(exactCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+bool exactGtEq(const OptimizerEstimate<ValueType, EstimateType>& a,
+               const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_gteq(exactCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+bool approxLt(const OptimizerEstimate<ValueType, EstimateType>& a,
+              const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_lt(approxCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+bool approxLtEq(const OptimizerEstimate<ValueType, EstimateType>& a,
+                const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_lteq(approxCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+bool approxGt(const OptimizerEstimate<ValueType, EstimateType>& a,
+              const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_gt(approxCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+bool approxGtEq(const OptimizerEstimate<ValueType, EstimateType>& a,
+                const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return std::is_gteq(approxCompare(a, b));
+}
+
+template <class ValueType, class EstimateType>
+EstimateType exactMin(const OptimizerEstimate<ValueType, EstimateType>& a,
+                      const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return static_cast<const EstimateType&>(a.toDouble() <= b.toDouble() ? a : b);
+}
+
+template <class ValueType, class EstimateType>
+EstimateType exactMax(const OptimizerEstimate<ValueType, EstimateType>& a,
+                      const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return static_cast<const EstimateType&>(a.toDouble() >= b.toDouble() ? a : b);
+}
+
+// Pairwise epsilon-tolerant min/max. On an epsilon tie these return 'b' (mirroring the
+// '(a < b) ? a : b' ternaries they replace). Per the note above, the result is not a guaranteed
+// bound -- use exactMin/exactMax when that matters.
+template <class ValueType, class EstimateType>
+EstimateType approxMin(const OptimizerEstimate<ValueType, EstimateType>& a,
+                       const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return static_cast<const EstimateType&>(approxLt(a, b) ? a : b);
+}
+
+template <class ValueType, class EstimateType>
+EstimateType approxMax(const OptimizerEstimate<ValueType, EstimateType>& a,
+                       const OptimizerEstimate<ValueType, EstimateType>& b) {
+    return static_cast<const EstimateType&>(approxGt(a, b) ? a : b);
+}
+
+/**
+ * Saturating ("truncated") subtraction: max(0, a - b), using exact comparison. For domains where
+ * the subtrahend legitimately exceeding the minuend means zero (e.g. a $skip past the end of its
+ * input), so it never asserts -- unlike operator-, which treats a non-epsilon underflow as a bug.
+ */
+CardinalityEstimate saturatingSubtract(const CardinalityEstimate& a, const CardinalityEstimate& b);
+
+/**
  * The actual strategy used to generate the sample.
  */
 enum class SamplingTechnique {
@@ -619,6 +812,10 @@ struct QSNEstimate {
     boost::optional<CardinalityEstimate> inCE;
     CardinalityEstimate outCE{CardinalityType{0}, EstimationSource::Code};
     boost::optional<CardinalityEstimate> indexSeekCE;
+    // Sentinel: default-initialized to the maximum representable cost so that an un-estimated plan
+    // ranks as the worst possible candidate. The cost estimator always overwrites this with a real
+    // estimate before a plan is ranked. Any further optimization/estimation is supposed to improve
+    // on the default maximum cost.
     CostEstimate cost{CostType::maxValue(), EstimationSource::Code};
 
     QSNEstimate() = default;
@@ -657,8 +854,7 @@ inline const CostCoefficient minCC{CostCoefficientType::minValue()};
 
 inline const CostEstimate zeroCost{CostType{0.0}, EstimationSource::Code};
 // No query plan can be cheaper than running the cheapest operation for a single input value.
-static const CostEstimate minCost{CostType{CostCoefficientType::minValue().v()},
-                                  EstimationSource::Code};
+static const CostEstimate minCost{CostType{CostCoefficientTag::kMinValue}, EstimationSource::Code};
 inline const CostEstimate maxCost{CostType::maxValue(), EstimationSource::Code};
 
 }  // namespace mongo::cost_based_ranker

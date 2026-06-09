@@ -53,7 +53,8 @@ TEST(CostEstimator, FullCollScanVsFilteredCollScan) {
     costEstimator.estimatePlan(*fullCollScan);
     costEstimator.estimatePlan(*collScanFilter);
 
-    ASSERT_LT(estimates[fullCollScan->root()]->cost, estimates[collScanFilter->root()]->cost);
+    ASSERT_TRUE(
+        approxLt(estimates[fullCollScan->root()]->cost, estimates[collScanFilter->root()]->cost));
 }
 
 CostEstimate getCollScanWithFilterCost(const BSONObj& filterObj) {
@@ -77,7 +78,7 @@ TEST(CostEstimator, FilterCostForSingleLeaf) {
         getCollScanWithFilterCost(fromjson("{a: {$elemMatch: { $gte: 80}}}"));
 
     // The empty filter '{}' is treated the same way as if there was no filter at all.
-    ASSERT_LT(emptyFilterCost, singleLeafCost);
+    ASSERT_TRUE(approxLt(emptyFilterCost, singleLeafCost));
 
     // These are all treated as having 1 leaf.
     ASSERT_EQ(singleLeafCost, singleSizeCost);
@@ -108,8 +109,8 @@ TEST(CostEstimator, FilterCostForMultipleLeaves) {
     auto incrementalLeafCost = twoLeavesCost - singleLeafCost;
 
     // More complex filters should have a higher cost
-    ASSERT_LT(singleLeafCost, twoLeavesCost);
-    ASSERT_LT(twoLeavesCost, fiveLeavesCost);
+    ASSERT_TRUE(approxLt(singleLeafCost, twoLeavesCost));
+    ASSERT_TRUE(approxLt(twoLeavesCost, fiveLeavesCost));
 
     ASSERT_EQ(fiveLeavesCost,
               twoLeavesCost + incrementalLeafCost + incrementalLeafCost + incrementalLeafCost);
@@ -130,7 +131,8 @@ TEST(CostEstimator, VirtualScan) {
     costEstimator.estimatePlan(*fullCollScan);
     costEstimator.estimatePlan(*collScanFilter);
 
-    ASSERT_LT(estimates[fullCollScan->root()]->cost, estimates[collScanFilter->root()]->cost);
+    ASSERT_TRUE(
+        approxLt(estimates[fullCollScan->root()]->cost, estimates[collScanFilter->root()]->cost));
 }
 
 TEST(CostEstimator, PointIndexScanLessCostThanRange) {
@@ -160,10 +162,11 @@ TEST(CostEstimator, PointIndexScanLessCostThanRange) {
     costEstimator.estimatePlan(*rangeIndexScan);
 
     // Cost of point scan plan should be less than that of the range scan
-    ASSERT_LT(estimates[pointIndexScan->root()]->cost, estimates[rangeIndexScan->root()]->cost);
+    ASSERT_TRUE(
+        approxLt(estimates[pointIndexScan->root()]->cost, estimates[rangeIndexScan->root()]->cost));
     // Cost of fetch node should be greater than cost of the index scan as costs are cumulative
-    ASSERT_GT(estimates[pointIndexScan->root()]->cost,
-              estimates[pointIndexScan->root()->children[0].get()]->cost);
+    ASSERT_TRUE(approxGt(estimates[pointIndexScan->root()]->cost,
+                         estimates[pointIndexScan->root()->children[0].get()]->cost));
 }
 
 std::unique_ptr<IndexScanNode> indexScanNode(const NamespaceString& nss,
@@ -207,7 +210,8 @@ void testIndexCombinationDependsOnChildren() {
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*cheapPlan);
     costEstimator.estimatePlan(*expensivePlan);
-    ASSERT_LT(estimates[cheapPlan->root()]->cost, estimates[expensivePlan->root()]->cost);
+    ASSERT_TRUE(
+        approxLt(estimates[cheapPlan->root()]->cost, estimates[expensivePlan->root()]->cost));
 }
 
 // Increasing child cost increases the cost of index intersection and union plans
@@ -244,7 +248,8 @@ void testSortCostDependsOnChildren() {
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*cheapPlan);
     costEstimator.estimatePlan(*expensivePlan);
-    ASSERT_LT(estimates[cheapPlan->root()]->cost, estimates[expensivePlan->root()]->cost);
+    ASSERT_TRUE(
+        approxLt(estimates[cheapPlan->root()]->cost, estimates[expensivePlan->root()]->cost));
 }
 
 TEST(CostEstimator, SortDefaultOrSimple) {

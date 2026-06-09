@@ -2,6 +2,7 @@
  * Regression test for AF-16798 and other occurrences of the same bug.
  */
 
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-117707: Remove this check once CBR is enabled for SBE
@@ -142,6 +143,95 @@ if (checkSbeFullyEnabled(db)) {
             db.adminCommand({
                 setParameter: 1,
                 featureFlagCostBasedRanker: false,
+            }),
+        );
+    }
+})();
+
+/**
+ * Case 3
+ *
+ * limitNodeCard() (used by estimate(LimitNode), and estimate(SortNode) with a limit) computes the
+ * node's cardinality as std::min(limitCE, childEst), and computeAndSetNodeCost() costs STAGE_LIMIT
+ * via std::min(limitCE, inCE). std::min on CardinalityEstimate derives from the fuzzy operator<=>,
+ * so when limitCE and childEst are within the relative epsilon (1e-4) it treats them as equivalent
+ * and returns the FIRST argument (limitCE). If limitCE is strictly larger than childEst, the LIMIT
+ * node is assigned a cardinality strictly greater than its child's. Unlike Cases 1 and 2 this
+ * does not tassert, so it must be detected by comparing the raw estimates exactly; the fuzzy
+ * comparator would mask the sub-epsilon gap.
+ */
+(function testLimitNodeCE() {
+    const collName = jsTestName();
+    const coll = db[collName];
+    coll.drop();
+
+    // Same deterministic sample as Case 1: 1,000 docs (a=0..999), sequential sampling scans the
+    // first S=384 docs (a=0..383), of which exactly 43 match {a: {$gte: 341}}. The samplingCE
+    // estimate of the access path is:
+    //
+    //   childEst = matchCount * collCard / sampleSize = 43 * 1000 / 384 = 5375/48 ≈ 111.9791...
+    //
+    // With limit=112 and childEst=5375/48:
+    //   diff/sum = (1/48) / (10751/48) = 1/10751 ≈ 9.3e-5 < 1e-4  →  nearlyEqual returns true
+    // The fuzzy std::min therefore returns the first argument, limitCE=112, so the LIMIT node is
+    // estimated at 112 > childEst. The strict-comparison fix returns childEst instead.
+    assert.commandWorked(coll.insertMany(Array.from({length: 1000}, (_, i) => ({a: i}))));
+    assert.commandWorked(coll.createIndex({a: 1}));
+
+    try {
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                featureFlagCostBasedRanker: true,
+                internalQueryCBRCEMode: "samplingCE",
+                internalQuerySamplingBySequentialScan: true,
+            }),
+        );
+
+        const explain = coll
+            .find({a: {$gte: 341}})
+            .limit(112)
+            .explain();
+        const limitStage = getPlanStage(getWinningPlanFromExplain(explain), "LIMIT");
+        assert.neq(limitStage, null, "expected a LIMIT stage", {explain});
+        assert(limitStage.hasOwnProperty("cardinalityEstimate"), "LIMIT stage missing CE", {limitStage});
+        const childStage = limitStage.inputStage;
+        assert(childStage.hasOwnProperty("cardinalityEstimate"), "child stage missing CE", {childStage});
+
+        // A LIMIT node cannot produce more rows than its input. Compare exactly, not via the fuzzy
+        // ceEqual(): before the fix the LIMIT estimate (112) exceeds its child (≈111.979) by less
+        // than epsilon, which a fuzzy comparison would consider equal.
+        assert.lte(
+            limitStage.cardinalityEstimate,
+            childStage.cardinalityEstimate,
+            "LIMIT node CE must not exceed its child's CE",
+        );
+
+        // cost_estimator.cpp costs STAGE_LIMIT with the same fuzzy std::min. A limit bigger than
+        // the child's cardinality does not affect the total cost. limit(200) is an equivalent plan
+        // whose LIMIT cost is computed from the child cardinality (≈111.979). If the bug was
+        // present in the code, then limit(112) would cost slightly more (using 112 instead of
+        // ≈111.979) which would result in a test failure.
+        const largeLimitStage = getPlanStage(
+            getWinningPlanFromExplain(
+                coll
+                    .find({a: {$gte: 341}})
+                    .limit(200)
+                    .explain(),
+            ),
+            "LIMIT",
+        );
+        assert.eq(
+            limitStage.costEstimate,
+            largeLimitStage.costEstimate,
+            "LIMIT node cost must not depend on the raw limit once it exceeds the child CE",
+        );
+    } finally {
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                featureFlagCostBasedRanker: false,
+                internalQuerySamplingBySequentialScan: false,
             }),
         );
     }

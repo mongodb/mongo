@@ -98,10 +98,20 @@ TEST(HeuristicEstimate, SelectivityRelationships) {
     auto bitOpSel = estimateLeafQueryExpr("{a: {$bitsAllClear: [1, 5]}}", card);
     auto exprSel = estimateLeafQueryExpr("{ '$expr' : {  '$ifNull' : [ '$a', null ] } }", card);
 
-    ASSERT_LT(eqSel, regexSel);
-    ASSERT_LT(regexSel, sizeSel);
+    ASSERT_TRUE(approxLt(eqSel, regexSel));
+    ASSERT_TRUE(approxLt(regexSel, sizeSel));
     ASSERT_EQ(sizeSel, bitOpSel);
     ASSERT_EQ(sizeSel, exprSel);
+}
+
+TEST(HeuristicEstimate, ScaledPredSelStaysInRangeForSubUnitCardinality) {
+    // An equality predicate routes through heuristicScaledPredSel(inputCard,
+    // kEqualityScalingFactor) with no 'inputCard <= 1' gate. With inputCard = 0.5 the unclamped
+    // formula is 1 / pow(0.5, 0.5) = sqrt(2) ~= 1.414, which exceeds 1 and tasserts (9274200) the
+    // moment the SelectivityType is constructed. Clamping inputCard to >= 1 makes pow(1, f) == 1,
+    // so the selectivity is exactly 1.0; without the clamp this call aborts before returning.
+    auto sel = estimateLeafQueryExpr("{a: 42}", 0.5);
+    ASSERT_EQ(sel.toDouble(), 1.0);
 }
 
 }  // unnamed namespace

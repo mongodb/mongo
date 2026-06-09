@@ -222,7 +222,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
                 // The 'numReturnedLogFactor' is used to estimate the number of sort steps. Even
                 // for very small estimates make sure to count at least one sort step per input
                 // document.
-                const auto& numReturned = std::min(numProcessed, sortLimitCE);
+                const auto numReturned = exactMin(numProcessed, sortLimitCE);
                 double numReturnedLogFactor = numReturned.toDouble();
                 numReturnedLogFactor += 1;
 
@@ -291,7 +291,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             auto limitNode = static_cast<const LimitNode*>(node);
             auto limitCE = CardinalityEstimate{
                 CardinalityType{static_cast<double>(limitNode->limit)}, EstimationSource::Metadata};
-            auto adjLimitCE = std::min(limitCE, inCE);
+            auto adjLimitCE = exactMin(limitCE, inCE);
             nodeCost += limitIncrement * adjLimitCE;
             break;
         }
@@ -301,12 +301,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             auto skipNode = static_cast<const SkipNode*>(node);
             auto skipCE = CardinalityEstimate{CardinalityType{static_cast<double>(skipNode->skip)},
                                               EstimationSource::Metadata};
-            // < must be used instead of std::min() because std::min() returns the first argument if
-            // it is <= the second argument. CardinalityEstimate overloads these operators with an
-            // approximate implementation of equality, which can lead to a tassert due to a negative
-            // value during the subtraction operation below.
-            auto adjSkipCE = skipCE < inCE ? skipCE : inCE;
-
+            auto adjSkipCE = exactMin(skipCE, inCE);
             auto passCE = inCE - adjSkipCE;
             nodeCost += skipIncrement * adjSkipCE + passIncrement * passCE;
             break;
@@ -321,7 +316,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
     // TODO SERVER-97933 make this even more fine-grained with different minCosts for different
     // node types.
     const CostEstimate additiveFloor = childSum + minCost;
-    qsnEst.cost = (nodeCost < additiveFloor) ? additiveFloor : nodeCost;
+    qsnEst.cost = approxMax(additiveFloor, nodeCost);
 }
 
 /**
