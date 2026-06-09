@@ -187,6 +187,10 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
+    void setFlushAllFilesObserver(FlushAllFilesObserver* observer) final;
+
+    FlushAllFilesObserver* getFlushAllFilesObserver() const final;
+
     KVEngine* getEngine() override {
         return _engine.get();
     }

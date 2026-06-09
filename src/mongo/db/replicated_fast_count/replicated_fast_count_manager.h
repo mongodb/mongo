@@ -41,6 +41,7 @@
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/flush_all_files_observer.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
@@ -85,7 +86,7 @@ namespace mongo::replicated_fast_count {
  * the collection write path to persist fast SizeCounts. Instead, operations should
  * interact with this class through UncommittedFastCountChange.
  */
-class MONGO_MOD_PUBLIC ReplicatedFastCountManager {
+class MONGO_MOD_PUBLIC ReplicatedFastCountManager : public FlushAllFilesObserver {
     struct StoredSizeCount {
         CollectionSizeCount sizeCount;
         bool dirty{false};  // Indicates if flush is needed.
@@ -189,6 +190,13 @@ public:
      * fastcount collection on disk.
      */
     void flushAsync();
+
+    /**
+     * FlushAllFilesObserver hook. Triggers an asynchronous flush when invoked.
+     */
+    void onFlushAllFiles() override {
+        flushAsync();
+    }
 
     /**
      * Flushes data synchronously on the caller's thread. The calling thread must be able to take a

@@ -36,6 +36,7 @@
 #include "mongo/db/index_builds/index_builds.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/storage/compact_options.h"
+#include "mongo/db/storage/flush_all_files_observer.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_tier_gen.h"
@@ -504,6 +505,19 @@ public:
      * This may only be set once.
      */
     virtual void setJournalListener(JournalListener* jl) = 0;
+
+    /**
+     * Sets the FlushAllFilesObserver, which the storage engine notifies while it flushes all of its
+     * data files to disk in flushAllFiles().
+     */
+    virtual void setFlushAllFilesObserver(FlushAllFilesObserver* observer) {}
+
+    /**
+     * Returns the registered FlushAllFilesObserver, or nullptr if none has been set.
+     */
+    virtual FlushAllFilesObserver* getFlushAllFilesObserver() const {
+        return nullptr;
+    }
 
     /**
      * Returns whether the storage engine supports "recover to stable timestamp". Returns true

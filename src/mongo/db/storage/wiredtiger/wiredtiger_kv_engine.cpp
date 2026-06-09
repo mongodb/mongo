@@ -38,8 +38,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -48,6 +46,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/flush_all_files_observer.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
@@ -1206,9 +1205,8 @@ void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHolds
 
     // Immediately flush the size storer information to disk. When the node is fsync locked for
     // operations such as backup, it's imperative that we copy the most up-to-date data files.
-    if (isReplicatedFastCountEnabled(opCtx)) {
-        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
-            .flushAsync();
+    if (auto* observer = getFlushAllFilesObserver()) {
+        observer->onFlushAllFiles();
     }
     syncSizeInfo(true);
 
@@ -2419,6 +2417,14 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
     invariant(!_journalListener);
 
     _journalListener = jl;
+}
+
+void WiredTigerKVEngine::setFlushAllFilesObserver(FlushAllFilesObserver* observer) {
+    _flushAllFilesObserver = observer;
+}
+
+FlushAllFilesObserver* WiredTigerKVEngine::getFlushAllFilesObserver() const {
+    return _flushAllFilesObserver.get();
 }
 
 void WiredTigerKVEngine::setLastMaterializedLsn(uint64_t lsn) {

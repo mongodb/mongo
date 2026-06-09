@@ -77,7 +77,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:container",
         "//src/mongo/db/storage:execution_context",

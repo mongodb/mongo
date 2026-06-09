@@ -157,6 +157,10 @@ void setUpReplicatedFastCount(OperationContext* opCtx) {
     }
 
     manager.startup(opCtx);
+
+    // Register the manager as the storage engine's FlushAllFilesObserver so the engine notifies it
+    // to flush size and count metadata when flushing all files.
+    opCtx->getServiceContext()->getStorageEngine()->setFlushAllFilesObserver(&manager);
 }
 
 namespace {

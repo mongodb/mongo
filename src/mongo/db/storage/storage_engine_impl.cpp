@@ -783,6 +783,14 @@ void StorageEngineImpl::setJournalListener(JournalListener* jl) {
     _engine->setJournalListener(jl);
 }
 
+void StorageEngineImpl::setFlushAllFilesObserver(FlushAllFilesObserver* observer) {
+    _engine->setFlushAllFilesObserver(observer);
+}
+
+FlushAllFilesObserver* StorageEngineImpl::getFlushAllFilesObserver() const {
+    return _engine->getFlushAllFilesObserver();
+}
+
 void StorageEngineImpl::setLastMaterializedLsn(uint64_t lsn) {
     _engine->setLastMaterializedLsn(lsn);
 }
