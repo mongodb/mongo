@@ -56,7 +56,7 @@ let checkConnectionAcceptedLog = function(serverHandle, path) {
         serverHandle,
         22943,
         {
-            "unixSockPath": `${path}`,
+            "local": `${path}`,
         },
         1,
         30 * 1000,
