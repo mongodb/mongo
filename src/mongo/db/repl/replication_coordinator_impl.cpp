@@ -526,7 +526,7 @@ void ReplicationCoordinatorImpl::_waitForStartUpComplete() {
 
 ReplSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
     std::unique_lock lk(_mutex);
-    return _rsConfig.unsafePeek();
+    return *_rsConfig.makeSnapshot();
 }
 
 Date_t ReplicationCoordinatorImpl::getElectionTimeout_forTest() const {
@@ -3621,7 +3621,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
         });
     });
 
-    ReplSetConfig oldConfig = _rsConfig.unsafePeek();
+    ReplSetConfig oldConfig = *_rsConfig.makeSnapshot();
     int myIndex = _selfIndex;
     lk.unlock();
 
@@ -3996,7 +3996,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
     invariant(_rsConfig.unsafePeek().isInitialized());
 
-    const ReplSetConfig oldConfig = _rsConfig.unsafePeek();
+    const ReplSetConfig oldConfig = *_rsConfig.makeSnapshot();
     const Date_t startTimeUpdateMemberState = _replExecutor->now();
     const PostMemberStateUpdateAction action = _setCurrentRSConfig(lk, opCtx, newConfig, myIndex);
 
@@ -4046,7 +4046,7 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     }
     auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
     auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);
-    auto currConfig = _rsConfig.unsafePeek();
+    auto currConfig = *_rsConfig.makeSnapshot();
     lk.unlock();
 
     OpTime fakeOpTime(Timestamp(1, 1), term);
@@ -4591,7 +4591,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     // updateConfig() can change terms, so update our term shadow to match.
     _termShadow.store(_topCoord->getTerm());
 
-    const ReplSetConfig oldConfig = _rsConfig.unsafePeek();
+    const ReplSetConfig oldConfig = *_rsConfig.makeSnapshot();
     _rsConfig.update(std::make_shared<ReplSetConfig>(newConfig));
     _protVersion.store(_rsConfig.unsafePeek().getProtocolVersion());
 
@@ -5444,7 +5444,7 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
 
     Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
 
-    auto rsc = _rsConfig.unsafePeek();
+    auto rsc = *_rsConfig.makeSnapshot();
 
     std::string replSetName = [&]() {
         if (_settings.shouldAutoInitiate()) {

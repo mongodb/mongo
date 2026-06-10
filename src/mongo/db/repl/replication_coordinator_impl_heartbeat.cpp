@@ -204,7 +204,7 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
     {
         std::unique_lock lk(_mutex);
 
-        ReplSetConfig rsc = _rsConfig.unsafePeek();
+        ReplSetConfig rsc = *_rsConfig.makeSnapshot();
         request.target = rsc.getMemberAt(targetIndex).getHostAndPort();
 
         StringData replSetName = rsc.getReplSetName();
@@ -473,7 +473,7 @@ ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
     const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
     std::unique_lock<ObservableMutex<std::mutex>> lock) {
     invariant(lock.owns_lock());
-    auto rsc = _rsConfig.unsafePeek();
+    auto rsc = *_rsConfig.makeSnapshot();
     switch (action.getAction()) {
         case HeartbeatResponseAction::NoAction:
             // Update the cached member state if different than the current topology member state
@@ -725,7 +725,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
     }
 
     _setConfigState(lk, kConfigHBReconfiguring);
-    auto rsc = _rsConfig.unsafePeek();
+    auto rsc = *_rsConfig.makeSnapshot();
     invariant(
         !rsc.isInitialized() ||
             rsc.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() || _selfIndex < 0,
@@ -947,7 +947,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     std::unique_lock lk(_mutex);
-    auto rsc = _rsConfig.unsafePeek();
+    auto rsc = *_rsConfig.makeSnapshot();
     if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
@@ -1151,7 +1151,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats(WithLock lk) {
     const Date_t now = _replExecutor->now();
     _seedList.clear();
 
-    auto rsc = _rsConfig.unsafePeek();
+    auto rsc = *_rsConfig.makeSnapshot();
     for (int i = 0; i < rsc.getNumMembers(); ++i) {
         if (i == _selfIndex) {
             continue;
