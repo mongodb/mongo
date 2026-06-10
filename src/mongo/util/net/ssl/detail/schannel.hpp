@@ -215,6 +215,22 @@ enum class ssl_want {
     want_output = 1
 };
 
+// RAII wrapper to free a context buffer allocated by SSPI (e.g. via ISC_REQ_ALLOCATE_MEMORY
+// or ASC_REQ_ALLOCATE_MEMORY)
+class ContextBufferDeleter {
+public:
+    ContextBufferDeleter(void** buf) : _buf(buf) {}
+
+    ~ContextBufferDeleter() {
+        if (*_buf != nullptr) {
+            FreeContextBuffer(*_buf);
+        }
+    }
+
+private:
+    void** _buf;
+};
+
 /**
  * Manages the SSL handshake and shutdown state machines.
  *
@@ -362,23 +378,6 @@ private:
             ISC_REQ_EXTENDED_ERROR | ISC_REQ_STREAM | ISC_REQ_USE_SUPPLIED_CREDS |
             ISC_REQ_MANUAL_CRED_VALIDATION;
     }
-
-    /**
-     * RAII class to free a buffer allocated by SSPI.
-     */
-    class ContextBufferDeleter {
-    public:
-        ContextBufferDeleter(void** buf) : _buf(buf) {}
-
-        ~ContextBufferDeleter() {
-            if (*_buf != nullptr) {
-                FreeContextBuffer(*_buf);
-            }
-        }
-
-    private:
-        void** _buf;
-    };
 
     ssl_want startShutdown(asio::error_code& ec);
 
@@ -540,8 +539,39 @@ public:
         setState(State::HaveEncryptedData);
     }
 
+    void setIsClient(bool isClient) {
+        _isClient = isClient;
+    }
+
 private:
     ssl_want decryptBuffer(asio::error_code& ec, DecryptState* pDecryptState);
+
+    /**
+     * Feeds a TLS 1.3 post-handshake token (NewSessionTicket / KeyUpdate — still encrypted) to
+     * ISC (client) or ASC (server), as required after DecryptMessage returns SEC_I_RENEGOTIATE
+     * or 0x80090317.  `tokenData`/`tokenLen` must be the SECBUFFER_EXTRA bytes left undecrypted
+     * by DecryptMessage (NOT the empty SECBUFFER_DATA buffer, and NOT decrypted-in-place bytes).
+     *
+     * Any leftover bytes that ISC/ASC reports via its input SECBUFFER_EXTRA (a following record
+     * such as a second NST or application data) are copied into _pInBuffer.  Returns the ssl_want
+     * for the read loop and sets *continueLoop true when the caller should `continue` the decrypt
+     * loop to process those leftover bytes.
+     */
+    ssl_want processPostHandshakeToken(const uint8_t* tokenData,
+                                       ULONG tokenLen,
+                                       asio::error_code& ec,
+                                       bool* continueLoop);
+
+    DWORD getServerFlags() {
+        return ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY |
+            ASC_REQ_EXTENDED_ERROR | ASC_REQ_STREAM | ASC_REQ_MUTUAL_AUTH;
+    }
+
+    DWORD getClientFlags() {
+        return ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY |
+            ISC_REQ_EXTENDED_ERROR | ISC_REQ_STREAM | ISC_REQ_USE_SUPPLIED_CREDS |
+            ISC_REQ_MANUAL_CRED_VALIDATION;
+    }
 
 private:
     /**
@@ -609,6 +639,9 @@ private:
 
     // TLS SNI server name (for InitializeSecurityContextW when processing post-handshake).
     std::wstring* _pServerName;
+
+    // True when this manager is on the client side of the TLS connection.
+    bool _isClient{false};
 };
 
 /**

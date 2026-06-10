@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 #include "asio/detail/assert.hpp"
 
@@ -685,6 +686,151 @@ ssl_want SSLReadManager::readDecryptedData(void* data,
     return ssl_want::want_nothing;
 }
 
+ssl_want SSLReadManager::processPostHandshakeToken(const uint8_t* tokenData,
+                                                   ULONG tokenLen,
+                                                   asio::error_code& ec,
+                                                   bool* continueLoop) {
+    *continueLoop = false;
+
+    // Own the token bytes: they alias _pInBuffer, which we reset before returning.
+    std::vector<uint8_t> token(tokenData, tokenData + tokenLen);
+
+    // Buffer layouts required by ISC/ASC for post-handshake token processing.
+    // References:
+    // [1]
+    // https://learn.microsoft.com/en-us/windows/win32/secauthn/initializesecuritycontext--schannel
+    // [2] https://learn.microsoft.com/en-us/windows/win32/secauthn/acceptsecuritycontext--schannel
+    // [3] https://learn.microsoft.com/en-us/windows/win32/api/sspi/ns-sspi-secbuffer
+    //
+    // Input — per [1][2], there must be two buffers:
+    //   [0] SECBUFFER_TOKEN  — "contains the token received from the server/client" [1][2].
+    //                          Data is from `token` (copied above from tokenData, which aliases
+    //                          _pInBuffer, to survive the reset below).
+    //   [1] SECBUFFER_EMPTY  — "set both pvBuffer and cbBuffer members to zero" [1].
+    //                          SECBUFFER_EMPTY is "a placeholder … the security package can return
+    //                          information in" [3]; Schannel re-types it to SECBUFFER_EXTRA on
+    //                          return if any bytes were not consumed (e.g. a second record that
+    //                          arrived in the same network read) — "indicates the number of extra
+    //                          or unprocessed bytes in a message" [3].
+    std::array<SecBuffer, 2> inBuffers;
+    inBuffers[0].BufferType = SECBUFFER_TOKEN;
+    inBuffers[0].cbBuffer = tokenLen;
+    inBuffers[0].pvBuffer = token.data();
+    inBuffers[1].BufferType = SECBUFFER_EMPTY;
+    inBuffers[1].cbBuffer = 0;
+    inBuffers[1].pvBuffer = nullptr;
+    SecBufferDesc inDesc;
+    inDesc.ulVersion = SECBUFFER_VERSION;
+    inDesc.cBuffers = static_cast<ULONG>(inBuffers.size());
+    inDesc.pBuffers = inBuffers.data();
+
+    // Output — per [1][2], "the caller must pass in a buffer of type SECBUFFER_ALERT. On output,
+    // if an alert is generated, this buffer contains information about that alert":
+    //   [0] SECBUFFER_TOKEN — receives the response token Schannel must send to the peer (e.g. a
+    //                         KeyUpdate acknowledgment).  Starts null; Schannel allocates it via
+    //                         ISC/ASC_REQ_ALLOCATE_MEMORY, so ContextBufferDeleter owns the ptr.
+    //   [1] SECBUFFER_ALERT — receives a TLS alert record if Schannel decides to abort [1][2].
+    //                         Also Schannel-allocated; must be present or the call may fail.
+    //   [2] SECBUFFER_EMPTY — trailing placeholder; "the security package can return information
+    //                         in" it [3].
+    std::array<SecBuffer, 3> outBuffers;
+    outBuffers[0].BufferType = SECBUFFER_TOKEN;
+    outBuffers[0].cbBuffer = 0;
+    outBuffers[0].pvBuffer = nullptr;
+    ContextBufferDeleter outDeleter0(&outBuffers[0].pvBuffer);
+    outBuffers[1].BufferType = SECBUFFER_ALERT;
+    outBuffers[1].cbBuffer = 0;
+    outBuffers[1].pvBuffer = nullptr;
+    ContextBufferDeleter outDeleter1(&outBuffers[1].pvBuffer);
+    outBuffers[2].BufferType = SECBUFFER_EMPTY;
+    outBuffers[2].cbBuffer = 0;
+    outBuffers[2].pvBuffer = nullptr;
+    SecBufferDesc outDesc;
+    outDesc.ulVersion = SECBUFFER_VERSION;
+    outDesc.cBuffers = static_cast<ULONG>(outBuffers.size());
+    outDesc.pBuffers = outBuffers.data();
+
+    ULONG retAttribs = 0;
+    TimeStamp lifetime;
+    SECURITY_STATUS s;
+
+    if (_isClient) {
+        DWORD flags = getClientFlags() | ISC_REQ_ALLOCATE_MEMORY;
+        s = InitializeSecurityContextW(_phcred,
+                                       _phctxt,
+                                       const_cast<SEC_WCHAR*>(_pServerName->c_str()),
+                                       flags,
+                                       0,
+                                       0,
+                                       &inDesc,
+                                       0,
+                                       _phctxt,
+                                       &outDesc,
+                                       &retAttribs,
+                                       &lifetime);
+    } else {
+        DWORD flags = getServerFlags() | ASC_REQ_ALLOCATE_MEMORY;
+        s = AcceptSecurityContext(
+            _phcred, _phctxt, &inDesc, flags, 0, _phctxt, &outDesc, &retAttribs, &lifetime);
+    }
+
+    // ISC/ASC reports unprocessed trailing bytes (a following NST or application data) via the
+    // input companion buffer set to SECBUFFER_EXTRA.  cbBuffer counts the trailing bytes; they
+    // sit at the tail of the token we passed in.
+    ULONG leftoverLen = (inBuffers[1].BufferType == SECBUFFER_EXTRA) ? inBuffers[1].cbBuffer : 0;
+    if (leftoverLen > token.size()) {
+        ec = asio::error_code(SEC_E_INVALID_TOKEN, asio::error::get_ssl_category());
+        return ssl_want::want_nothing;
+    }
+    const uint8_t* leftoverPtr = token.data() + token.size() - leftoverLen;
+
+    LOGV2_DEBUG(12786300,
+                2,
+                "TLS 1.3 post-handshake message processed",
+                "isClient"_attr = _isClient,
+                "status"_attr = static_cast<int32_t>(s),
+                "outputBytes"_attr = outBuffers[0].cbBuffer,
+                "leftoverLen"_attr = leftoverLen);
+
+    _pInBuffer->reset();
+    _pExtraEncryptedBuffer->reset();
+
+    // Negative status is a real error.  SEC_I_CONTINUE_NEEDED (positive) is not.
+    if (s < SEC_E_OK) {
+        ec = asio::error_code(s, asio::error::get_ssl_category());
+        if ((retAttribs & (ASC_RET_EXTENDED_ERROR | ISC_RET_EXTENDED_ERROR)) &&
+            outBuffers[1].cbBuffer > 0 && outBuffers[0].cbBuffer > 0 &&
+            outBuffers[0].pvBuffer != nullptr) {
+            _pOutBuffer->reset();
+            _pOutBuffer->append(outBuffers[0].pvBuffer, outBuffers[0].cbBuffer);
+            return ssl_want::want_output;
+        }
+        return ssl_want::want_nothing;
+    }
+
+    // Stage leftover bytes for processing by the outer decrypt loop.
+    if (leftoverLen > 0) {
+        _pInBuffer->append(leftoverPtr, leftoverLen);
+    }
+
+    // If ISC/ASC produced an output token (e.g. a KeyUpdate acknowledgement or a continuation
+    // flight), send it before reading more.  Any leftover already sits in _pInBuffer and will be
+    // processed when the read is retried after the write completes.
+    if (outBuffers[0].cbBuffer > 0 && outBuffers[0].pvBuffer != nullptr) {
+        _pOutBuffer->reset();
+        _pOutBuffer->append(outBuffers[0].pvBuffer, outBuffers[0].cbBuffer);
+        return ssl_want::want_output_and_retry;
+    }
+
+    // No output: process the leftover (a following NST → SEC_I_RENEGOTIATE again, or application
+    // data → decrypts normally) via the outer loop, otherwise request more input.
+    if (leftoverLen > 0) {
+        *continueLoop = true;
+        return ssl_want::want_nothing;
+    }
+    return ssl_want::want_input_and_retry;
+}
+
 ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecryptState) {
     while (true) {
         // Save original buffer pointer and size before DecryptMessage.  For status 0x80090317,
@@ -719,72 +865,13 @@ ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecr
         SECURITY_STATUS ss = DecryptMessage(_phctxt, &bufferDesc, 0, NULL);
 
         LOGV2_DEBUG(7998028,
-                    1,
+                    3,
                     "TLS DecryptMessage result",
                     "status"_attr = static_cast<int32_t>(ss),
                     "inputBytes"_attr = securityBuffers[0].cbBuffer);
 
         if (ss < SEC_E_OK) {
             if (ss == SEC_E_INCOMPLETE_MESSAGE) {
-                return ssl_want::want_input_and_retry;
-            } else if (ss == static_cast<SECURITY_STATUS>(0x80090317L)) {
-                // 0x80090317 is the error-severity form of SEC_I_CONTEXT_EXPIRED.  Schannel
-                // returns it from DecryptMessage after consuming a TLS 1.3 post-handshake
-                // message (e.g. NewSessionTicket) from an OpenSSL peer.  Treat it like
-                // SEC_I_RENEGOTIATE on TLS 1.3: the record is already consumed internally;
-                // preserve any trailing bytes for the next decryption call.
-                //
-                // Schannel may not populate SECBUFFER_EXTRA for this status code even when the
-                // input buffer contains bytes beyond the consumed TLS record (e.g. a KMIP
-                // response that arrived in the same recv() call).  As a fallback, parse the
-                // 5-byte TLS record header (ContentType + Version[2] + Length[2]) to locate
-                // the boundary and rescue any trailing bytes before resetting _pInBuffer.
-                //
-                // Use the pre-call pointer and size (not securityBuffers[0] post-call values)
-                // because DecryptMessage sets securityBuffers[0].cbBuffer to the consumed NST
-                // record size, which causes recordSize == inputLen and extraBytes = 0, losing
-                // any trailing bytes (e.g. a KMIP response in the same TCP segment).
-                const auto* inputPtr = preCallInputPtr;
-                const ULONG inputLen = preCallInputLen;
-
-                ULONG extraBytes = 0;
-                const uint8_t* extraPtr = nullptr;
-
-                if (securityBuffers[3].BufferType == SECBUFFER_EXTRA &&
-                    securityBuffers[3].pvBuffer != nullptr && securityBuffers[3].cbBuffer > 0) {
-                    extraBytes = securityBuffers[3].cbBuffer;
-                    extraPtr = static_cast<const uint8_t*>(securityBuffers[3].pvBuffer);
-                } else if (inputLen >= 5) {
-                    // TLS record header: bytes [3..4] are the payload length (big-endian).
-                    const uint32_t recordSize =
-                        5u + ((static_cast<uint32_t>(inputPtr[3]) << 8) | inputPtr[4]);
-                    if (recordSize < inputLen) {
-                        extraBytes = inputLen - recordSize;
-                        extraPtr = inputPtr + recordSize;
-                    }
-                }
-
-                LOGV2_DEBUG(7998029,
-                            0,
-                            "TLS 1.3 post-handshake message (0x80090317) received from OpenSSL "
-                            "peer: consuming NewSessionTicket and preserving trailing bytes",
-                            "extraBytes"_attr = extraBytes,
-                            "usedTLSHeaderFallback"_attr =
-                                (extraBytes > 0 && securityBuffers[3].cbBuffer == 0),
-                            "postCallCbBuffer"_attr = securityBuffers[0].cbBuffer,
-                            "preCallInputLen"_attr = preCallInputLen);
-
-                if (extraBytes > 0) {
-                    ASIO_ASSERT(_pExtraEncryptedBuffer->empty());
-                    _pExtraEncryptedBuffer->append(extraPtr, extraBytes);
-                }
-                _pInBuffer->reset();
-                if (!_pExtraEncryptedBuffer->empty()) {
-                    _pInBuffer->swap(*_pExtraEncryptedBuffer);
-                    _pExtraEncryptedBuffer->reset();
-                    continue;
-                }
-
                 return ssl_want::want_input_and_retry;
             } else {
                 LOGV2_DEBUG(7998027,
@@ -813,10 +900,9 @@ ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecr
             //
             //  TLS 1.3: A post-handshake message was received: NewSessionTicket (the server
             //           is distributing session-resumption material) or KeyUpdate (traffic-key
-            //           rotation).  These are *not* renegotiation; TLS 1.3 removed that
-            //           feature entirely.  Schannel reuses SEC_I_RENEGOTIATE for both cases.
-            //           Schannel processes the message internally; no ISC/ASC call is needed
-            //           (calling ISC/ASC here corrupts the application traffic keys).
+            //           rotation).  These are *not* renegotiation; TLS 1.3 removed that feature.
+            //           Schannel reuses SEC_I_RENEGOTIATE for both cases and requires the caller
+            //           to feed the post-handshake record back into ISC/ASC.
             //
             // Determine the negotiated protocol to pick the right behaviour.
             SecPkgContext_ConnectionInfo connInfo{};
@@ -831,51 +917,39 @@ ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecr
                 return ssl_want::want_nothing;
             }
 
-            // Do NOT call ISC/ASC here.
+            // The post-handshake token is the SECBUFFER_EXTRA bytes (buf3) that DecryptMessage
+            // left UNdecrypted.  buf1 (SECBUFFER_DATA) is empty for a consumed NST, so it is NOT
+            // the token — feeding the empty buffer makes ISC rotate the traffic keys, which then
+            // fails the next DecryptMessage with SEC_E_DECRYPT_FAILURE.
             //
-            // Calling InitializeSecurityContext or AcceptSecurityContext after DecryptMessage
-            // returns SEC_I_RENEGOTIATE for a TLS 1.3 NewSessionTicket or KeyUpdate — even
-            // with an existing phContext and an empty/NULL input descriptor — causes Schannel
-            // to corrupt its application-layer traffic keys.  The next DecryptMessage call
-            // then fails with SEC_E_DECRYPT_FAILURE (0x80090330), "The specified data could
-            // not be decrypted."
-            //
-            // Schannel processes the post-handshake message internally when DecryptMessage
-            // returns SEC_I_RENEGOTIATE.  No ISC/ASC call is required.  Any trailing bytes
-            // in the input buffer (SECBUFFER_EXTRA) are the start of the next TLS record and
-            // must be preserved for the next decryption.
-
-            ULONG extraBytes =
-                (securityBuffers[3].BufferType == SECBUFFER_EXTRA &&
-                 securityBuffers[3].pvBuffer != nullptr && securityBuffers[3].cbBuffer > 0)
-                ? securityBuffers[3].cbBuffer
-                : 0;
-            LOGV2_DEBUG(7998005,
-                        2,
-                        "TLS 1.3 post-handshake message processed by Schannel (no ISC/ASC needed)",
-                        "extraBytes"_attr = extraBytes);
-
-            // Save any extra encrypted data that arrived after the post-handshake record
-            // before we reset _pInBuffer (SECBUFFER_EXTRA pvBuffer points into _pInBuffer).
-            if (extraBytes > 0) {
-                ASIO_ASSERT(_pExtraEncryptedBuffer->empty());
-                _pExtraEncryptedBuffer->append(securityBuffers[3].pvBuffer,
-                                               securityBuffers[3].cbBuffer);
+            // Per "Renegotiating an Schannel Connection"
+            // (https://learn.microsoft.com/en-us/windows/win32/secauthn/renegotiating-an-schannel-connection):
+            //   "When you receive the SEC_I_RENEGOTIATE return code, your application must call
+            //    AcceptSecurityContext (servers) or InitializeSecurityContext (clients), and pass
+            //    the contents of SECBUFFER_EXTRA returned from DecryptMessage in the
+            //    SECBUFFER_TOKEN."
+            // (The DecryptMessage reference page says only "the same buffer as modified by
+            // DecryptMessage", which is the ambiguous wording that invites the wrong buf1 reading.)
+            if (!(securityBuffers[3].BufferType == SECBUFFER_EXTRA &&
+                  securityBuffers[3].pvBuffer != nullptr && securityBuffers[3].cbBuffer > 0)) {
+                // No token bytes to process; just read more.
+                _pInBuffer->reset();
+                return ssl_want::want_input_and_retry;
             }
-            _pInBuffer->reset();  // The post-handshake record has been consumed.
 
-            LOGV2_DEBUG(7998015,
-                        2,
-                        "TLS 1.3 post-handshake: continuing read after NewSessionTicket/KeyUpdate",
-                        "extraBufferEmpty"_attr = _pExtraEncryptedBuffer->empty());
-
-            // Continue reading: process extra data if available, else request more.
-            if (!_pExtraEncryptedBuffer->empty()) {
-                _pInBuffer->swap(*_pExtraEncryptedBuffer);
-                _pExtraEncryptedBuffer->reset();
+            bool continueLoop = false;
+            ssl_want w =
+                processPostHandshakeToken(static_cast<const uint8_t*>(securityBuffers[3].pvBuffer),
+                                          securityBuffers[3].cbBuffer,
+                                          ec,
+                                          &continueLoop);
+            if (ec) {
+                return w;
+            }
+            if (continueLoop) {
                 continue;
             }
-            return ssl_want::want_input_and_retry;
+            return w;
         }
 
         // The network layer may have read more then 1 SSL packet so remember the extra data.

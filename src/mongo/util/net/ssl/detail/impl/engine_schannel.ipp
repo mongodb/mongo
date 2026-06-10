@@ -101,9 +101,10 @@ engine::want engine::handshake(stream_base::handshake_type type, asio::error_cod
         return want::want_nothing;
     }
 
-    _handshakeManager.setMode((type == asio::ssl::stream_base::client)
-                                  ? SSLHandshakeManager::HandshakeMode::Client
-                                  : SSLHandshakeManager::HandshakeMode::Server);
+    const bool isClient = (type == asio::ssl::stream_base::client);
+    _handshakeManager.setMode(isClient ? SSLHandshakeManager::HandshakeMode::Client
+                                       : SSLHandshakeManager::HandshakeMode::Server);
+    _readManager.setIsClient(isClient);
     SSLHandshakeManager::HandshakeState state;
     auto w = _handshakeManager.nextHandshake(ec, &state);
     if (!ec &&
