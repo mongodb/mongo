@@ -15,6 +15,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {disableReplicaSetWriteBlock, enableReplicaSetWriteBlock} from "jstests/libs/block_replica_set_writes_utils.js";
 import {afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
+import {isEnterpriseShell, runEncryptedTest} from "jstests/fle2/libs/encrypted_client_util.js";
 
 describe("Test blockReplicaSetWrites command on replica set level", function () {
     before(function () {
@@ -597,5 +598,58 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             testColl.getIndexes().find((idx) => idx.name === "a_1"),
             "Expected index to exist after write block is disabled",
         );
+    });
+
+    it("Test that new QE compact and cleanup are blocked when allowDeletions: false", function () {
+        // blockedColl is a non-existent collection, so when the commands are not blocked we expect
+        // them to fail with NamespaceNotFound. The deletions check fires before collection validation, so a
+        // non-existent collection is sufficient to verify the rejection.
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const compactCmd = {compactStructuredEncryptionData: "blockedColl", compactionTokens: {}};
+        const cleanupCmd = {cleanupStructuredEncryptionData: "blockedColl", cleanupTokens: {}};
+
+        // Enable replica set write block with allowDeletions: false and check that the commands are blocked.
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandFailedWithCode(testDB.runCommand(compactCmd), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(testDB.runCommand(cleanupCmd), ErrorCodes.ReplicaSetWritesBlocked);
+
+        // Disable replica set write block and check that new QE compact and cleanup are not blocked anymore.
+        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        assert.commandFailedWithCode(testDB.runCommand(compactCmd), ErrorCodes.NamespaceNotFound);
+        assert.commandFailedWithCode(testDB.runCommand(cleanupCmd), ErrorCodes.NamespaceNotFound);
+    });
+
+    it("Test that new QE compact and cleanup complete end-to-end on a real encrypted collection when allowDeletions: true", function () {
+        if (!isEnterpriseShell()) {
+            jsTest.log.info("Skipping enterprise-only QE compact/cleanup write-block test");
+            return;
+        }
+        const fleDbName = "block_replica_set_writes_fle";
+        const fleCollName = "encrypted";
+        const encryptedFields = {
+            fields: [{path: "first", bsonType: "string", queries: {queryType: "equality", contention: 0}}],
+        };
+        runEncryptedTest(db, fleDbName, fleCollName, encryptedFields, (edb, client) => {
+            const coll = edb[fleCollName];
+            for (let i = 0; i < 5; i++) {
+                assert.commandWorked(coll.insert({first: "roger_" + i}));
+            }
+            try {
+                enableReplicaSetWriteBlock(
+                    this.replicaSetPrimaryAdminDB,
+                    true /* allowDeletions */,
+                    "InsufficientDiskSpace",
+                );
+                // Check that compact and cleanup complete successfully when allowDeletions: true.
+                assert.commandWorked(coll.compact());
+                assert.commandWorked(coll.cleanup());
+            } finally {
+                disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace");
+            }
+        });
     });
 });

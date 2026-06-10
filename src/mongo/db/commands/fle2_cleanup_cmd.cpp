@@ -70,6 +70,8 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
@@ -206,6 +208,15 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
             str::stream() << CleanupStructuredEncryptionData::kCommandName
                           << " must be run through mongos in a sharded cluster",
             !ShardingState::get(opCtx)->enabled());
+
+    // Like storage-level compact, QE cleanup reclaims disk space and is gated behind
+    // allowDeletions. If the block is active with allowDeletions:true, bypass the general write
+    // block so that internal ESC inserts/updates are not rejected by the op observer.
+    auto* writeBlockState = ReplicaSetWriteBlockState::get(opCtx);
+    uassertStatusOK(writeBlockState->checkIfCompactAllowedToStart(opCtx));
+    if (writeBlockState->isReplicaSetWriteBlockingEnabled()) {
+        ReplicaSetWriteBlockBypass::get(opCtx).set(true);
+    }
 
     // Since this command holds an IX lock on the DB and the global lock throughout
     // the lifetime of this operation, setFCV should not be allowed to abort the transaction

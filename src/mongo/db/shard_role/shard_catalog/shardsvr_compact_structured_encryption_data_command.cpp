@@ -54,6 +54,8 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -113,6 +115,15 @@ public:
             {
                 std::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+            }
+
+            // Like storage-level compact, QE compact reclaims disk space and is gated behind
+            // allowDeletions. If the block is active with allowDeletions:true, bypass the general
+            // write block so that internal ESC inserts/updates are not rejected by the op observer.
+            auto* writeBlockState = ReplicaSetWriteBlockState::get(opCtx);
+            uassertStatusOK(writeBlockState->checkIfCompactAllowedToStart(opCtx));
+            if (writeBlockState->isReplicaSetWriteBlockingEnabled()) {
+                ReplicaSetWriteBlockBypass::get(opCtx).set(true);
             }
 
             auto compactCoordinator =
