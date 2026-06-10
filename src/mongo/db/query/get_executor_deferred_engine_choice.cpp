@@ -53,6 +53,7 @@
 #include "mongo/db/query/get_executor_deferred_engine_choice_planning.h"
 #include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameter.h"
@@ -88,10 +89,26 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
         return {std::move(rankerResult.expressExecutor)};
     }
     // If we replanned and the old plan and new plan are the same, update the counter.
-    if (rankerResult.plannerParams->replanningData && !rankerResult.solutions.empty()) {
-        const auto replanningData = rankerResult.plannerParams->replanningData;
+    const auto replanningData = rankerResult.plannerParams->replanningData;
+    if (replanningData && !rankerResult.solutions.empty()) {
         const auto qsn = rankerResult.solutions.at(0).get();
-        if (qsn && replanningData->oldPlanHash == qsn->hash()) {
+        const bool isSameAsCachedPlan = qsn && replanningData->oldPlanHash == qsn->hash();
+        tassert(12870801, "Expected execState to exist after replanning.", rankerResult.execState);
+        const auto classicExecStats = rankerResult.execState->peekExecState<ClassicExecState>();
+        tassert(
+            12870802, "Expected classic execState to exist after replanning.", classicExecStats);
+        LOGV2_DEBUG(
+            12870800,
+            1,
+            "Query plan after replanning and its cache status",
+            "query"_attr = redact(canonicalQuery->toStringShort()),
+            "planSummary"_attr =
+                plan_explainer_factory::make(classicExecStats->root.get())->getPlanSummary(),
+            "shouldCache"_attr =
+                replanningData->shouldCache == plan_cache_util::CacheMode::AlwaysCache ? "yes"
+                                                                                       : "no",
+            "isSameAsCachedPlan"_attr = isSameAsCachedPlan);
+        if (isSameAsCachedPlan) {
             planCacheCounters.incrementClassicReplannedPlanIsCachedPlanCounter();
         }
     }
