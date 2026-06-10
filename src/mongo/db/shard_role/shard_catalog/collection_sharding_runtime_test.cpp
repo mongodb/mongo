@@ -1070,8 +1070,11 @@ TEST_P(CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
 
     {
         phase.arrive_and_wait();
-        // Sleep for a bit to ensure waiters show the wait. We use 20 here instead of the 10 we
-        // check for in order to avoid races between timers.
+        // The timer only starts once the waiter calls signal->get(), so wait for it to register.
+        while (getStatistics()["activeWaitersCount"].safeNumberLong() == 0) {
+            sleepmillis(1);
+        }
+        // Now that the waiter is registered, sleep a known amount so the wait time is observable.
         sleepmillis(20);
         auto metrics = getStatistics();
         ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
