@@ -100,7 +100,14 @@ public:
              const DatabaseName&,
              const BSONObj& jsobj,
              BSONObjBuilder& result) override {
-        AutoGetCollection coll(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
+        // Use LocalWrite intent so the IntentRegistry does not enforce primary-only
+        // write access, allowing replSetResizeOplog to run on secondaries as intended.
+        AutoGetCollection coll(
+            opCtx,
+            NamespaceString::kRsOplogNamespace,
+            MODE_X,
+            auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite}));
         uassert(ErrorCodes::NamespaceNotFound, "oplog does not exist", coll);
         uassert(ErrorCodes::IllegalOperation, "oplog isn't capped", coll->isCapped());
 
