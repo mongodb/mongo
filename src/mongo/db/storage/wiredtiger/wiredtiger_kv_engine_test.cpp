@@ -38,6 +38,7 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -54,14 +55,20 @@
 #include "mongo/db/storage/checkpoint_schedule_policy.h"
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/flush_all_files_observer.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
@@ -377,6 +384,59 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     ASSERT_FALSE(rs->findRecord(
         opCtxPtr.get(), *shard_role_details::getRecoveryUnit(opCtxPtr.get()), loc, &data));
 #endif
+}
+
+// The size storer buffers collection fast counts and only periodically writes them to its table, so
+// that an unclean shutdown loses at most the updates since the last periodic flush.
+TEST_F(WiredTigerKVEngineTest, SizeStorerFlushesAfterSyncPeriodElapses) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto opCtxPtr = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+
+    // Create a collection and insert some records. This updates the in-memory fast count buffered
+    // by the size storer, but does not write it to the size storer table.
+    const std::string ident = "collection-sizestorer";
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.sizeStorer");
+    const RecordStore::Options rsOptions;
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, rsOptions));
+        txn.commit();
+    }
+    auto rs = engine->getRecordStore(opCtxPtr.get(), nss, ident, rsOptions, UUID::gen());
+    ASSERT(rs);
+
+    constexpr int64_t kNumRecords = 10;
+    {
+        StorageWriteTransaction txn(ru);
+        for (int64_t i = 0; i < kNumRecords; ++i) {
+            const std::string doc = "record";
+            ASSERT_OK(rs->insertRecord(opCtxPtr.get(), ru, doc.c_str(), doc.size() + 1, Timestamp())
+                          .getStatus());
+        }
+        txn.commit();
+    }
+    EXPECT_EQ(kNumRecords, rs->numRecords());
+
+    // A fresh size storer reads persisted fast counts directly from the size storer table,
+    // bypassing the engine's in-memory buffer.
+    const StringData uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+    WiredTigerSizeStorer reader(&engine->getConnection(),
+                                WiredTigerUtil::buildTableUri(ident::kSizeStorer));
+    WiredTigerSession session(&engine->getConnection());
+
+    // The periodic sync period has not elapsed, so a periodic flush is a no-op: the updated fast
+    // count is not yet durable and would be lost on an unclean shutdown.
+    engine->sizeStorerPeriodicFlush();
+    EXPECT_EQ(0, reader.load(session, uri)->numRecords.load());
+
+    // Advancing the clock past the periodic sync period makes the next periodic flush write the
+    // fast count to the size storer table, without relying on a clean shutdown.
+    auto* clock = checked_cast<ClockSourceMock*>(engine->getClockSource());
+    clock->advance(Milliseconds{gWiredTigerSizeStorerPeriodicSyncPeriodMillis} + Milliseconds{1});
+    engine->sizeStorerPeriodicFlush();
+    EXPECT_EQ(kNumRecords, reader.load(session, uri)->numRecords.load());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
