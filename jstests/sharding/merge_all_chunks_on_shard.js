@@ -1,8 +1,9 @@
 /**
  * Tests mergeAllChunksOnShard command and auto-merger behavior
- *
+ * TODO SERVER-90274: Remove does_not_support_stepdowns.
  * @tags: [
  *   requires_fcv_70,
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {

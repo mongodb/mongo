@@ -1246,7 +1246,7 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(bool resched
     // check to continue conducting liveness checks and be able to step down from primary if we
     // lose contact with a majority of nodes.
     // We ignore shutdown errors; any other error triggers an fassert.
-    _handleLivenessTimeoutCallback.delayUntil(nextTimeout).ignore();
+    _handleLivenessTimeoutCallback.scheduleAt(nextTimeout).ignore();
     _earliestMemberId = earliestMemberId.getData();
 }
 
@@ -1314,7 +1314,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     auto requestedWhen = now + _rsConfig.getElectionTimeoutPeriod();
     invariant(requestedWhen > now);
     Status delayStatus =
-        _handleElectionTimeoutCallback.delayUntilWithJitter(requestedWhen, upperBound);
+        _handleElectionTimeoutCallback.scheduleAtWithJitter(requestedWhen, upperBound);
     Date_t when = _handleElectionTimeoutCallback.getNextCall();
     if (wasActive) {
         // The log level here is 4 once per second, otherwise 5.
