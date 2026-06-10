@@ -37,6 +37,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_coordinator.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -214,12 +215,9 @@ public:
 
     /**
      * Flushes data synchronously on the caller's thread. The calling thread must be able to take a
-     * MODE_IX lock.
-     *
-     * This function is useful in testing and during shutdown when flushing must happen
-     * synchronously to ensure a predictable order of events.
+     * MODE_IX lock. Requires periodic writes to be disabled.
      */
-    void flushSync(OperationContext* opCtx);
+    void flushSync_ForTest(OperationContext* opCtx);
 
     ReplicatedFastCountMetrics& getReplicatedFastCountMetrics() {
         return _metrics;
@@ -358,6 +356,24 @@ private:
      * TODO SERVER-123284: Remove this flag and the legacy mechanism.
      */
     bool _useLegacyFlush{false};
+
+    /**
+     * Guards _checkpointer, _backgroundThread, and _isEnabled across startup(), shutdown(), and
+     * flushAsync(). Holding this lock through the idempotency check + state assignment in startup()
+     * and through the move-to-claim in shutdown() makes those transitions self-protecting — no
+     * reliance on external FCV/replication lock ordering for memory safety.
+     *
+     * Lock ordering: _lifecycleMutex is never acquired while _metadataMutex is held. They are
+     * always acquired separately, never nested.
+     */
+    mutable ObservableMutex<std::mutex> _lifecycleMutex;
+
+    /**
+     * When non-null, the durability feature flag was enabled at startup and all flush work is
+     * delegated to the checkpointer. The legacy background thread is not started in this mode.
+     * Guarded by _lifecycleMutex.
+     */
+    std::unique_ptr<SizeCountCheckpointCoordinator> _checkpointer;
 
     /**
      * Interface for reads / writes to the fast count metadata store.

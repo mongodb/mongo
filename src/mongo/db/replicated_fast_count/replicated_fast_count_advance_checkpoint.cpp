@@ -35,16 +35,9 @@
 
 namespace mongo::replicated_fast_count {
 namespace {
-struct SizeCountCheckpoint {
-    // Absolute size and count totals ready to persist, for each collection modified since the
-    // last checkpoint.
-    SizeCountDeltas updatedCollections;
-    Timestamp validAsOf;
-};
-
-SizeCountCheckpoint computeNextCheckpoint(OperationContext* opCtx,
-                                          const SizeCountStore& sizeCountStore,
-                                          Timestamp seekAfterTimestamp) {
+SizeCountCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
+                                                  const SizeCountStore& sizeCountStore,
+                                                  Timestamp seekAfterTimestamp) {
     // Scan the oplog from `seekAfterTimestamp` and accumulate size and count deltas for every UUID
     // that has written since the last checkpoint.
     auto scanResult = [&]() -> OplogScanResult {
@@ -63,17 +56,24 @@ SizeCountCheckpoint computeNextCheckpoint(OperationContext* opCtx,
                                                oplogColl->uuid());
     }();
 
-    // Combine the oplog deltas with the currently persisted totals to produce the absolute values
-    // ready to persist.
-    sizeCountStore.readAndIncrementSizeCounts(opCtx, scanResult.deltas);
-
-    return {std::move(scanResult.deltas), scanResult.lastTimestamp.value_or(seekAfterTimestamp)};
+    return materializeCheckpointSnapshot(
+        opCtx, sizeCountStore, std::move(scanResult), std::move(seekAfterTimestamp));
 }
 
-void persistCheckpoint(OperationContext* opCtx,
-                       const SizeCountCheckpoint& checkpoint,
-                       SizeCountStore& sizeCountStore,
-                       SizeCountTimestampStore& timestampStore) {
+}  // namespace
+SizeCountCheckpointSnapshot materializeCheckpointSnapshot(OperationContext* opCtx,
+                                                          const SizeCountStore& sizeCountStore,
+                                                          OplogScanResult scanResult,
+                                                          Timestamp scanStartAfterTS) {
+    sizeCountStore.readAndIncrementSizeCounts(opCtx, scanResult.deltas);
+    return {.updatedCollections = std::move(scanResult.deltas),
+            .validAsOf = scanResult.lastTimestamp.value_or(scanStartAfterTS)};
+}
+
+void persistCheckpointSnapshot(OperationContext* opCtx,
+                               const SizeCountCheckpointSnapshot& checkpoint,
+                               SizeCountStore& sizeCountStore,
+                               SizeCountTimestampStore& timestampStore) {
     for (const auto& [uuid, entry] : checkpoint.updatedCollections) {
         switch (entry.state) {
             case DDLState::kCreated: {
@@ -107,7 +107,6 @@ void persistCheckpoint(OperationContext* opCtx,
     timestampStore.write(opCtx, checkpoint.validAsOf);
 }
 
-}  // namespace
 
 void advanceCheckpoint(OperationContext* opCtx,
                        SizeCountStore& sizeCountStore,
@@ -128,7 +127,7 @@ void advanceCheckpoint(OperationContext* opCtx,
     }
 
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
-    persistCheckpoint(opCtx, checkpoint, sizeCountStore, timestampStore);
+    persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
     wuow.commit();
 }
 

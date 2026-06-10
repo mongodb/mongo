@@ -192,8 +192,17 @@ protected:
     OtelMetricsCapturer _capturer;
 };
 
-TEST_F(ReplicatedFastCountManagerMetricsTest, MetadataMutexRegisteredWithObservableMutexRegistry) {
-    _fastCountManager->flushSync(operationContext());
+// Sub-fixture that forces the legacy (non-durability) path. Used for tests that explicitly cover
+// code that behaves differently between paths.
+class ReplicatedFastCountManagerLegacyMetricsTest : public ReplicatedFastCountManagerMetricsTest {
+protected:
+    RAIIServerParameterControllerForTest _ffDurability{"featureFlagReplicatedFastCountDurability",
+                                                       false};
+};
+
+TEST_F(ReplicatedFastCountManagerLegacyMetricsTest,
+       MetadataMutexRegisteredWithObservableMutexRegistry) {
+    _fastCountManager->flushSync_ForTest(operationContext());
 
     const BSONObj report = ObservableMutexRegistry::get().report(false);
     const StringData name = "ReplicatedFastCountManager::_metadataMutex";
@@ -207,12 +216,11 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, IsRunningGaugeSetByStartup) {
     EXPECT_EQ(_capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 1);
 }
 
-
 TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDuringFailure) {
     auto& failDuringFlushFp = *globalFailPointRegistry().find("failDuringFlush");
 
     failDuringFlushFp.setMode(FailPoint::alwaysOn);
-    _fastCountManager->flushSync(operationContext());
+    _fastCountManager->flushSync_ForTest(operationContext());
     failDuringFlushFp.setMode(FailPoint::off);
 
     EXPECT_EQ(_capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 1);
@@ -226,7 +234,7 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDurin
 //     boost::container::flat_map<UUID, CollectionSizeCount> changes;
 //     changes[uuid] = {/*count=*/1, /*size=*/100};
 //     _fastCountManager->commit(changes, /*commitTime=*/boost::none);
-//     _fastCountManager->flushSync(operationContext());
+//     _fastCountManager->flushSync_ForTest(operationContext());
 //
 //     // After flushing, at least the above change should be inserted.
 //     EXPECT_GE(
@@ -235,7 +243,7 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDurin
 //
 //     changes[uuid] = {/*count=*/1, /*size=*/50};
 //     _fastCountManager->commit(changes, /*commitTime=*/boost::none);
-//     _fastCountManager->flushSync(operationContext());
+//     _fastCountManager->flushSync_ForTest(operationContext());
 //
 //     // The above change should update the existing document.
 //     EXPECT_GE(
@@ -249,7 +257,7 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, WriteTimeMsTotalIncrementsAfterFlu
     boost::container::flat_map<UUID, CollectionSizeCount> changes;
     changes[uuid] = {/*count=*/1, /*size=*/100};
     _fastCountManager->commit(operationContext(), changes, /*commitTime=*/boost::none);
-    _fastCountManager->flushSync(operationContext());
+    _fastCountManager->flushSync_ForTest(operationContext());
 
     // writeTimeMsTotal is the time spent inside the WriteUnitOfWork; it may be 0ms on a fast
     // machine. We can only assert that addWriteTimeMsTotal() was called (i.e., the OTel counter

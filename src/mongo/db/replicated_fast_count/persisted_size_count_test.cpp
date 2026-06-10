@@ -96,7 +96,7 @@ TEST_F(PersistedSizeCountTest, UuidExistsInSizeCountStore) {
         wuow.commit();
     }
 
-    manager->flushSync(operationContext());
+    manager->flushSync_ForTest(operationContext());
 
     const CollectionSizeCount sizeCount =
         coll.getCollectionPtr()->persistedSizeCount(operationContext());

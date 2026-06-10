@@ -310,7 +310,7 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
                                                         /*expectedSize=*/0);
 
     // Manually trigger an iteration to write dirty metadata to the internal collection.
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
                                                         _fastCountManager,
@@ -352,7 +352,7 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     auto applyOpsEntries = test_helpers::getApplyOpsForFastCountStore(_opCtx);
 
@@ -396,7 +396,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     // Now, dirty metadata for the same collections, and check that an applyOps entry with the
     // correct update information is generated.
@@ -431,7 +431,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
                              sampleDocForInsert,
                              sampleDocForUpdate);
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -464,7 +464,7 @@ TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -492,7 +492,7 @@ TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss3));
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -525,12 +525,12 @@ TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
 
     // We should detect that we dropped the collection _nss1 and delete the fast count entry for it.
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -552,7 +552,7 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -565,7 +565,7 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
 
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -602,13 +602,12 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
                              _fastCountManager,
                              _nss1,
                              numInitialDocs,
-                             /*startingCount=*/0,
-                             /*startingSize=*/0,
+                             0,
+                             0,
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
     checkCommittedSizeCount(_opCtx, _uuid1, {.size = initialSize, .count = numInitialDocs});
-
     stdx::thread iterThread;
 
     {
@@ -622,7 +621,7 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
             // Hang after we make a copy of the _metadata map which should include our initial
             // inserts to the collection, but before we actually write to disk and change our dirty
             // flag for the collection we wrote to.
-            _fastCountManager->flushSync(opCtxForThread);
+            _fastCountManager->flushSync_ForTest(opCtxForThread);
         });
 
         fp->waitForTimesEntered(initialTimesEntered + 1);
@@ -633,13 +632,12 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
                                  _fastCountManager,
                                  _nss1,
                                  numExtraDocs,
-                                 /*startingCount=*/numInitialDocs,
-                                 /*startingSize=*/numInitialDocs * sampleDocForInsert.objsize(),
+                                 numInitialDocs,
+                                 numInitialDocs * sampleDocForInsert.objsize(),
                                  docGeneratorForInsert,
                                  sampleDocForInsert);
 
         checkCommittedSizeCount(_opCtx, _uuid1, {.size = totalSize, .count = numTotalDocs});
-
         // Disable failpoint by letting it go out of scope.
     }
 
@@ -647,15 +645,11 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
 
     // If the dirty metadata wasn't incorrectly cleared, this flush should persist our second batch
     // of inserts.
-    _fastCountManager->flushSync(_opCtx);
+    _fastCountManager->flushSync_ForTest(_opCtx);
 
     // Verify that all of our writes were persisted to disk.
-    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
-                                                        _fastCountManager,
-                                                        _uuid1,
-                                                        /*expectPersisted=*/true,
-                                                        numTotalDocs,
-                                                        totalSize);
+    test_helpers::checkFastCountMetadataInInternalStore(
+        _opCtx, _fastCountManager, _uuid1, true, numTotalDocs, totalSize);
 }
 
 // TODO SERVER-118457: Parameterize test and test variety of operations with different sizes and
