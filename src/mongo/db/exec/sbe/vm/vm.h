@@ -535,8 +535,7 @@ private:
 
     int32_t convertNumericToInt32(value::TagValueView v);
 
-    FastTuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,
-                                                                value::Value val);
+    value::TagValueView getArraySize(value::TagValueView arr);
 
     FastTuple<bool, value::TypeTags, value::Value> aggSum(value::TypeTags accTag,
                                                           value::Value accValue,

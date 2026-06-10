@@ -402,33 +402,32 @@ void ByteCode::traverseFInArray(const CodeFragment* code,
 }
 
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::getArraySize(value::TypeTags tag,
-                                                                      value::Value val) {
+value::TagValueView ByteCode::getArraySize(value::TagValueView arr) {
     size_t result = 0;
 
-    switch (tag) {
+    switch (arr.tag) {
         case value::TypeTags::Array: {
-            result = value::getArrayView(val)->size();
+            result = value::getArrayView(arr.value)->size();
             break;
         }
         case value::TypeTags::ArraySet: {
-            result = value::getArraySetView(val)->size();
+            result = value::getArraySetView(arr.value)->size();
             break;
         }
         case value::TypeTags::ArrayMultiSet: {
-            result = value::getArrayMultiSetView(val)->size();
+            result = value::getArrayMultiSetView(arr.value)->size();
             break;
         }
         case value::TypeTags::bsonArray: {
             value::arrayForEach(
-                tag, val, [&](value::TypeTags t_unused, value::Value v_unused) { result++; });
+                arr.tag, arr.value, [&](value::TypeTags, value::Value) { result++; });
             break;
         }
         default:
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueView::nothing();
     }
 
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
+    return value::TagValueView::numberInt64(static_cast<int64_t>(result));
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags accTag,

@@ -1134,9 +1134,9 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToSet(ArityType arity) {
     auto result = value::TagValueOwned::fromRaw(value::makeNewArraySet());
     value::ArraySet* arrSet = value::getArraySetView(result.value());
 
-    auto sizeView = getArraySize(arr.tag, arr.value);
-    tassert(11086810, "Unexpected type of size", sizeView.b == value::TypeTags::NumberInt64);
-    arrSet->reserve(static_cast<int64_t>(sizeView.c));
+    auto sizeView = getArraySize(arr);
+    tassert(11086810, "Unexpected type of size", sizeView.tag == value::TypeTags::NumberInt64);
+    arrSet->reserve(static_cast<int64_t>(sizeView.value));
 
     value::ArrayEnumerator arrayEnumerator(arr.tag, arr.value);
     while (!arrayEnumerator.atEnd()) {
@@ -1166,9 +1166,9 @@ value::TagValueMaybeOwned ByteCode::builtinCollArrayToSet(ArityType arity) {
         value::makeNewArraySet(value::getCollatorView(collView.value)));
     value::ArraySet* arrSet = value::getArraySetView(result.value());
 
-    auto sizeView = getArraySize(arr.tag, arr.value);
-    tassert(11086809, "Unexpected type of size", sizeView.b == value::TypeTags::NumberInt64);
-    arrSet->reserve(static_cast<int64_t>(sizeView.c));
+    auto sizeView = getArraySize(arr);
+    tassert(11086809, "Unexpected type of size", sizeView.tag == value::TypeTags::NumberInt64);
+    arrSet->reserve(static_cast<int64_t>(sizeView.value));
 
     value::ArrayEnumerator arrayEnumerator(arr.tag, arr.value);
     while (!arrayEnumerator.atEnd()) {

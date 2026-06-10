@@ -1011,8 +1011,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto [owned, tag, val] = getFromStack(offsetParam, popParam);
         value::ValueGuard paramGuard(owned && popParam, tag, val);
 
-        auto [resultOwned, resultTag, resultVal] = getArraySize(tag, val);
-        pushStack(resultOwned, resultTag, resultVal);
+        auto result = getArraySize({tag, val});
+        pushStack(false, result.tag, result.value);
     }
     DISPATCH();
     INSTRUCTION(collComparisonKey) {
