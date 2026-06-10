@@ -257,7 +257,7 @@ void generatePlannerInfo(PlanExecutor* exec,
  * Stats are generated at the verbosity specified by 'verbosity'.
  */
 void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& details,
-                                     boost::optional<long long> totalTimeMillis,
+                                     boost::optional<long long> totalTimeMicros,
                                      BSONObjBuilder* out,
                                      bool isTrialPeriodInfo) {
     auto&& [stats, summary] = details;
@@ -266,8 +266,9 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
     out->appendNumber("nReturned", static_cast<long long>(summary->nReturned));
 
     // Time elapsed could might be either precise or approximate.
-    if (totalTimeMillis) {
-        out->appendNumber("executionTimeMillis", *totalTimeMillis);
+    if (totalTimeMicros) {
+        out->appendNumber("executionTimeMillis", *totalTimeMicros / 1000);
+        out->appendNumber("executionTimeMicros", *totalTimeMicros);
     } else {
         appendExecutionTimeFields(*out, summary->executionTime);
     }
@@ -329,9 +330,10 @@ void generateExecutionInfo(PlanExecutor* exec,
 
     // Generate exec stats BSON for the winning plan.
     auto opCtx = exec->getOpCtx();
-    auto totalTimeMillis = durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal());
+    auto elapsed = CurOp::get(opCtx)->elapsedTimeTotal();
+    auto totalTimeMicros = durationCount<Microseconds>(elapsed);
     generateSinglePlanExecutionInfo(explainer.getWinningPlanStats(verbosity),
-                                    totalTimeMillis,
+                                    totalTimeMicros,
                                     &execBob,
                                     false /* isTrialPeriodInfo */);
 

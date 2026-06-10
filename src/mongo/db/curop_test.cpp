@@ -659,6 +659,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
                                          "numYield",
                                          "locks",
                                          "millis",
+                                         "micros",
                                          "flowControl"};
 
     QueryTestServiceContext serviceContext;
@@ -1545,6 +1546,42 @@ TEST(CurOpTest, AppendStagedIdLookupMetricsReportedCorrectly) {
     ASSERT_EQ(result["docsSeenByIdLookup"].Long(), 3LL);
     ASSERT_EQ(result["docsReturnedByIdLookup"].Long(), 1LL);
     ASSERT_APPROX_EQUAL(result["idLookupSuccessRate"].Double(), 1.0 / 3.0, 1e-9);
+}
+
+TEST(CurOpTest, ExecutionTimeMicrosPreservesSubMillisecondPrecision) {
+    // Use a 1-tick-per-microsecond source so the tick value equals the microsecond count.
+    auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
+    // CurOp treats tick value 0 as "not started", so advance past it first.
+    tickSourceMock->advance(Microseconds{1});
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto* curop = CurOp::get(*opCtx);
+    curop->setTickSource_forTest(tickSourceMock.get());
+
+    curop->ensureStarted();
+
+    // Advance by 500 µs — deliberately not a round millisecond multiple — to prove the value
+    // is stored at microsecond precision rather than rounded to the nearest millisecond.
+    constexpr Microseconds kElapsed{500};
+    tickSourceMock->advance(kElapsed);
+
+    curop->done();
+
+    ASSERT_EQ(curop->elapsedTimeTotal(), kElapsed);
+
+    // Verify round-trip through AdditiveMetrics BSON output.
+    OpDebug::AdditiveMetrics metrics;
+    metrics.executionTime = kElapsed;
+    BSONObj bson = metrics.reportBSON();
+
+    // "durationMicros" should be the exact microsecond count, not just millis * 1,000.
+    ASSERT_EQ(bson["durationMicros"].safeNumberLong(), durationCount<Microseconds>(kElapsed));
+    // "durationMillis" should be 0 because kElapsed < 1 ms.
+    ASSERT_EQ(bson["durationMillis"].safeNumberLong(), 0LL);
+    // The microsecond value must not be a round multiple of 1,000 (which would indicate it was
+    // derived from a millisecond value rather than stored directly).
+    ASSERT_NE(bson["durationMicros"].safeNumberLong() % 1'000, 0LL);
 }
 
 }  // namespace

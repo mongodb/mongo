@@ -38,6 +38,16 @@ let executionStages = explainResult.executionStats.executionStages;
 assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
 verifyStages(executionStages, false);
 
+// Verify that executionStats has both executionTimeMillis and executionTimeMicros, and that
+// the microsecond value is at least as large as millis * 1000.
+assert(explainResult.executionStats.hasOwnProperty("executionTimeMillis"), explainResult.executionStats);
+assert(explainResult.executionStats.hasOwnProperty("executionTimeMicros"), explainResult.executionStats);
+assert.gte(
+    explainResult.executionStats.executionTimeMicros,
+    explainResult.executionStats.executionTimeMillis * 1000,
+    explainResult.executionStats,
+);
+
 // Test explain on aggregate command.
 const pipeline = [{$match: {x: {$gt: 500}}}, {$addFields: {xx: {$add: ["$x", "$y"]}}}];
 // Run an explain command when the "executionTimeMicros"/"executionTimeNanos" should be omitted.

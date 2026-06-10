@@ -68,6 +68,8 @@ if (isLinux()) {
     assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
 }
 assert(profileObj.hasOwnProperty("millis"), profileObj);
+assert(profileObj.hasOwnProperty("micros"), profileObj);
+assert.gte(profileObj.micros, profileObj.millis * 1000, profileObj);
 assert(profileObj.hasOwnProperty("numYield"), profileObj);
 assert(profileObj.hasOwnProperty("locks"), profileObj);
 assert(profileObj.locks.hasOwnProperty("Global"), profileObj);

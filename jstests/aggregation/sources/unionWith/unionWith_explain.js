@@ -27,6 +27,7 @@ for (let i = 0; i < docsPerColl; i++) {
 
 const executionStatsIgnoredFields = [
     "executionTimeMillis",
+    "executionTimeMicros",
     "executionTimeMillisEstimate",
     "saveState",
     "restoreState",
