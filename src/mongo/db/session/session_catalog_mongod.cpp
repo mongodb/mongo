@@ -149,7 +149,16 @@ void killSessionTokens(OperationContext* opCtx,
         [service = opCtx->getServiceContext(),
          ti,
          sessionKillTokens = std::move(sessionKillTokens)](auto status) mutable {
-            invariant(status);
+            if (!status.isOK()) {
+                if (ErrorCodes::isCancellationError(status)) {
+                    LOGV2_DEBUG(10580200,
+                                3,
+                                "Not killing sessions because task scheduling was cancelled",
+                                "status"_attr = status);
+                    return;
+                }
+                invariant(status);
+            }
 
             // TODO(SERVER-111754): Please revisit if this thread could be made killable.
             ThreadClient tc(
