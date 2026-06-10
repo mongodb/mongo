@@ -645,7 +645,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     shardRegistry->reload(opCtx);
     tassert(9870600,
             "Shard not found in ShardRegistry after committing addShard",
-            shardRegistry->getShard(opCtx, shardType.getName()).isOK());
+            shardRegistry->getShard(opCtx, ShardRef(shardType.getName())).isOK());
 
     topology_change_helpers::hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);
 

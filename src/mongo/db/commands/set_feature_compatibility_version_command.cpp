@@ -334,7 +334,7 @@ void generateShardUUIDs(OperationContext* opCtx) {
         entry.setMulti(false);
         updateOp.setUpdates({entry});
         updateOp.setWriteConcern(defaultMajorityWriteConcern());
-        requests.emplace_back(shardType.getName(), updateOp.toBSON());
+        requests.emplace_back(ShardRef(shardType.getName()), updateOp.toBSON());
     }
 
     if (requests.empty()) {
@@ -379,7 +379,7 @@ void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
         if (!shardStatus.isOK()) {
             continue;
         }

@@ -139,7 +139,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
 
         if (chunk.size() == 1) {
             const auto shard =
-                uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
+                uassertStatusOK(shardRegistry->getShard(opCtx, ShardRef(shardEntry.getName())));
 
             // This is a best-effort attempt to refresh the shard 'shardEntry'. Fire and forget an
             // asynchronous '_flushRoutingTableCacheUpdates' request.

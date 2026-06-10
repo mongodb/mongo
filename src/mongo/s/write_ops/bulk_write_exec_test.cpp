@@ -2002,38 +2002,40 @@ protected:
     // And so that targeting for an unordered bulkWrite would take one round:
     // - 2 child batches, one targeting shard1 with the writes to nss1 and one targeting shard2 with
     // the writes to nss2.
-    static const inline ShardId kShardId1 = ShardId("shard1");
-    static const inline ShardId kShardId2 = ShardId("shard2");
+    static const inline ShardHandle kShardHandle1 =
+        ShardHandle(ShardId("shard1"), boost::make_optional(UUID::gen()));
+    static const inline ShardHandle kShardHandle2 =
+        ShardHandle(ShardId("shard2"), boost::make_optional(UUID::gen()));
     static const inline NamespaceString kNss1 =
         NamespaceString::createNamespaceString_forTest("foo.bar");
     static const inline NamespaceString kNss2 =
         NamespaceString::createNamespaceString_forTest("bar.foo");
-    static const inline ShardEndpoint kEndpoint1 =
-        ShardEndpoint(kShardId1, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
-    static const inline ShardEndpoint kEndpoint2 =
-        ShardEndpoint(kShardId2, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+    static const inline ShardEndpoint kEndpoint1 = ShardEndpoint(
+        kShardHandle1.name(), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+    static const inline ShardEndpoint kEndpoint2 = ShardEndpoint(
+        kShardHandle2.name(), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
 
     // Various mock error responses used for testing.
     static const inline AsyncRequestsSender::Response kCallbackCanceledResponse =
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(ErrorCodes::CallbackCanceled,
                                                         "simulating callback canceled"),
             boost::none};
     static const inline AsyncRequestsSender::Response kNetworkErrorResponse =
-        AsyncRequestsSender::Response{kShardId1,
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           ErrorCodes::NetworkTimeout, "simulating network error"),
                                       boost::none};
     static const inline AsyncRequestsSender::Response kInterruptedErrorResponse =
-        AsyncRequestsSender::Response{kShardId1,
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           ErrorCodes::Interrupted, "simulating interruption"),
                                       boost::none};
 
     static const inline AsyncRequestsSender::Response kRemoteInterruptedResponse =
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
@@ -2047,7 +2049,7 @@ protected:
     static const inline int kCustomErrorCode = 8017400;
     static const inline AsyncRequestsSender::Response kCustomRemoteTransientErrorResponse =
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     [] {
@@ -2067,7 +2069,7 @@ protected:
         // illustrate the expected state after targeting.
         if (ordered) {
             ASSERT_EQUALS(targeted.size(), 1);
-            ASSERT_EQUALS(targeted[kShardId1]->getWrites().size(), 2u);
+            ASSERT_EQUALS(targeted[kShardHandle1.name()]->getWrites().size(), 2u);
             // We should have targeted only the first 2 writes.
             ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
             ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
@@ -2075,8 +2077,8 @@ protected:
             ASSERT_EQ(op.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
         } else {
             ASSERT_EQUALS(targeted.size(), 2);
-            ASSERT_EQUALS(targeted[kShardId1]->getWrites().size(), 2u);
-            ASSERT_EQUALS(targeted[kShardId2]->getWrites().size(), 2u);
+            ASSERT_EQUALS(targeted[kShardHandle1.name()]->getWrites().size(), 2u);
+            ASSERT_EQUALS(targeted[kShardHandle2.name()]->getWrites().size(), 2u);
             // We should have targeted all the writes.
             ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
             ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
@@ -2096,7 +2098,8 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalShutdownError) {
     // Simulate a shutdown error.
     auto shutdownStatus = StatusWith<executor::RemoteCommandResponse>(
         ErrorCodes::ShutdownInProgress, "simulating shutdown");
-    auto shutdownResponse = AsyncRequestsSender::Response{kShardId1, shutdownStatus, boost::none};
+    auto shutdownResponse =
+        AsyncRequestsSender::Response{kShardHandle1.name(), shutdownStatus, boost::none};
     ASSERT_THROWS_CODE(
         bulkWriteOp.processLocalChildBatchError(*targeted.begin()->second, shutdownResponse),
         DBException,
@@ -2193,7 +2196,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNetworkErrorOrdered) {
     auto targeted = targetOp(bulkWriteOp, true);
 
     // Simulate a network error.
-    bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse);
+    bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()], kNetworkErrorResponse);
 
     // For ordered writes, we will treat the batch error as a failure of the first write in the
     // batch. The other write in the batch should have been re-set to ready.
@@ -2223,7 +2226,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNetworkErrorUnordered) {
     auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 
     // Simulate a network error.
-    bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse);
+    bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()], kNetworkErrorResponse);
 
     // For unordered writes, we will treat the batch error as a failure of all the writes in the
     // batch.
@@ -2238,7 +2241,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNetworkErrorUnordered) {
 
     // Simulate successful response to the second batch.
     auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {});
-    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle2.name()], reply, boost::none);
 
     // We should now be finished.
     ASSERT(bulkWriteOp.isFinished());
@@ -2272,10 +2275,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalTransientTransactionErrorInTxnOrdere
 
     // Simulate a network error (which is a transient transaction error.)
     // We expect the error to be raised as a top-level error.
-    ASSERT_THROWS_CODE(
-        bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse),
-        DBException,
-        ErrorCodes::NetworkTimeout);
+    ASSERT_THROWS_CODE(bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()],
+                                                               kNetworkErrorResponse),
+                       DBException,
+                       ErrorCodes::NetworkTimeout);
 
     // In practice, we expect the thrown error to propagate up past the scope where the op is
     // created. But to be thorough the assertions below check that our bookkeeping when
@@ -2305,7 +2308,8 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnOrd
     auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 
     // Simulate an interruption error (which is not a TransientTransactionError.)
-    bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
+    bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()],
+                                            kInterruptedErrorResponse);
 
     // For ordered writes, we will treat the batch error as a failure of the first write in the
     // batch. The other write in the batch should have been re-set to ready.
@@ -2345,10 +2349,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalTransientTransactionErrorInTxnUnorde
 
         // Simulate a network error (which is a transient transaction error.)
         // We expect the error to be raised as a top-level error.
-        ASSERT_THROWS_CODE(
-            bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse),
-            DBException,
-            ErrorCodes::NetworkTimeout);
+        ASSERT_THROWS_CODE(bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()],
+                                                                   kNetworkErrorResponse),
+                           DBException,
+                           ErrorCodes::NetworkTimeout);
 
         // In practice, we expect the thrown error to propagate up past the scope where the op is
         // created. But to be thorough the assertions below check that our bookkeeping when
@@ -2375,14 +2379,14 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalTransientTransactionErrorInTxnUnorde
 
         // Simulate successful response to second batch.
         auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {});
-        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle2.name()], reply, boost::none);
 
         // Simulate a network error (which is a transient transaction error.)
         // We expect the error to be raised as a top-level error.
-        ASSERT_THROWS_CODE(
-            bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse),
-            DBException,
-            ErrorCodes::NetworkTimeout);
+        ASSERT_THROWS_CODE(bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()],
+                                                                   kNetworkErrorResponse),
+                           DBException,
+                           ErrorCodes::NetworkTimeout);
 
         // In practice, we expect the thrown error to propagate up past the scope where the op is
         // created. But to be thorough the assertions below check that our bookkeeping when
@@ -2417,7 +2421,8 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
         auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 
         // Simulate an interruption error (which is not a TransientTransactionError.)
-        bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
+        bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()],
+                                                kInterruptedErrorResponse);
 
         // For unordered writes in a transaction, we will treat the batch error as a failure of the
         // first write in the batch. The other write in the batch should have been re-set to ready.
@@ -2450,10 +2455,11 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
 
         // Simulate successful response to second batch.
         auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {});
-        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle2.name()], reply, boost::none);
 
         // Simulate an interruption error (which is not a TransientTransactionError.)
-        bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
+        bulkWriteOp.processLocalChildBatchError(*targeted[kShardHandle1.name()],
+                                                kInterruptedErrorResponse);
 
         // For unordered writes in a transaction, we will treat the batch error as a failure of the
         // first write in the batch. The other write in the batch should have been re-set to ready.
@@ -2488,10 +2494,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, ErrorsOnlyErrorThenSuccess) {
     // Simulate successful response with 1 error and 1 success.
     auto status = Status(ErrorCodes::Interrupted, "interrupted");
     auto reply = makeBWCommandReply({BulkWriteReplyItem(0, status)}, {});
-    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId1], reply, boost::none);
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle1.name()], reply, boost::none);
 
     reply = makeBWCommandReply({BulkWriteReplyItem(1, status)}, {});
-    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle2.name()], reply, boost::none);
 
     // We should now be finished.
     ASSERT(bulkWriteOp.isFinished());
@@ -2512,7 +2518,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorOrdered) {
 
     // Simulate receiving an interrupted error from a shard.
     bulkWriteOp.processChildBatchResponseFromRemote(
-        *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+        *targeted[kShardHandle1.name()], kRemoteInterruptedResponse, boost::none);
 
     // For ordered writes, we will treat the batch error as a failure of the first write in the
     // batch. The other write in the batch should have been re-set to ready.
@@ -2543,7 +2549,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorUnordered) {
 
     // Simulate receiving an interrupted error from a shard.
     bulkWriteOp.processChildBatchResponseFromRemote(
-        *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+        *targeted[kShardHandle1.name()], kRemoteInterruptedResponse, boost::none);
 
     // For unordered writes, we will treat the batch error as a failure of all the writes in the
     // batch.
@@ -2558,7 +2564,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorUnordered) {
 
     // Simulate successful response to the second batch.
     auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {});
-    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle2.name()], reply, boost::none);
 
     // We should now be finished.
     ASSERT(bulkWriteOp.isFinished());
@@ -2593,7 +2599,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnOr
 
     // Simulate a remote interrupted error (which is not a transient txn error).
     bulkWriteOp.processChildBatchResponseFromRemote(
-        *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+        *targeted[kShardHandle1.name()], kRemoteInterruptedResponse, boost::none);
 
     // For ordered writes, we will treat the batch error as a failure of the first write in the
     // batch. The other write in the batch should have been re-set to ready.
@@ -2633,7 +2639,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, WouldChangeOwningShardInTxn) {
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
 
     ASSERT_EQUALS(targeted.size(), 1);
-    ASSERT_EQUALS(targeted[kShardId1]->getWrites().size(), 1);
+    ASSERT_EQUALS(targeted[kShardHandle1.name()]->getWrites().size(), 1);
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
 
     auto wcosInfo = WouldChangeOwningShardInfo(
@@ -2646,14 +2652,14 @@ TEST_F(BulkWriteOpChildBatchErrorTest, WouldChangeOwningShardInTxn) {
     wcosInfo = wcosInfo.addFields(errInfo);
 
     AsyncRequestsSender::Response wcosResponse = AsyncRequestsSender::Response{
-        kShardId1,
+        kShardHandle1.name(),
         StatusWith<executor::RemoteCommandResponse>(
             executor::RemoteCommandResponse::make_forTest(wcosInfo, Microseconds(0))),
         boost::none};
 
     // Simulate a WouldChangeOwningShardError.
     bulkWriteOp.processChildBatchResponseFromRemote(
-        *targeted[kShardId1], wcosResponse, boost::none);
+        *targeted[kShardHandle1.name()], wcosResponse, boost::none);
 
     // The command should be considered finished.
     ASSERT(bulkWriteOp.isFinished());
@@ -2687,10 +2693,11 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorInTxnOrder
 
     // Simulate a custom remote error that has the TransientTransactionError label attached.
     // We expect the error to be raised as a top-level error.
-    ASSERT_THROWS_CODE(bulkWriteOp.processChildBatchResponseFromRemote(
-                           *targeted[kShardId1], kCustomRemoteTransientErrorResponse, boost::none),
-                       DBException,
-                       kCustomErrorCode);
+    ASSERT_THROWS_CODE(
+        bulkWriteOp.processChildBatchResponseFromRemote(
+            *targeted[kShardHandle1.name()], kCustomRemoteTransientErrorResponse, boost::none),
+        DBException,
+        kCustomErrorCode);
 
     // In practice, we expect the thrown error to propagate up past the scope where the op is
     // created. But to be thorough the assertions below check that our bookkeeping when
@@ -2725,7 +2732,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
 
         // Simulate a remote interrupted error (which is not a transient txn error).
         bulkWriteOp.processChildBatchResponseFromRemote(
-            *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+            *targeted[kShardHandle1.name()], kRemoteInterruptedResponse, boost::none);
 
         // For unordered writes in a transaction, we will treat the batch error as a failure of the
         // first write in the batch. The other write in the batch should have been re-set to ready.
@@ -2756,11 +2763,11 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
 
         // Simulate successful response to second batch.
         auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {});
-        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle2.name()], reply, boost::none);
 
         // Simulate a remote interrupted error (which is not a transient txn error).
         bulkWriteOp.processChildBatchResponseFromRemote(
-            *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+            *targeted[kShardHandle1.name()], kRemoteInterruptedResponse, boost::none);
 
         // For unordered writes in a transaction, we will treat the batch error as a failure of the
         // first write in the batch. The other write in the batch should have been re-set to ready.
@@ -2802,7 +2809,7 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorUnordered)
         // We expect the error to be raised as a top-level error.
         ASSERT_THROWS_CODE(
             bulkWriteOp.processChildBatchResponseFromRemote(
-                *targeted[kShardId1], kCustomRemoteTransientErrorResponse, boost::none),
+                *targeted[kShardHandle1.name()], kCustomRemoteTransientErrorResponse, boost::none),
             DBException,
             kCustomErrorCode);
 
@@ -2830,13 +2837,13 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorUnordered)
 
         // Simulate successful response to second batch.
         auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {});
-        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardHandle2.name()], reply, boost::none);
 
         // Simulate a custom remote error that has the TransientTransactionError label attached.
         // We expect the error to be raised as a top-level error.
         ASSERT_THROWS_CODE(
             bulkWriteOp.processChildBatchResponseFromRemote(
-                *targeted[kShardId1], kCustomRemoteTransientErrorResponse, boost::none),
+                *targeted[kShardHandle1.name()], kCustomRemoteTransientErrorResponse, boost::none),
             DBException,
             kCustomErrorCode);
 
@@ -3096,18 +3103,21 @@ protected:
     OperationContext* _opCtx;
     std::vector<std::unique_ptr<NSTargeter>> targeters;
 
-    static const inline ShardId kShardId1 = ShardId("shard1");
-    static const inline ShardId kShardId2 = ShardId("shard2");
-    static const inline ShardId kShardId3 = ShardId("shard3");
+    static const inline ShardHandle kShardHandle1 =
+        ShardHandle(ShardId("shard1"), boost::make_optional(UUID::gen()));
+    static const inline ShardHandle kShardHandle2 =
+        ShardHandle(ShardId("shard2"), boost::make_optional(UUID::gen()));
+    static const inline ShardHandle kShardHandle3 =
+        ShardHandle(ShardId("shard3"), boost::make_optional(UUID::gen()));
     static const inline NamespaceString kNss1 =
         NamespaceString::createNamespaceString_forTest("foo.bar");
 
-    static const inline ShardEndpoint kEndpoint1 =
-        ShardEndpoint(kShardId1, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
-    static const inline ShardEndpoint kEndpoint2 =
-        ShardEndpoint(kShardId2, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
-    static const inline ShardEndpoint kEndpoint3 =
-        ShardEndpoint(kShardId3, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+    static const inline ShardEndpoint kEndpoint1 = ShardEndpoint(
+        kShardHandle1.name(), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+    static const inline ShardEndpoint kEndpoint2 = ShardEndpoint(
+        kShardHandle2.name(), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+    static const inline ShardEndpoint kEndpoint3 = ShardEndpoint(
+        kShardHandle3.name(), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
 
     static const inline BulkWriteCommandRequest request = BulkWriteCommandRequest(
         {
@@ -3404,7 +3414,7 @@ protected:
                             StaleConfigInfo(kNss1,
                                             ShardVersionFactory::make(ChunkVersion::IGNORED()),
                                             boost::none,
-                                            kShardId3),
+                                            kShardHandle3.name()),
                             "Mock error: shard version mismatch"});
                         return reply;
                     }()},
@@ -3434,7 +3444,7 @@ protected:
                             StaleConfigInfo(kNss1,
                                             ShardVersionFactory::make(ChunkVersion::IGNORED()),
                                             boost::none,
-                                            kShardId3),
+                                            kShardHandle3.name()),
                             "Mock error: shard version mismatch"});
                         replyItems.emplace_back(reply);
                         replyItems.emplace_back(reply);
@@ -3478,9 +3488,9 @@ protected:
         ASSERT_EQ(op.getWriteOp_forTest(0).getWriteType(), WriteType::WithoutShardKeyWithId);
 
         ASSERT_EQ(batches.size(), 3);
-        ASSERT_EQ(batches[kShardId1]->getWrites().size(), n);
-        ASSERT_EQ(batches[kShardId2]->getWrites().size(), n);
-        ASSERT_EQ(batches[kShardId3]->getWrites().size(), n);
+        ASSERT_EQ(batches[kShardHandle1.name()]->getWrites().size(), n);
+        ASSERT_EQ(batches[kShardHandle2.name()]->getWrites().size(), n);
+        ASSERT_EQ(batches[kShardHandle3.name()]->getWrites().size(), n);
         ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
     }
 };
@@ -3494,8 +3504,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatch) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -3515,8 +3525,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatch) {
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -3533,8 +3543,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatch) {
 
     // Simulate ok:1 n:0 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
-        AsyncRequestsSender::Response{kShardId3,
+        *targeted[kShardHandle3.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle3.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -3563,9 +3573,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchBatched) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -3592,9 +3602,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchBatched) {
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -3617,9 +3627,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchBatched) {
 
     // Simulate ok:1 n:0 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -3654,9 +3664,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyMode) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(kBulkWriteNoMatchResponseErrorsOnly,
                                                               Microseconds(0))),
@@ -3676,9 +3686,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyMode) {
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(kBulkWriteNoMatchResponseErrorsOnly,
                                                               Microseconds(0))),
@@ -3695,9 +3705,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyMode) {
 
     // Simulate ok:1 n:0 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(kBulkWriteNoMatchResponseErrorsOnly,
                                                               Microseconds(0))),
@@ -3728,9 +3738,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyModeBatc
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseErrorsOnlyMultipleWriteOps, Microseconds(0))),
@@ -3756,9 +3766,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyModeBatc
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseErrorsOnlyMultipleWriteOps, Microseconds(0))),
@@ -3780,9 +3790,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyModeBatc
 
     // Simulate ok:1 n:0 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseErrorsOnlyMultipleWriteOps, Microseconds(0))),
@@ -3812,8 +3822,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatch) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -3833,8 +3843,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatch) {
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteUpdateMatchResponse, Microseconds(0))),
@@ -3869,9 +3879,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchBatched) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -3897,9 +3907,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchBatched) {
 
     // Simulate ok:1 n:0 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -3924,9 +3934,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchBatched) {
 
     // Simulate ok:1 n:2 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteUpdateMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -3976,9 +3986,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyMode)
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(kBulkWriteNoMatchResponseErrorsOnly,
                                                               Microseconds(0))),
@@ -3998,9 +4008,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyMode)
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteUpdateMatchResponseErrorsOnly, Microseconds(0))),
@@ -4033,9 +4043,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyModeB
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseErrorsOnlyMultipleWriteOps, Microseconds(0))),
@@ -4059,9 +4069,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyModeB
 
     // Simulate ok:1 n:0 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseErrorsOnlyMultipleWriteOps, Microseconds(0))),
@@ -4083,9 +4093,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyModeB
 
     // Simulate ok:1 n:2 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteUpdateMatchResponseErrorsOnlyMultipleWriteOps, Microseconds(0))),
@@ -4134,8 +4144,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDelete) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -4155,8 +4165,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDelete) {
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteDeleteMatchResponse, Microseconds(0))),
@@ -4192,9 +4202,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDeleteBatche
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4220,9 +4230,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDeleteBatche
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteDeleteMixedMatchResponseMultipleWriteOps1, Microseconds(0))),
@@ -4245,9 +4255,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDeleteBatche
 
     // Simulate ok:1 n:1 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteDeleteMixedMatchResponseMultipleWriteOps2, Microseconds(0))),
@@ -4292,8 +4302,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatch) {
 
     // Simulate ok:1 n:1 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteUpdateMatchResponse, Microseconds(0))),
@@ -4323,9 +4333,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
 
     // Simulate ok:1 n:1 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(kBulkWriteUpdateMatchResponseWithWCE,
                                                               Microseconds(0))),
@@ -4356,9 +4366,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCErrorBatche
 
     // Simulate ok:1 n:2 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteUpdateMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
@@ -4367,9 +4377,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCErrorBatche
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4378,9 +4388,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCErrorBatche
 
     // Simulate ok:1 n:0 response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4419,8 +4429,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableError) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -4440,8 +4450,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableError) {
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -4458,8 +4468,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableError) {
 
     // Simulate StaleConfig response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
-        AsyncRequestsSender::Response{kShardId3,
+        *targeted[kShardHandle3.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle3.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kStaleConfigReplyShard3, Microseconds(0))),
@@ -4491,9 +4501,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorBatched) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4519,9 +4529,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorBatched) {
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4545,9 +4555,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorBatched) {
 
     // Simulate StaleConfig response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kStaleConfigReplyShard3MultipleWriteOps, Microseconds(0))),
@@ -4577,8 +4587,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
 
     // Simulate ok:1 n:0 response with WCE from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponseWithWCE, Microseconds(0))),
@@ -4598,8 +4608,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
 
     // Simulate ok:1 n:0 response with WCE from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponseWithWCE, Microseconds(0))),
@@ -4616,8 +4626,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
 
     // Simulate StaleConfig response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
-        AsyncRequestsSender::Response{kShardId3,
+        *targeted[kShardHandle3.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle3.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kStaleConfigReplyShard3, Microseconds(0))),
@@ -4638,8 +4648,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
 
     // Simulate ok:1, n:1 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteUpdateMatchResponse, Microseconds(0))),
@@ -4673,9 +4683,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorB
 
     // Simulate ok:1 n:0 response with WCE from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
@@ -4700,9 +4710,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorB
 
     // Simulate ok:1 n:0 response with WCE from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
@@ -4723,9 +4733,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorB
     ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
     // Simulate StaleConfig response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kStaleConfigReplyShard3MultipleWriteOps, Microseconds(0))),
@@ -4747,9 +4757,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorB
 
     // Simulate ok:1, n:1 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteUpdateMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4757,9 +4767,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorB
         boost::none);
 
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4767,9 +4777,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorB
         boost::none);
 
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4810,9 +4820,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableErrorBatched) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4838,9 +4848,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableErrorBatched) {
     ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
 
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kStaleConfigReplyShard3MultipleWriteOps, Microseconds(0))),
@@ -4868,9 +4878,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableErrorBatched) {
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteUpdateMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -4898,8 +4908,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableError) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -4919,8 +4929,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableError) {
 
     // Simulate StaleConfig response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
-        AsyncRequestsSender::Response{kShardId3,
+        *targeted[kShardHandle3.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle3.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kStaleConfigReplyShard3, Microseconds(0))),
@@ -4941,8 +4951,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableError) {
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteUpdateMatchResponse, Microseconds(0))),
@@ -4970,8 +4980,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableError) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -4991,8 +5001,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableError) {
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -5009,9 +5019,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableError) {
 
     // Simulate a non-retryable error response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
@@ -5040,9 +5050,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorMatched)
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -5068,9 +5078,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorMatched)
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -5092,9 +5102,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorMatched)
 
     // Simulate a non-retryable error response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
@@ -5126,8 +5136,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponseWithWCE, Microseconds(0))),
@@ -5147,8 +5157,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponseWithWCE, Microseconds(0))),
@@ -5165,9 +5175,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
 
     // Simulate a non-retryable error response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
@@ -5201,9 +5211,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
@@ -5228,9 +5238,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
 
     // Simulate ok:1 n:0 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
@@ -5251,9 +5261,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
 
     // Simulate a non-retryable error response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
@@ -5289,9 +5299,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableErrorBatched) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
+        *targeted[kShardHandle1.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId1,
+            kShardHandle1.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -5317,9 +5327,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableErrorBatched) {
 
     // Simulate a non-retryable error response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
@@ -5344,9 +5354,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableErrorBatched) {
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
+        *targeted[kShardHandle2.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId2,
+            kShardHandle2.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     kBulkWriteUpdateMatchResponseMultipleWriteOps, Microseconds(0))),
@@ -5376,8 +5386,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableError) {
 
     // Simulate ok:1 n:0 response from shard1.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId1].get(),
-        AsyncRequestsSender::Response{kShardId1,
+        *targeted[kShardHandle1.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle1.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteNoMatchResponse, Microseconds(0))),
@@ -5396,9 +5406,9 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableError) {
 
     // Simulate a non-retryable error response from shard3.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId3].get(),
+        *targeted[kShardHandle3.name()].get(),
         AsyncRequestsSender::Response{
-            kShardId3,
+            kShardHandle3.name(),
             StatusWith<executor::RemoteCommandResponse>(
                 executor::RemoteCommandResponse::make_forTest(
                     ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
@@ -5416,8 +5426,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableError) {
 
     // Simulate ok:1 n:1 response from shard2.
     op.processChildBatchResponseFromRemote(
-        *targeted[kShardId2].get(),
-        AsyncRequestsSender::Response{kShardId2,
+        *targeted[kShardHandle2.name()].get(),
+        AsyncRequestsSender::Response{kShardHandle2.name(),
                                       StatusWith<executor::RemoteCommandResponse>(
                                           executor::RemoteCommandResponse::make_forTest(
                                               kBulkWriteUpdateMatchResponse, Microseconds(0))),
@@ -5443,6 +5453,8 @@ TEST_F(BulkWriteOpTest, SummaryFieldsAreMergedAcrossReplies) {
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("foo.baz");
     auto shardId1 = ShardId("shard1");
     auto shardId2 = ShardId("shard2");
+    auto shardHandle1 = ShardHandle(shardId1, boost::make_optional(UUID::gen()));
+    auto shardHandle2 = ShardHandle(shardId2, boost::make_optional(UUID::gen()));
     auto endpoint1 =
         ShardEndpoint(shardId1, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
     auto endpoint2 =
@@ -5486,7 +5498,7 @@ TEST_F(BulkWriteOpTest, SummaryFieldsAreMergedAcrossReplies) {
                       .toBSON()
                       .addFields(BSON("ok" << 1));
     auto response1 = AsyncRequestsSender::Response{
-        shardId1,
+        shardHandle1.name(),
         StatusWith<executor::RemoteCommandResponse>(
             executor::RemoteCommandResponse::make_forTest(reply1, Microseconds(0))),
         boost::none};
@@ -5505,7 +5517,7 @@ TEST_F(BulkWriteOpTest, SummaryFieldsAreMergedAcrossReplies) {
                       .toBSON()
                       .addFields(BSON("ok" << 1));
     auto response2 = AsyncRequestsSender::Response{
-        shardId2,
+        shardHandle2.name(),
         StatusWith<executor::RemoteCommandResponse>(
             executor::RemoteCommandResponse::make_forTest(reply2, Microseconds(0))),
         boost::none};
@@ -5525,6 +5537,8 @@ TEST_F(BulkWriteOpTest, SummaryFieldsAreMergedAcrossReplies) {
 TEST_F(BulkWriteOpTest, SuccessAndErrorsAreMerged) {
     ShardId shardIdA("shardA");
     ShardId shardIdB("shardB");
+    auto shardHandleA = ShardHandle(shardIdA, boost::make_optional(UUID::gen()));
+    auto shardHandleB = ShardHandle(shardIdB, boost::make_optional(UUID::gen()));
     NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpointA(
         shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
@@ -5566,7 +5580,7 @@ TEST_F(BulkWriteOpTest, SuccessAndErrorsAreMerged) {
             .toBSON()
             .addFields(BSON("ok" << 1));
     auto response1 = AsyncRequestsSender::Response{
-        shardIdA,
+        shardHandleA.name(),
         StatusWith<executor::RemoteCommandResponse>(
             executor::RemoteCommandResponse::make_forTest(reply1, Microseconds(0))),
         boost::none};
@@ -5587,7 +5601,7 @@ TEST_F(BulkWriteOpTest, SuccessAndErrorsAreMerged) {
                       .toBSON()
                       .addFields(BSON("ok" << 1));
     auto response2 = AsyncRequestsSender::Response{
-        shardIdB,
+        shardHandleB.name(),
         StatusWith<executor::RemoteCommandResponse>(
             executor::RemoteCommandResponse::make_forTest(reply2, Microseconds(0))),
         boost::none};

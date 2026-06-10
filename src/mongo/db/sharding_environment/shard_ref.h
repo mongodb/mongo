@@ -132,6 +132,17 @@ public:
         return !(*this < other);
     }
 
+    /**
+     * Hash function compatible with absl::Hash for absl::unordered_{map,set}
+     */
+    template <typename H>
+    friend H AbslHashValue(H h, const ShardRef& ref) {
+        if (ref.isString()) {
+            return H::combine(std::move(h), ref.getString());
+        }
+        return H::combine(std::move(h), ref.getUUID());
+    }
+
     static ShardRef parse(const BSONElement& element);
     void serialize(StringData fieldName, BSONObjBuilder* builder) const;
     void serialize(BSONArrayBuilder* builder) const;

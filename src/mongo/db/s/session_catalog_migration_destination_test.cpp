@@ -168,8 +168,8 @@ public:
         _migrationId = UUID::gen();
 
         {
-            auto donorShard = assertGet(
-                shardRegistry()->getShard(operationContext(), kDonorConnStr.getSetName()));
+            auto donorShard = assertGet(shardRegistry()->getShard(
+                operationContext(), ShardRef(kDonorConnStr.getSetName())));
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
                 ->setConnectionStringReturnValue(kDonorConnStr);
             RemoteCommandTargeterMock::get(donorShard->getTargeter())

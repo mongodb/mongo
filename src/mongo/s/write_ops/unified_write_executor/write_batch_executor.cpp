@@ -1105,7 +1105,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                           shardRequest.ops,
                                                           inTransaction,
                                                           std::move(arsResponse.shardHostAndPort),
-                                                          shardId);
+                                                          ShardId(shardId));
 
         const bool isShutdownError = shardResponse.isShutdownError();
 

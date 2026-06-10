@@ -135,7 +135,7 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
                 auto errorContext = fmt::format("Failed command {} for database '{}' on shard '{}'",
                                                 command.toString(),
                                                 dbName.toStringForErrorMsg(),
-                                                StringData{response.shardId});
+                                                StringData{ShardId(response.shardId)});
 
                 uassertStatusOKWithContext(response.swResponse.getStatus(), errorContext);
                 const auto& respBody = response.swResponse.getValue().data;

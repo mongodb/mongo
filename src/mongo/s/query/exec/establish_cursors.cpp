@@ -212,7 +212,7 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
         } else {
             BSONObjBuilder newCmd(remote.cmdObj);
             appendOpKey(_defaultOpKey, &newCmd);
-            requests.emplace_back(remote.shardId, newCmd.obj());
+            requests.emplace_back(remote.shardRef, newCmd.obj());
         }
     }
 

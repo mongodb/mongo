@@ -628,8 +628,8 @@ protected:
         _client.emplace(operationContext());
 
         {
-            auto donorShard = assertGet(
-                shardRegistry()->getShard(operationContext(), kDonorConnStr.getSetName()));
+            auto donorShard = assertGet(shardRegistry()->getShard(
+                operationContext(), ShardRef(kDonorConnStr.getSetName())));
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
                 ->setConnectionStringReturnValue(kDonorConnStr);
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
@@ -637,8 +637,8 @@ protected:
         }
 
         {
-            auto recipientShard = assertGet(
-                shardRegistry()->getShard(operationContext(), kRecipientConnStr.getSetName()));
+            auto recipientShard = assertGet(shardRegistry()->getShard(
+                operationContext(), ShardRef(kRecipientConnStr.getSetName())));
             RemoteCommandTargeterMock::get(recipientShard->getTargeter())
                 ->setConnectionStringReturnValue(kRecipientConnStr);
             RemoteCommandTargeterMock::get(recipientShard->getTargeter())

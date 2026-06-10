@@ -294,7 +294,7 @@ std::vector<RemoteCursor> establishShardCursors(
                 designatedHostsMap.empty());
         std::set<ShardId> shardIds;
         for (const auto& request : requests) {
-            shardIds.emplace(request.shardId);
+            shardIds.emplace(request.shardRef);
             tassert(
                 8133500,
                 str::stream() << "Expected same request for each shard when targeting every shard "
@@ -1069,12 +1069,12 @@ std::vector<AsyncRequestsSender::Request> buildShardRequests(
         std::vector<AsyncRequestsSender::Request> requestsWithResumeTokens;
         requestsWithResumeTokens.reserve(requests.size());
         for (const auto& request : requests) {
-            auto resumeTokenIt = resumeTokenMap.find(request.shardId);
+            auto resumeTokenIt = resumeTokenMap.find(request.shardRef);
             if (resumeTokenIt == resumeTokenMap.end()) {
                 requestsWithResumeTokens.emplace_back(request);
             } else {
                 requestsWithResumeTokens.emplace_back(
-                    request.shardId,
+                    request.shardRef,
                     request.cmdObj.addField(BSON(AggregateCommandRequest::kResumeAfterFieldName
                                                  << resumeTokenIt->second)
                                                 .firstElement()));

@@ -118,12 +118,13 @@ public:
                                                 ShardFactory* shardFactory);
 
     /**
-     * Returns the shard matching the given identifier, or nullptr if no such shard.
+     * Returns the shard matching the given ShardRef, or nullptr if no such shard.
      *
-     * If 'allowNonShardIdIdentifiers' is false, only shard ids are considered. If true, the
-     * identifier may also be a connection string or host and port.
+     * If shardRef holds a UUID, looks up the shard in the UUID index only. If shardRef holds a
+     * string, looks up first by shard name (ShardId). If 'allowNonShardIdIdentifiers' is true, the
+     * lookup will continue by connection string and host and port.
      */
-    std::shared_ptr<Shard> findShard(const ShardId& shardId,
+    std::shared_ptr<Shard> findShard(const ShardRef& shardRef,
                                      bool allowNonShardIdIdentifiers = false) const;
 
     /**
@@ -155,6 +156,11 @@ public:
 
 private:
     friend class ShardRegistryTest;
+
+    /**
+     * Returns the shard with the given shard uuid, or nullptr if no such shard.
+     */
+    std::shared_ptr<Shard> _findByShardUUID(const UUID& shardUUID) const;
 
     /**
      * Returns the shard with the given shard id, or nullptr if no such shard.
@@ -292,20 +298,20 @@ public:
     std::shared_ptr<Shard> getConfigShard() const;
 
     /**
-     * Returns a shared pointer to the shard object with the given identifier, or ShardNotFound
-     * error otherwise.
+     * Returns a shared pointer to the shard object matching the given ShardRef, or ShardNotFound
+     * otherwise.
      *
-     * If 'allowNonShardIdIdentifiers' is false, only shard ids are considered. If true, the
+     * If 'allowNonShardIdIdentifiers' is false, only shard uuid/ids are considered. If true, the
      * identifier may also be a connection string or host and port.
      *
      * May refresh the shard registry if there's no cached information about the shard.
      */
     StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* opCtx,
-                                                const ShardId& shardId,
+                                                const ShardRef& shardRef,
                                                 bool allowNonShardIdIdentifiers = false);
 
     SemiFuture<std::shared_ptr<Shard>> getShard(ExecutorPtr executor,
-                                                const ShardId& shardId,
+                                                const ShardRef& shardRef,
                                                 bool allowNonShardIdIdentifiers = false) noexcept;
 
     /**

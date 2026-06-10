@@ -163,7 +163,7 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
         opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
         if (!shardStatus.isOK()) {
             continue;
         }
@@ -228,7 +228,7 @@ void dropAuthoritativeShardCatalogCollectionsOnShards(OperationContext* opCtx) {
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardRef(shardType.getName()));
         if (shardStatus == ErrorCodes::ShardNotFound) {
             continue;
         }

@@ -295,7 +295,7 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
     auto future = launchAsync([&]() {
         auto response = msars.next();
         auto status = response.swResponse.getStatus();
-        ASSERT(response.shardId.isValid());
+        ASSERT(ShardId(response.shardId).isValid());
         pendingShardIds.erase(response.shardId);
         assertFailedToUnyieldError(status, ErrorCodes::LockTimeout);
     });
@@ -319,7 +319,7 @@ TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
         while (!msars.done()) {
             auto response = msars.next();
             auto status = response.swResponse.getStatus();
-            ASSERT(response.shardId.isValid());
+            ASSERT(ShardId(response.shardId).isValid());
             pendingShardIds.erase(response.shardId);
             assertFailedToUnyieldError(status, ErrorCodes::LockTimeout);
         }
