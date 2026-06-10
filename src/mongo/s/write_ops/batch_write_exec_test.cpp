@@ -4618,5 +4618,185 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShards) {
     ASSERT_EQ(*metrics0.nModified, 2);      // 1 + 1
 }
 
+TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForDelete) {
+    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsDelete", true);
+    auto& limiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    limiter.configureWindowBased(-1);
+
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setDeletes({write_ops::DeleteOpEntry(BSON("_id" << 0), false),
+                             write_ops::DeleteOpEntry(BSON("_id" << 1), false)});
+        return deleteOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, deleteRequest, &response, &stats);
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        BatchedCommandResponse batchedResponse;
+        batchedResponse.setStatus(Status::OK());
+        batchedResponse.setN(2);
+        batchedResponse.setQueryStatsMetrics(
+            {makeQueryStatsMetrics(0, 10, 5, 1), makeQueryStatsMetrics(1, 20, 15, 1)});
+        return batchedResponse.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(2, response.getN());
+
+    auto& opDebug = CurOp::get(operationContext())->debug();
+
+    ASSERT(opDebug.hasQueryStatsInfo(0));
+    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
+    ASSERT_EQ(*metrics0.keysExamined, 10);
+    ASSERT_EQ(*metrics0.docsExamined, 5);
+
+    ASSERT(opDebug.hasQueryStatsInfo(1));
+    const auto& metrics1 = opDebug.getAdditiveMetrics(1);
+    ASSERT_EQ(*metrics1.keysExamined, 20);
+    ASSERT_EQ(*metrics1.docsExamined, 15);
+}
+
+TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForDelete) {
+    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsDelete", true);
+    auto& limiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    limiter.configureWindowBased(-1);
+
+    const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
+
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        NSTargeter::TargetingResult targetDelete(OperationContext* opCtx,
+                                                 const BatchItemRef& itemRef) const override {
+            return std::vector{ShardEndpoint(kShardName1,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {100, 200})),
+                                             boost::none),
+                               ShardEndpoint(kShardName2,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {101, 200})),
+                                             boost::none)};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(
+             ShardEndpoint(kShardName1,
+                           ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {100, 200})),
+                           boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2,
+                           ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200})),
+                           boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
+
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setDeletes({write_ops::DeleteOpEntry(BSON("_id" << 0), false)});
+        return deleteOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, deleteRequest, &response, &stats);
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+        BatchedCommandResponse batchedResponse;
+        batchedResponse.setStatus(Status::OK());
+        batchedResponse.setN(1);
+        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(0, 10, 5, 1)});
+        return batchedResponse.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+        BatchedCommandResponse batchedResponse;
+        batchedResponse.setStatus(Status::OK());
+        batchedResponse.setN(1);
+        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(0, 15, 8, 1)});
+        return batchedResponse.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(2, response.getN());
+
+    auto& opDebug = CurOp::get(operationContext())->debug();
+    ASSERT(opDebug.hasQueryStatsInfo(0));
+    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
+    ASSERT_EQ(*metrics0.keysExamined, 25);  // 10 + 15
+    ASSERT_EQ(*metrics0.docsExamined, 13);  // 5 + 8
+}
+
+// Verifies that when featureFlagQueryStatsDelete is enabled, each outgoing delete op entry is
+// stamped with includeQueryStatsMetricsForOpIndex, instructing the shard to return per-op metrics.
+TEST_F(BatchWriteExecTest, QueryStatsMetricsFieldSetOnOutgoingDeleteRequest) {
+    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsDelete", true);
+    auto& limiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    limiter.configureWindowBased(-1);
+
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setDeletes({write_ops::DeleteOpEntry(BSON("_id" << 0), false),
+                             write_ops::DeleteOpEntry(BSON("_id" << 1), false)});
+        return deleteOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, deleteRequest, &response, &stats);
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        const auto opMsgRequest = static_cast<OpMsgRequest>(request);
+        const auto actualDelete(BatchedCommandRequest::parseDelete(opMsgRequest));
+        const auto& deletes = actualDelete.getDeleteRequest().getDeletes();
+
+        ASSERT_EQ(*deletes[0].getIncludeQueryStatsMetricsForOpIndex(), 0);
+        ASSERT_EQ(*deletes[1].getIncludeQueryStatsMetricsForOpIndex(), 1);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setN(2);
+        response.setQueryStatsMetrics(
+            {makeQueryStatsMetrics(0, 10, 5, 1), makeQueryStatsMetrics(1, 20, 15, 1)});
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+
+    auto& opDebug = CurOp::get(operationContext())->debug();
+    ASSERT(opDebug.hasQueryStatsInfo(0));
+    ASSERT_EQ(*opDebug.getAdditiveMetrics(0).keysExamined, 10);
+    ASSERT(opDebug.hasQueryStatsInfo(1));
+    ASSERT_EQ(*opDebug.getAdditiveMetrics(1).keysExamined, 20);
+}
+
 }  // namespace
 }  // namespace mongo
