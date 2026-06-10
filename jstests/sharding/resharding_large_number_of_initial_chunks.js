@@ -17,8 +17,10 @@ const st = new ShardingTest({
     config: 1,
     other: {
         configOptions: {
+            oplogSize: 128,
             setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */},
         },
+        rsOptions: {oplogSize: 128},
     },
 });
 
