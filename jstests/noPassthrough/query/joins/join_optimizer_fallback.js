@@ -228,6 +228,21 @@ runTestCaseIneligiblePipeline({
     expectedCount: 1,
 });
 
+// Regression test for tassert 11116400 "unexpected $match": a $limit before a $match prevents the
+// $match from being folded into the base collection's CanonicalQuery (it must run after the limit).
+// The $limit is still pushed down, leaving the $match as the first stage seen by the join-building
+// loop before any $lookup is absorbed. The optimizer must fall back gracefully rather than trip the
+// tripwire assertion.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$limit: 1},
+        {$match: {a: 1}},
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+});
+
 // Join opt should be applied to the prefix because it is eligible but
 // *not* the remaining pipeline because of the $sort in the suffix.
 runTestCaseIneligibleSuffix({

@@ -458,7 +458,10 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             }
 
         } else if (auto* match = dynamic_cast<DocumentSourceMatch*>(stage); match) {
-            tassert(11116400, "unexpected $match", !prefix->getSources().empty());
+            if (graph.numNodes() < 2) {
+                // Bail out if the leading $match can't be absorbed.
+                break;
+            }
 
             auto result = extractExprPredicates(pathResolver, match->getMatchExpression());
             bool canMatchBeEliminated = result.expressionIsFullyAbsorbed;

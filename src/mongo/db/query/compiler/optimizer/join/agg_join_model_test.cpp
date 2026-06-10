@@ -2358,5 +2358,32 @@ TEST_F(PipelineAnalyzerTest, ImplicitEdgeInferenceSelfEdgeSkipped) {
     ASSERT_EQ(joinGraph.numEdges(), 1);
 }
 
+TEST_F(PipelineAnalyzerTest, LeadingMatchAfterLimitPushdownBailsOut) {
+    // Regression test: a $limit before a $match prevents the $match from being folded into the
+    // base collection's CanonicalQuery (the $match runs *after* the limit, so it can't become a
+    // find-layer filter). The limit is still pushed down, leaving the $match as the first stage
+    // surfacing in the join-building loop -- before any $lookup has been absorbed. That $match
+    // can't encode a join predicate (there is no foreign node yet), so we must bail out
+    // gracefully rather than trip tassert 11116400.
+    const auto query = R"([
+        { $limit: 1 },
+        { $match: { x: 1 } },
+        {
+            $lookup: {
+                from: "B",
+                localField: "x",
+                foreignField: "y",
+                as: "joined"
+            }
+        },
+        { $unwind: "$joined" }
+    ])";
+
+    auto pipeline = makePipeline(query, {"B"});
+    markFieldsAsScalar(*pipeline, {"x"_sd}, {{"B", {"y"_sd}}});
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
 }  // namespace
 }  // namespace mongo::join_ordering
