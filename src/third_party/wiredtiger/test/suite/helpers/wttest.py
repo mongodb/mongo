@@ -36,6 +36,7 @@
 from __future__ import print_function
 
 import unittest
+import warnings
 
 from contextlib import contextmanager
 import errno, glob, os, re, shutil, sys, threading, time, traceback, types, shutil
@@ -1174,6 +1175,10 @@ def runsuite(suite, parallel):
         if not WiredTigerTestCase._globalSetup:
             WiredTigerTestCase.globalSetup({})
         WiredTigerTestCase._concurrent = True
+        # concurrencytest requests line buffering on its binary pipes, which results in a harmless warning.
+        warnings.filterwarnings(
+            "ignore", category=RuntimeWarning,
+            message="line buffering .* isn't supported in binary mode")
         suite_to_run = ConcurrentTestSuite(suite, fork_for_tests(parallel), wrap_result=wrap_result_for_tags)
     try:
         if WiredTigerTestCase._randomseed:

@@ -193,11 +193,7 @@ connection_reconfigure_disaggregated_configuration = [
         type='category', subconfig=connection_disaggregated_config_common),
 ]
 wiredtiger_open_page_delta_configuration = connection_page_delta_config
-connection_reconfigure_page_delta_configuration = [
-    Config('page_delta', '', r'''
-        configure page delta settings for this connection''',
-        type='category', subconfig=connection_page_delta_config_common),
-]
+connection_reconfigure_page_delta_configuration = connection_page_delta_config
 
 format_meta = common_meta + [
     Config('key_format', 'u', r'''

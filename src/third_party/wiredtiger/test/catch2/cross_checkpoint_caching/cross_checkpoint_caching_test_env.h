@@ -23,9 +23,9 @@ constexpr size_t CROSS_CHECKPOINT_CACHING_TEST_DATA_SIZE = WT_PAGE_HEADER_SIZE;
 
 /*
  * Stands up the minimum state needed to exercise the cross-checkpoint cache against a real
- * connection: a real cache (created by wiredtiger open), an initialized shared disk cache, a real
- * dhandle + btree obtained by creating a table and opening a cursor on it, and enough disaggregated
- * storage state to satisfy the assertion in destroy.
+ * connection: a real WT_CACHE (created by wiredtiger_open), an initialized shared dsk cache, a real
+ * dhandle + btree obtained by creating a table and opening a cursor on it, and enough of
+ * conn->disaggregated_storage to satisfy the disagg assertion in destroy.
  */
 class cross_checkpoint_caching_test_env {
 public:
@@ -41,8 +41,9 @@ public:
     WT_CONNECTION_STATS *stats();
     uint32_t btree_id();
 
-    /* Insert a fresh item at the given addr and return it (ref_count == 1). */
-    WT_SHARED_DSK_ITEM *put(const uint8_t *addr, size_t addr_size);
+    /* Insert an item at the given addr; on collision returns the existing entry with ref_count
+     * incremented rather than inserting a new one. */
+    WT_SHARED_DSK_ITEM *put(const uint8_t *addr, size_t addr_size, bool *insertedp = nullptr);
 
     /* Count the entries currently chained in the given bucket. */
     int bucket_size(u_int bucket);

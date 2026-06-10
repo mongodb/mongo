@@ -599,7 +599,7 @@ void testutil_deduce_build_dir(TEST_OPTS *opts);
 void testutil_delete_old_backups(int);
 void testutil_disagg_storage_configuration(
   TEST_OPTS *, const char *, char *, size_t, char *, size_t);
-void testutil_disagg_preserve(WT_CONNECTION *, const char *);
+void testutil_disagg_preserve(WT_CONNECTION *, const char *, uint64_t);
 
 bool testutil_exists(const char *, const char *);
 int testutil_general_event_handler(

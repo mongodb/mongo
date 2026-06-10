@@ -64,21 +64,34 @@ testutil_disagg_storage_configuration(TEST_OPTS *opts, const char *home, char *d
 
 /*
  * preserve_copy_uri --
- *     Copy a uri from one connection to another.
+ *     Copy a uri from one connection to another. If read_timestamp is not WT_TS_NONE, the source is
+ *     read as visible at that timestamp, so the snapshot matches the point where divergence was
+ *     detected; otherwise the latest committed values are copied.
  */
 static void
-preserve_copy_uri(
-  WT_SESSION *from_session, const char *from_uri, WT_SESSION *to_session, const char *to_uri)
+preserve_copy_uri(WT_SESSION *from_session, const char *from_uri, WT_SESSION *to_session,
+  const char *to_uri, uint64_t read_timestamp)
 {
     WT_CURSOR *from, *to;
     WT_DECL_RET;
     WT_ITEM key, value;
     char new_config[256];
+    bool txn_active;
+
+    txn_active = false;
+    if (read_timestamp != WT_TS_NONE) {
+        testutil_check(from_session->begin_transaction(from_session, NULL));
+        testutil_check(from_session->timestamp_transaction_uint(
+          from_session, WT_TS_TXN_TYPE_READ, read_timestamp));
+        txn_active = true;
+    }
 
     ret = from_session->open_cursor(from_session, from_uri, NULL, "raw", &from);
     if (ret == WT_NOTFOUND || ret == ENOENT) {
         fprintf(
           stderr, "%s: file not found during preserve: %s\n", from_uri, wiredtiger_strerror(ret));
+        if (txn_active)
+            testutil_check(from_session->rollback_transaction(from_session, NULL));
         return;
     }
     testutil_check(ret);
@@ -99,6 +112,9 @@ preserve_copy_uri(
     testutil_assert(ret == 0 || ret == WT_NOTFOUND);
     testutil_check(from->close(from));
     testutil_check(to->close(to));
+
+    if (txn_active)
+        testutil_check(from_session->rollback_transaction(from_session, NULL));
 }
 
 #define LAYERED_PREFIX "layered:"
@@ -107,20 +123,28 @@ preserve_copy_uri(
  * testutil_disagg_preserve --
  *     Save the components of disaggregated and layered tables to regular local tables. The ingest
  *     table, the stable table and the composite view of the layered table is saved, for layered
- *     tables found in the metadata. This is typically called after a failure has occurred.
+ *     tables found in the metadata. This is typically called after a failure has occurred. A
+ *     read_timestamp other than WT_TS_NONE snapshots the table contents as of that timestamp,
+ *     matching the read used when divergence was detected.
  */
 void
-testutil_disagg_preserve(WT_CONNECTION *conn, const char *subdir)
+testutil_disagg_preserve(WT_CONNECTION *conn, const char *subdir, uint64_t read_timestamp)
 {
     WT_CONNECTION *dest_conn;
     WT_CURSOR *metacur;
     WT_DECL_RET;
     WT_ITEM dest_dir, from_uri, to_uri;
-    WT_SESSION *session, *dest_session;
+    WT_SESSION *read_session, *session, *dest_session;
     const char *base, *home, *uri;
 
     home = conn->get_home(conn);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    /*
+     * The data copies read under a transaction so they can pin a read timestamp. Begin those
+     * transactions on a separate session: beginning a transaction on a session that still has the
+     * metadata cursor positioned trips an assertion in __wt_session_copy_values.
+     */
+    testutil_check(conn->open_session(conn, NULL, NULL, &read_session));
     WT_CLEAR(dest_dir);
     WT_CLEAR(from_uri);
     WT_CLEAR(to_uri);
@@ -132,8 +156,8 @@ testutil_disagg_preserve(WT_CONNECTION *conn, const char *subdir)
     testutil_check(wiredtiger_open((char *)dest_dir.data, NULL, "create", &dest_conn));
     testutil_check(dest_conn->open_session(dest_conn, NULL, NULL, &dest_session));
 
-    /* Copy the metadata file first. */
-    preserve_copy_uri(session, "metadata:", dest_session, "table:metadata.preserve");
+    /* Copy the metadata first. The metadata is not timestamped, so always read its latest state. */
+    preserve_copy_uri(session, "metadata:", dest_session, "table:metadata.preserve", WT_TS_NONE);
 
     /*
      * Now, for each layered table in the metadata, copy its layered component to a newly created
@@ -150,14 +174,16 @@ testutil_disagg_preserve(WT_CONNECTION *conn, const char *subdir)
             base = uri + strlen(LAYERED_PREFIX);
             testutil_format_item(&from_uri, "file:%s.wt_ingest", base);
             testutil_format_item(&to_uri, "table:%s.ingest_preserve", base);
-            preserve_copy_uri(session, (char *)from_uri.data, dest_session, (char *)to_uri.data);
+            preserve_copy_uri(read_session, (char *)from_uri.data, dest_session,
+              (char *)to_uri.data, read_timestamp);
 
             testutil_format_item(&from_uri, "file:%s.wt_stable", base);
             testutil_format_item(&to_uri, "table:%s.stable_preserve", base);
-            preserve_copy_uri(session, (char *)from_uri.data, dest_session, (char *)to_uri.data);
+            preserve_copy_uri(read_session, (char *)from_uri.data, dest_session,
+              (char *)to_uri.data, read_timestamp);
 
             testutil_format_item(&to_uri, "table:%s.layered_preserve", base);
-            preserve_copy_uri(session, uri, dest_session, (char *)to_uri.data);
+            preserve_copy_uri(read_session, uri, dest_session, (char *)to_uri.data, read_timestamp);
         }
     }
     testutil_assert(ret == WT_NOTFOUND);
@@ -166,6 +192,7 @@ testutil_disagg_preserve(WT_CONNECTION *conn, const char *subdir)
     free(dest_dir.mem);
     free(from_uri.mem);
     free(to_uri.mem);
+    testutil_check(read_session->close(read_session, NULL));
     testutil_check(session->close(session, NULL));
 
     /* Final checkpoint for destination and close everything. */

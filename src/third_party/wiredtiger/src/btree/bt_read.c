@@ -408,6 +408,8 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
     if (shared_dsk_cache->enabled && F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
         bool shared_dsk_inserted = false;
+
+        /* A cache hit takes the skip_disk_read path, so we can't already have an item here. */
         WT_ASSERT(session, shared_dsk_item == NULL);
         /* Disagg should never use mmap, so the image must be an owned allocation. */
         WT_ASSERT(session, FLD_ISSET(page_flags, WT_PAGE_DISK_ALLOC));

@@ -804,6 +804,7 @@ comparators
 comparep
 compat
 compilable
+concurrencytest
 cond
 conditionalize
 conf

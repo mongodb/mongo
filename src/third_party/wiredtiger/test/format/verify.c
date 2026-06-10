@@ -316,7 +316,7 @@ table_verify_mirror(
              */
             if (++failures == 1) {
                 if (g.disagg_storage_config && GV(DISAGG_PRESERVE))
-                    testutil_disagg_preserve(conn, "preserve");
+                    testutil_disagg_preserve(conn, "preserve", WT_TS_NONE);
                 testutil_snprintf(
                   tagbuf, sizeof(tagbuf), "mirror error: base cursor (table %u)", base->id);
                 cursor_dump_page(base_cursor, tagbuf);

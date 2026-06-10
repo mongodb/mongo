@@ -3199,8 +3199,21 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
                 if (page->disagg_info != NULL)
                     page->disagg_info->block_meta = *r->multi->block_meta;
                 WT_TIME_AGGREGATE_MERGE_OBSOLETE_VISIBLE(session, &stop_ta, &mod->mod_replace.ta);
-            } else
+            } else {
                 WT_ASSERT(session, F_ISSET(btree, WT_BTREE_DISAGGREGATED) && r->ref->addr != NULL);
+                WT_ASSERT(session, F_ISSET(r->multi, WT_MULTI_SKIP_WRITE));
+                /*
+                 * Skip-write with no cookie: the previous reconciliation reset rec_result to 0, so
+                 * no prior cookie was copied. Under scrub, carry the disk image forward so the page
+                 * is re-instantiated in cache rather than discarded ahead of the materialization
+                 * frontier.
+                 */
+                if (F_ISSET(r, WT_REC_SCRUB)) {
+                    mod->mod_disk_image = r->multi->disk_image;
+                    r->multi->disk_image = NULL;
+                } else
+                    WT_ASSERT(session, F_ISSET(r, WT_REC_CHECKPOINT));
+            }
         } else {
             __wt_checkpoint_tree_reconcile_update(session, &r->multi->addr.ta);
             WT_RET(

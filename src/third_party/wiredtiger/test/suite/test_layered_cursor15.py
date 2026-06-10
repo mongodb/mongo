@@ -202,7 +202,7 @@ class test_layered_cursor15(wttest.WiredTigerTestCase):
         ts = 100
         uri_sits = []
         for sit in sits:
-            uri = 'table:' + ''.join(sit)
+            uri = 'table:t' + ''.join(sit)
             self.session.create(uri, 'key_format=S,value_format=S,block_manager=disagg,type=layered')
             uri_sits.append((uri, sit))
 
