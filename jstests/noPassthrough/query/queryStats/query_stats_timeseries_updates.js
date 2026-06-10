@@ -124,7 +124,7 @@ function testMetaFieldUpdateRecordedOnMongos(testDB, coll, collName) {
         usedDisk: false,
         fromMultiPlanner: false,
         fromPlanCache: false,
-        writes: {nMatched: 2, nUpserted: 0, nModified: 2, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+        writes: {nMatched: 2, nUpserted: 0, nModified: 2, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
     });
     assertExpectedResults({
         results: entry,
@@ -292,6 +292,7 @@ describe("time-series query stats (sharded)", function () {
                     nDeleted: 0,
                     nInserted: 0,
                     nUpdateOps: 1,
+                    nDeleteOps: 0,
                 },
             });
         });

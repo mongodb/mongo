@@ -1543,6 +1543,7 @@ struct QueryStatsBSONParams {
     BSONObj nMatched = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj nModified = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj nUpdateOps = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj nDeleteOps = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj planningTimeMicros = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     CardinalityEstimationMethods cardinalityEstimationMethods;
     BSONObj nDocsSampled = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
@@ -1637,7 +1638,8 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
             .append("nModified", params.nModified)
             .append("nDeleted", emptyIntMetric)
             .append("nInserted", emptyIntMetric)
-            .append("nUpdateOps", params.nUpdateOps);
+            .append("nUpdateOps", params.nUpdateOps)
+            .append("nDeleteOps", params.nDeleteOps);
 
         testBuilder.append("writes", writeSection.obj());
     }
@@ -1707,6 +1709,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
             metrics->writesStats.nMatched.aggregate(1);
             metrics->writesStats.nModified.aggregate(1);
             metrics->writesStats.nUpdateOps.aggregate(1);
+            metrics->writesStats.nDeleteOps.aggregate(1);
         }
 
         // With some boolean and write metrics.
@@ -1724,6 +1727,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                     .nMatched = intMetricBson(1, 1, 1, 1),
                     .nModified = intMetricBson(1, 1, 1, 1),
                     .nUpdateOps = intMetricBson(1, 1, 1, 1),
+                    .nDeleteOps = intMetricBson(1, 1, 1, 1),
                     .peakTrackedMemBytes = intMetricBson(2048, 2048, 2048, 2048LL * 2048),
                     .clusterPeakTrackedMemBytes = intMetricBson(5000, 5000, 5000, 5000LL * 5000),
                 });
@@ -1782,7 +1786,6 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
                                      .includeCBRMetrics = true,
                                      .lastExecutionMicros = 100LL,
                                      .execCount = 1LL,
-                                     .nUpdateOps = intMetricBson(1, 1, 1, 1),
                                      .planningTimeMicros = intMetricBson(500, 500, 500, 250000),
                                      .cardinalityEstimationMethods = expectedCE,
                                      .nDocsSampled = intMetricBson(15, 15, 15, 225),

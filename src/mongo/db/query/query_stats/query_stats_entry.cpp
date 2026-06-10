@@ -165,6 +165,7 @@ void WritesEntry::toBSON(BSONObjBuilder& queryStatsBuilder) const {
     nDeleted.appendTo(writesBuilder, "nDeleted");
     nInserted.appendTo(writesBuilder, "nInserted");
     nUpdateOps.appendTo(writesBuilder, "nUpdateOps");
+    nDeleteOps.appendTo(writesBuilder, "nDeleteOps");
     queryStatsBuilder.append("writes", writesBuilder.obj());
 }
 }  // namespace mongo::query_stats

@@ -66,7 +66,7 @@ const updateSpec = {
             },
         ],
     }),
-    expectedWrites: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+    expectedWrites: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
     verifyShardMetrics: (metrics) => {
         assert.eq(metrics.nModified, 1);
         assert.eq(metrics.nMatched, 1);
@@ -85,7 +85,7 @@ const deleteSpec = {
         delete: collName,
         deletes: [{q: {v: 1}, limit: 0, includeQueryStatsMetricsForOpIndex: NumberInt(opIndex)}],
     }),
-    expectedWrites: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 8, nInserted: 0, nUpdateOps: 0},
+    expectedWrites: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 8, nInserted: 0, nUpdateOps: 0, nDeleteOps: 1},
     verifyShardMetrics: (metrics) => {
         assert.eq(metrics.nDeleted, 1);
     },

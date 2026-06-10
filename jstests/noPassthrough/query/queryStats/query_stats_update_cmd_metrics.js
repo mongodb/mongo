@@ -27,7 +27,7 @@ function testReplacementUpdate(testDB, coll, collName) {
         command: "update",
         keysExamined: 0,
         docsExamined: 1,
-        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
     });
 }
 
@@ -46,7 +46,7 @@ function testIdUpdate(testDB, coll, collName) {
         command: "update",
         keysExamined: 1,
         docsExamined: 1,
-        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
     });
     assert.commandWorked(coll.remove({_id: 999}));
 }
@@ -63,7 +63,7 @@ function testModifierUpdate(testDB, coll, collName) {
         command: "update",
         keysExamined: 0,
         docsExamined: 8,
-        writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+        writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
     });
 }
 
@@ -90,7 +90,7 @@ function testPipelineUpdate(testDB, coll, collName) {
         command: "update",
         keysExamined: 0,
         docsExamined: 8,
-        writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+        writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
     });
 }
 

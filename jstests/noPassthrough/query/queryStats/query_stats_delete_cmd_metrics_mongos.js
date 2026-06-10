@@ -36,6 +36,7 @@ runMongosWriteMetricsTests({
         nDeleted: n,
         nInserted: 0,
         nUpdateOps: 0,
+        nDeleteOps: 1,
     }),
     validateCmdFn: (result) => assert.eq(result.n, 1, result),
     getQueryStatsFn: getQueryStatsDeleteCmd,

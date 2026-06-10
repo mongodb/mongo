@@ -2277,6 +2277,7 @@ static SingleWriteResult performSingleDeleteOp(
     globalOpCounters().gotDelete();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
+    curOp.debug().getAdditiveMetrics().nDeleteOps = wholeOp.getDeletes().size();
     {
         std::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS(lk,

@@ -26,7 +26,7 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
         command: "insert",
         keysExamined: 0,
         docsExamined: 0,
-        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0},
+        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0, nDeleteOps: 0},
     });
 
     if (shardConn) {
@@ -40,7 +40,7 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
             usedDisk: false,
             fromMultiPlanner: false,
             fromPlanCache: false,
-            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0},
+            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0, nDeleteOps: 0},
         });
     }
 }
@@ -52,7 +52,7 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
         command: "insert",
         keysExamined: 0,
         docsExamined: 0,
-        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0},
+        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0, nDeleteOps: 0},
     });
 
     if (shardConn) {
@@ -66,7 +66,7 @@ function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
             usedDisk: false,
             fromMultiPlanner: false,
             fromPlanCache: false,
-            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0},
+            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0, nDeleteOps: 0},
         });
     }
 }

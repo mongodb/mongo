@@ -19,16 +19,28 @@ const collName = jsTestName();
  * @param {string} topologyName - Name of the topology (e.g. "Standalone", "Sharded")
  * @param {Function} setupFn - Returns {fixture, testDB}
  * @param {Function} teardownFn - Takes {fixture} and cleans up
+ * @param {Function} validateFn - Optional function to validate cluster setup. Called after data is inserted, takes {testDB, coll}
  */
-function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn) {
+function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn, validateFn = null) {
     describe(`query stats nUpdateOps metric (${topologyName})`, function () {
         let fixture;
         let testDB;
         let coll;
 
         function resetCollection() {
-            coll.drop();
-            assert.commandWorked(coll.insert([{v: 1}, {v: 2}, {v: 3}, {v: 4}, {v: 5}, {v: 6}, {v: 7}, {v: 8}]));
+            assert.commandWorked(coll.deleteMany({}));
+            assert.commandWorked(
+                coll.insertMany([
+                    {_id: -4, v: 1},
+                    {_id: -3, v: 2},
+                    {_id: -2, v: 3},
+                    {_id: -1, v: 4},
+                    {_id: 1, v: 5},
+                    {_id: 2, v: 6},
+                    {_id: 3, v: 7},
+                    {_id: 4, v: 8},
+                ]),
+            );
         }
 
         before(function () {
@@ -37,6 +49,9 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn) {
             testDB = setupRes.testDB;
             coll = testDB[collName];
             resetCollection();
+            if (validateFn) {
+                validateFn({testDB, coll});
+            }
         });
 
         after(function () {
@@ -203,8 +218,12 @@ runUpdateCmdMetricsTests(
             mongosOptions: {setParameter: {internalQueryStatsWriteCmdSampleRate: 1}},
         });
         const testDB = st.s.getDB("test");
-        st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
+        st.shardColl(testDB[collName], {_id: 1}, {_id: 1}, {_id: 1});
         return {fixture: st, testDB};
     },
-    (st) => st.stop(),
+    (fixture) => fixture.stop(),
+    ({testDB, coll}) => {
+        const stats = assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
+        assert.gte(Object.keys(stats.shards).length, 2, "Expected data on at least 2 shards", {shards: stats.shards});
+    },
 );

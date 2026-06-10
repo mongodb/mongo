@@ -196,6 +196,11 @@ struct WritesEntry {
      * Aggregates the total number of update operations in the update request.
      */
     AggregatedMetric<uint64_t> nUpdateOps;
+
+    /**
+     * Aggregates the total number of delete operations in the delete request.
+     */
+    AggregatedMetric<uint64_t> nDeleteOps;
 };
 
 /**

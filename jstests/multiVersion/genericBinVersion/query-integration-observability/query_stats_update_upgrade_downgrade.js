@@ -86,7 +86,7 @@ function assertUpdateQueryStatsMetrics(entry) {
         usedDisk: false,
         fromMultiPlanner: false,
         fromPlanCache: false,
-        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+        writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1, nDeleteOps: 0},
     });
     assertExpectedResults({
         results: entry,

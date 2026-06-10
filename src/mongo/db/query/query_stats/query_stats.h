@@ -267,6 +267,7 @@ struct QueryStatsSnapshot {
     uint64_t nDeleted;
     uint64_t nInserted;
     uint64_t nUpdateOps;
+    uint64_t nDeleteOps;
 
     int64_t totalTimeQueuedMicros;
     uint64_t totalAdmissions;

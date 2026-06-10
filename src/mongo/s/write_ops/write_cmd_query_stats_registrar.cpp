@@ -405,6 +405,11 @@ void WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* opCt
                     parseAndRegisterDeleteOp(
                         opCtx, opRef.getNss(), opIndex, opRef.getDeleteOp(), skipRegistration);
                 }
+                // Record the batch size for any registered delete ops.
+                opDebug.forEachQueryStatsInfoForBatchWrites(
+                    [nOps](size_t, OpDebug::QueryStatsInfo& info) {
+                        info.additiveMetrics.nDeleteOps = nOps;
+                    });
                 break;
             default:
                 MONGO_UNREACHABLE;

@@ -23,8 +23,9 @@ const collName = jsTestName();
  * @param {string} topologyName - Name of the topology (e.g. "Standalone", "Sharded")
  * @param {Function} setupFn - Returns {fixture, testDB}
  * @param {Function} teardownFn - Takes {fixture} and cleans up
+ * @param {Function} validateFn - Optional function to validate cluster setup. Called after data is inserted, takes {testDB, coll}
  */
-function runInsertKeyTests(topologyName, setupFn, teardownFn) {
+function runInsertKeyTests(topologyName, setupFn, teardownFn, validateFn = null) {
     describe(`query stats insert key (${topologyName})`, function () {
         let fixture;
         let testDB;
@@ -35,6 +36,9 @@ function runInsertKeyTests(topologyName, setupFn, teardownFn) {
             fixture = setupRes.fixture;
             testDB = setupRes.testDB;
             coll = testDB[collName];
+            if (validateFn) {
+                validateFn({testDB, coll});
+            }
         });
 
         after(function () {
@@ -44,7 +48,7 @@ function runInsertKeyTests(topologyName, setupFn, teardownFn) {
         });
 
         beforeEach(function () {
-            coll.drop();
+            assert.commandWorked(coll.deleteMany({}));
             resetQueryStatsStore(testDB.getMongo(), "1MB");
         });
 
@@ -153,8 +157,12 @@ runInsertKeyTests(
             },
         });
         const testDB = st.s.getDB("test");
-        st.shardColl(testDB[collName], {_id: 1}, {_id: 0});
+        st.shardColl(testDB[collName], {_id: 1}, {_id: 1}, {_id: 1});
         return {fixture: st, testDB};
     },
     (st) => st.stop(),
+    ({testDB, coll}) => {
+        const stats = assert.commandWorked(testDB.runCommand({collStats: coll.getName()}));
+        assert.gte(Object.keys(stats.shards).length, 2, "Expected chunks on at least 2 shards", {shards: stats.shards});
+    },
 );

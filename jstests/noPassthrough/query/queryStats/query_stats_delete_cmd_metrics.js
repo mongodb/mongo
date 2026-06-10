@@ -24,7 +24,7 @@ function testSingleDelete(testDB, coll, collName) {
         command: "delete",
         keysExamined: 0,
         docsExamined: 1,
-        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 1, nInserted: 0, nUpdateOps: 0},
+        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 1, nInserted: 0, nUpdateOps: 0, nDeleteOps: 1},
     });
 }
 
@@ -43,7 +43,7 @@ function testIdDelete(testDB, coll, collName) {
         command: "delete",
         keysExamined: 1,
         docsExamined: 1,
-        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 1, nInserted: 0, nUpdateOps: 0},
+        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 1, nInserted: 0, nUpdateOps: 0, nDeleteOps: 1},
     });
 }
 
@@ -59,7 +59,7 @@ function testMultiDelete(testDB, coll, collName) {
         command: "delete",
         keysExamined: 0,
         docsExamined: 8,
-        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 4, nInserted: 0, nUpdateOps: 0},
+        writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 4, nInserted: 0, nUpdateOps: 0, nDeleteOps: 1},
     });
 }
 

@@ -94,7 +94,15 @@ function WouldChangeOwningShardTests(ctxFn) {
                 usedDisk: false,
                 fromMultiPlanner: false,
                 fromPlanCache: false,
-                writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
+                writes: {
+                    nMatched: 0,
+                    nUpserted: 0,
+                    nModified: 0,
+                    nDeleted: 0,
+                    nInserted: 0,
+                    nUpdateOps: 1,
+                    nDeleteOps: 0,
+                },
             });
         });
     });
@@ -110,6 +118,7 @@ runMongosWriteMetricsTests({
         nDeleted: 0,
         nInserted: 0,
         nUpdateOps: 1,
+        nDeleteOps: 0,
     }),
     validateCmdFn: (result) => assert.eq(result.nModified, 1, result),
     getQueryStatsFn: getQueryStatsUpdateCmd,

@@ -99,6 +99,7 @@ describe("query stats insert command metrics (mongos)", function () {
                     nDeleted: 0,
                     nInserted: 5,
                     nUpdateOps: 0,
+                    nDeleteOps: 0,
                 },
             });
 
@@ -143,6 +144,7 @@ describe("query stats insert command metrics (mongos)", function () {
                     nDeleted: 0,
                     nInserted: 2,
                     nUpdateOps: 0,
+                    nDeleteOps: 0,
                 },
             });
 
@@ -231,6 +233,7 @@ describe("query stats insert command metrics (mongos)", function () {
                     nDeleted: 0,
                     nInserted: 1,
                     nUpdateOps: 0,
+                    nDeleteOps: 0,
                 },
             });
 
@@ -389,6 +392,7 @@ describe("query stats insert command metrics (mongos)", function () {
                     nDeleted: 0,
                     nInserted: 3,
                     nUpdateOps: 0,
+                    nDeleteOps: 0,
                 },
             });
         });

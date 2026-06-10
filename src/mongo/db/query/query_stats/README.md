@@ -207,6 +207,7 @@ the metric is computed.
 | `writes.nDeleted`                                              | Documents deleted                                                                                 | Zero for reads; for writes, summed from shards                                                            |
 | `writes.nInserted`                                             | Documents inserted (non-upsert)                                                                   | Zero for reads; for writes, summed from shards                                                            |
 | `writes.nUpdateOps`                                            | Number of update operations in request                                                            | Zero for reads; for writes, number of update ops in client batch                                          |
+| `writes.nDeleteOps`                                            | Number of delete operations in request                                                            | Zero for reads; for writes, number of delete ops in client batch                                          |
 | **Supplemental Metrics**                                       |                                                                                                   |                                                                                                           |
 | Engine type (Bonsai/SBE/Classic)                               | Which query engine was used                                                                       | Always taken from local OpDebug                                                                           |
 
@@ -367,6 +368,7 @@ following way:
             nDeleted:   {sum: 0, max: 0, min: 0, sumOfSquares: 0},
             nInserted:  {sum: 0, max: 0, min: 0, sumOfSquares: 0},
             nUpdateOps: {sum: 0, max: 0, min: 0, sumOfSquares: 0},
+            nDeleteOps: {sum: 0, max: 0, min: 0, sumOfSquares: 0},
         },
         firstSeenTimestamp:  ISODate(/* … */),
         latestSeenTimestamp: ISODate(/* … */),
@@ -460,6 +462,7 @@ following way:
 - `metrics.writes.nDeleted`: The number of documents deleted.
 - `metrics.writes.nInserted`: The number of documents inserted (excluding upserts).
 - `metrics.writes.nUpdateOps`: The number of updates in the original update request.
+- `metrics.writes.nDeleteOps`: The number of deletes in the original delete request.
 
 #### Permissions
 

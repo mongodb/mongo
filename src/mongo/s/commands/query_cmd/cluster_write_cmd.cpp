@@ -777,6 +777,8 @@ bool cluster_write_cmd::runImpl(OperationContext* opCtx,
         case BatchedCommandRequest::BatchType_Delete:
             globalOpCounters().gotDeletes(numAttempts);
             debug.getAdditiveMetrics().ndeleted = response.getN();
+            debug.getAdditiveMetrics().nDeleteOps =
+                batchedRequest.getDeleteRequest().getDeletes().size();
             break;
     }
 

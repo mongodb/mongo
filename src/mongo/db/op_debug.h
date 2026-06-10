@@ -185,6 +185,7 @@ public:
         boost::optional<long long> ndeleted;
         boost::optional<long long> nUpserted;
         boost::optional<long long> nUpdateOps;
+        boost::optional<long long> nDeleteOps;
 
         // Number of index keys inserted.
         boost::optional<long long> keysInserted;
