@@ -1891,7 +1891,7 @@ Status syncRollback(OperationContext* opCtx,
     invariant(opCtx);
     invariant(replCoord);
 
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
     UnreplicatedWritesBlock replicationDisabler(opCtx);
     Status status = _syncRollback(opCtx,
                                   localOplog,

@@ -347,7 +347,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
                                 const NamespaceString& target,
                                 RenameCollectionOptions options) {
     invariant(source.isEqualDb(target));
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     AutoGetDb autoDb(opCtx, source.dbName(), MODE_IX);
 
@@ -423,7 +423,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                            repl::OpTime renameOpTimeFromApplyOps,
                                            const RenameCollectionOptions& options) {
     invariant(source.isEqualDb(target));
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     AutoGetDb autoDb(opCtx, source.dbName(), MODE_X);
 
@@ -558,7 +558,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     DatabaseShardingState::assertMatchingDbVersion(opCtx, source.dbName());
 
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     auto sourceDB = DatabaseHolder::get(opCtx)->getDb(opCtx, source.dbName());
     if (!sourceDB)
