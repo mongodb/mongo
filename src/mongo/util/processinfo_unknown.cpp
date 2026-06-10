@@ -54,7 +54,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {}
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
 
-boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
+boost::optional<uint64_t> ProcessInfo::getNumCoresForProcess() {
     return boost::none;
 }
 }  // namespace mongo

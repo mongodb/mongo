@@ -139,15 +139,16 @@ public:
      * Get the number of cores available. Make a best effort to get the cores for this process.
      * If that information is not available, get the total number of CPUs.
      */
-    static unsigned long getNumAvailableCores() {
+    static uint64_t getNumAvailableCores() {
         return ProcessInfo::getNumCoresForProcess().value_or(ProcessInfo::getNumLogicalCores());
     }
 
     /**
      * Get the number of cores available for process or return the errorValue.
      */
-    static long getNumCoresAvailableToProcess(long errorValue = -1) {
-        return ProcessInfo::getNumCoresForProcess().value_or(errorValue);
+    static int64_t getNumCoresAvailableToProcess(int64_t errorValue = -1) {
+        const auto cores = ProcessInfo::getNumCoresForProcess();
+        return cores ? static_cast<int64_t>(cores.value()) : errorValue;
     }
 
     /**
@@ -174,7 +175,7 @@ public:
     /**
      * Get the number of NUMA nodes if NUMA is enabled, or 1 otherwise.
      */
-    static unsigned long getNumNumaNodes() {
+    static uint64_t getNumNumaNodes() {
         if (sysInfo().hasNuma) {
             return sysInfo().numNumaNodes;
         }
@@ -311,7 +312,7 @@ private:
      * Get the number of available CPUs. Depending on the OS, the number can be the
      * number of available CPUs to the current process or scheduler.
      */
-    static boost::optional<unsigned long> getNumCoresForProcess();
+    static boost::optional<uint64_t> getNumCoresForProcess();
 };
 
 bool writePidFile(const std::string& path);

@@ -56,10 +56,10 @@ bool ProcessInfo::supported() {
 }
 
 // get the number of CPUs available to the scheduler
-boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
+boost::optional<uint64_t> ProcessInfo::getNumCoresForProcess() {
     long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     if (nprocs)
-        return nprocs;
+        return static_cast<uint64_t>(nprocs);
     return boost::none;
 }
 

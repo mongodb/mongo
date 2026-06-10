@@ -953,14 +953,14 @@ bool ProcessInfo::supported() {
 }
 
 // get the number of CPUs available to the current process
-boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
+boost::optional<uint64_t> ProcessInfo::getNumCoresForProcess() {
     cpu_set_t set;
 
     if (sched_getaffinity(0, sizeof(cpu_set_t), &set) == 0) {
 #ifdef CPU_COUNT  // glibc >= 2.6 has CPU_COUNT defined
         return CPU_COUNT(&set);
 #else
-        unsigned long count = 0;
+        uint64_t count = 0;
         for (size_t i = 0; i < CPU_SETSIZE; i++)
             if (CPU_ISSET(i, &set))
                 count++;

@@ -494,9 +494,7 @@ mongo_cc_library(
     srcs_select = [{
         "@platforms//os:{}".format(os): ["processinfo_{}.cpp".format(os)]
         for os in [
-            "freebsd",
             "linux",
-            "openbsd",
             "osx",
             "windows",
         ]
