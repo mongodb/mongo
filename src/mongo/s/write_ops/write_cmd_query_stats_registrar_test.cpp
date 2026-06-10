@@ -61,14 +61,29 @@ public:
         opCtxHolder = makeOperationContext();
         opCtx = opCtxHolder.get();
 
-        // Set write cmd query stats collection to 100% (1000/1000)
+        // Set write cmd query stats collection to 100% (1000/1000).
         auto& limiter =
             query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
         limiter.configureSampleBased(1000, 42);
     }
 
+    // Runs 'fn' with a fresh opCtx on a dedicated client. AlternativeClientRegion stays alive
+    // for the duration of the call, ensuring the client swap is active throughout 'fn'.
+    template <typename Fn>
+    void withFreshOpCtx(std::string clientName, Fn fn) {
+        auto client = getServiceContext()->getService()->makeClient(clientName);
+        AlternativeClientRegion acr(client);
+        auto freshOpCtxHolder = cc().makeOperationContext();
+        fn(freshOpCtxHolder.get());
+    }
+
     ServiceContext::UniqueOperationContext opCtxHolder;
     OperationContext* opCtx;
+    // Enable collection of query stats for updates.
+    RAIIServerParameterControllerForTest controller{"featureFlagQueryStatsUpdateCommand", true};
+    // Enable collection of query stats for inserts.
+    RAIIServerParameterControllerForTest insertController{"featureFlagQueryStatsInsert", true};
+    // Enable collection of query stats for deletes.
     RAIIServerParameterControllerForTest deleteFlag{"featureFlagQueryStatsDelete", true};
 };
 
@@ -105,10 +120,10 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
-    // queryShapeHash shouldn't be computed in the multi-update case
+    // queryShapeHash shouldn't be computed in the multi-update case.
     EXPECT_FALSE(opDebug.getQueryShapeHash());
 
-    // If registration wasn't requested, checks that info isn't populated
+    // If registration wasn't requested, checks that info isn't populated.
     if (skipRegistration) {
         for (size_t opIndex = 0; opIndex < 3; opIndex++) {
             EXPECT_FALSE(opDebug.hasQueryStatsInfo(opIndex));
@@ -172,10 +187,10 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
-    // Checks that queryShapeHash is set on opDebug
+    // Checks that queryShapeHash is set on opDebug.
     EXPECT_TRUE(opDebug.getQueryShapeHash());
 
-    // If registration wasn't requested, checks that info isn't populated
+    // If registration wasn't requested, checks that info isn't populated.
     if (skipRegistration) {
         EXPECT_FALSE(opDebug.hasQueryStatsInfo(0));
         return;
@@ -185,7 +200,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
     ASSERT_TRUE(opDebug.hasQueryStatsInfo(0));
     ASSERT_TRUE(opDebug.getQueryStatsInfo(0).key);
 
-    // Check the query stats key
+    // Check the query stats key.
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
             "queryShape": {
@@ -214,7 +229,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        ParseAndRegisterRequestSingleUpdateModifier) {
     bool skipRegistration = GetParam();
 
-    // Batch update request with one update
+    // Batch update request with one update.
     auto update = fromjson(R"({
         update: "testColl",
         updates: [
@@ -230,10 +245,10 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
-    // Checks that queryShapeHash is set on opDebug
+    // Checks that queryShapeHash is set on opDebug.
     EXPECT_TRUE(opDebug.getQueryShapeHash());
 
-    // If registration wasn't requested, checks that info isn't populated
+    // If registration wasn't requested, checks that info isn't populated.
     if (skipRegistration) {
         EXPECT_FALSE(opDebug.hasQueryStatsInfo(0));
         return;
@@ -243,7 +258,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
     ASSERT_TRUE(opDebug.hasQueryStatsInfo(0));
     ASSERT_TRUE(opDebug.getQueryStatsInfo(0).key);
 
-    // Check the query stats key
+    // Check the query stats key.
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
             "queryShape": {
@@ -278,7 +293,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        ParseAndRegisterRequestSingleUpdatePipeline) {
     bool skipRegistration = GetParam();
 
-    // Batch update request with one update
+    // Batch update request with one update.
     auto update = fromjson(R"({
         update: "testColl",
         updates: [
@@ -294,10 +309,10 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
-    // Checks that queryShapeHash is set on opDebug
+    // Checks that queryShapeHash is set on opDebug.
     EXPECT_TRUE(opDebug.getQueryShapeHash());
 
-    // If registration wasn't requested, checks that info isn't populated
+    // If registration wasn't requested, checks that info isn't populated.
     if (skipRegistration) {
         EXPECT_FALSE(opDebug.hasQueryStatsInfo(0));
         return;
@@ -307,7 +322,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
     ASSERT_TRUE(opDebug.hasQueryStatsInfo(0));
     ASSERT_TRUE(opDebug.getQueryStatsInfo(0).key);
 
-    // Check the query stats key
+    // Check the query stats key.
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
             "queryShape": {
@@ -336,6 +351,51 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
         })",
         opDebug.getQueryStatsInfo(0).key->toBson(
             opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+}
+
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestInsert) {
+    bool skipRegistration = GetParam();
+
+    auto insert = fromjson(R"({
+        insert: "testColl",
+        documents: [{ _id: 1, name: "Alice" }, { _id: 2, score: 42 }],
+        "$db": "testDB"
+        })"_sd);
+    auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
+    BatchedCommandRequest batchRequest(insertCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+
+    // Checks that queryShapeHash is set on opDebug.
+    EXPECT_TRUE(opDebug.getQueryShapeHash());
+
+    // If registration wasn't requested, checks that info isn't populated.
+    if (skipRegistration) {
+        EXPECT_FALSE(opDebug.hasQueryStatsInfo(kInsertOpIndex));
+        return;
+    }
+
+    ASSERT_TRUE(opDebug.hasQueryStatsInfo(kInsertOpIndex));
+    ASSERT_TRUE(opDebug.getQueryStatsInfo(kInsertOpIndex).key);
+
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "insert",
+                "documents": "?array<?object>"
+            },
+            "ordered": true,
+            "bypassDocumentValidation": false
+        })",
+        opDebug.getQueryStatsInfo(kInsertOpIndex)
+            .key->toBson(opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
@@ -377,6 +437,59 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
     ASSERT_TRUE(opDebug.hasQueryStatsInfo(42));
     ASSERT_FALSE(opDebug.getQueryStatsInfo(42).key);
     ASSERT_FALSE(opDebug.getQueryStatsInfo(42).keyHash);
+}
+
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, RegisterRequestForShardsvrInsertTest) {
+    bool skipRegistration = GetParam();
+
+    // Setting this to simulate the scenario that a primary shard receives a dispatched insert
+    // command from the router and it has to act like a router.
+    opCtx->setCommandForwardedFromRouter();
+
+    auto insert = fromjson(R"({
+        insert: "testColl",
+        documents: [{ _id: 1 }],
+        includeQueryStatsMetrics: true,
+        "$db": "testDB"
+        })"_sd);
+    auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
+    BatchedCommandRequest batchRequest(insertCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+
+    // Asserts that the entry for kInsertOpIndex is created. Since we are on a primary shard and it
+    // creates QueryStatsInfo only for returning the metrics back to the mongos, the entry does not
+    // have key and key hash.
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+    ASSERT_TRUE(opDebug.hasQueryStatsInfo(kInsertOpIndex));
+    ASSERT_FALSE(opDebug.getQueryStatsInfo(kInsertOpIndex).key);
+    ASSERT_FALSE(opDebug.getQueryStatsInfo(kInsertOpIndex).keyHash);
+}
+
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
+       RegisterRequestForShardsvrInsertSkipsQueryStatsInfoTest) {
+    bool skipRegistration = GetParam();
+
+    // Setting this to simulate the scenario that a primary shard receives a dispatched insert
+    // command from the router and it has to act like a router.
+    opCtx->setCommandForwardedFromRouter();
+
+    // includeQueryStatsMetrics is explicitly false, so no QueryStatsInfo entry should be created.
+    auto insert = fromjson(R"({
+        insert: "testColl",
+        documents: [{ _id: 1 }],
+        includeQueryStatsMetrics: false,
+        "$db": "testDB"
+        })"_sd);
+    auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
+    BatchedCommandRequest batchRequest(insertCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+    ASSERT_FALSE(opDebug.hasQueryStatsInfo(kInsertOpIndex));
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestMultiDelete) {
@@ -464,6 +577,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
         opDebug.getQueryStatsInfo(0).key->toBson(
             opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
+
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        RegisterRequestForShardsvrCoordinateDeleteForwardedFromRouter) {
     bool skipRegistration = GetParam();
@@ -500,6 +614,29 @@ INSTANTIATE_TEST_SUITE_P(RegisterRequestSuite,
                          WriteCmdQueryStatsRegistrarRegisterRequestFixture,
                          testing::Bool());
 
+TEST_F(WriteCmdQueryStatsRegistrarTest, DoesNotRegisterInsertRequestWhenFeatureFlagOff) {
+    // Override the fixture's insert flag controller to disable it for this test.
+    RAIIServerParameterControllerForTest featureFlagController{"featureFlagQueryStatsInsert",
+                                                               false};
+
+    auto insert = fromjson(R"({
+        insert: "testColl",
+        documents: [{ _id: 1 }],
+        "$db": "testDB"
+        })"_sd);
+    auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
+    BatchedCommandRequest batchRequest(insertCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, false);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+
+    // With the flag disabled, parseAndRegisterInsertOp returns early and registers nothing.
+    EXPECT_FALSE(opDebug.getQueryShapeHash());
+    EXPECT_FALSE(opDebug.hasQueryStatsInfo(kInsertOpIndex));
+}
+
 TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestDeleteSkipsWhenFlagDisabled) {
     // Disable the delete feature flag for this test.
     RAIIServerParameterControllerForTest disabledFlag{"featureFlagQueryStatsDelete", false};
@@ -534,6 +671,23 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestDeleteSkipsWhenEn
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
     EXPECT_FALSE(opDebug.hasQueryStatsInfo(0));
+}
+
+TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestInsertSkipsWhenEncrypted) {
+    auto insert = fromjson(R"({
+        insert: "testColl",
+        documents: [{ _id: 1 }],
+        encryptionInformation: { type: 1, schema: {} },
+        "$db": "testDB"
+    })"_sd);
+    auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
+    BatchedCommandRequest batchRequest(insertCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+    EXPECT_FALSE(opDebug.hasQueryStatsInfo(kInsertOpIndex));
 }
 
 TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
@@ -628,15 +782,6 @@ TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
         qsi.key = std::make_unique<query_stats::MockKey>(ctx);
         qsi.keyHash = 42;
         CurOp::get(ctx)->debug().setQueryStatsInfoAtOpIndex(0 /* kInsertOpIndex */, std::move(qsi));
-    };
-
-    // Runs 'fn' with a fresh opCtx on a dedicated client. AlternativeClientRegion stays alive
-    // for the duration of the call, ensuring the client swap is active throughout 'fn'.
-    auto withFreshOpCtx = [&](std::string clientName, auto fn) {
-        auto client = getServiceContext()->getService()->makeClient(clientName);
-        AlternativeClientRegion acr(client);
-        auto opCtxHolder = cc().makeOperationContext();
-        fn(opCtxHolder.get());
     };
 
     // No query stats entry registered: the flag is explicitly cleared, even if the client pre-set
@@ -781,24 +926,58 @@ TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
     auto& readLimiter = query_stats::QueryStatsStoreManager::getRateLimiter(getServiceContext());
 
     auto runTest = [&](auto configureReadLimiter) {
-        auto update = fromjson(R"({
-            update: "testColl",
-            updates: [
-                { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false }
-            ],
-            "$db": "testDB"
-            })"_sd);
-        auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
-        BatchedCommandRequest batchRequest(updateCommandRequest);
-        WriteCommandRef cmdRef{batchRequest};
+        withFreshOpCtx("update-sampling-client", [&](OperationContext* localOpCtx) {
+            auto update = fromjson(R"({
+                update: "testColl",
+                updates: [
+                    { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false }
+                ],
+                "$db": "testDB"
+                })"_sd);
+            auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
+            BatchedCommandRequest batchRequest(updateCommandRequest);
+            WriteCommandRef cmdRef{batchRequest};
 
-        configureReadLimiter();
+            configureReadLimiter();
 
-        WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
-            opCtx, cmdRef, false /* skip request */);
+            WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
+                localOpCtx, cmdRef, false /* skipRegistration */);
 
-        const auto& opDebug = CurOp::get(opCtx)->debug();
-        ASSERT_FALSE(opDebug.hasQueryStatsInfo(0));
+            const auto& opDebug = CurOp::get(localOpCtx)->debug();
+            ASSERT_FALSE(opDebug.hasQueryStatsInfo(0));
+        });
+    };
+
+    runTest([&] { readLimiter.configureSampleBased(1000, 42); });
+    runTest([&] { readLimiter.configureWindowBased(1000); });
+}
+
+TEST_F(WriteCmdQueryStatsRegistrarTest, RegisterRequestInsertNotSampledWhenWriteRateIsZero) {
+    auto& writeLimiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    writeLimiter.configureSampleBased(0, 42);
+
+    auto& readLimiter = query_stats::QueryStatsStoreManager::getRateLimiter(getServiceContext());
+
+    auto runTest = [&](auto configureReadLimiter) {
+        withFreshOpCtx("insert-sampling-client", [&](OperationContext* localOpCtx) {
+            auto insert = fromjson(R"({
+                insert: "testColl",
+                documents: [{ _id: 1 }],
+                "$db": "testDB"
+                })"_sd);
+            auto insertCommandRequest = write_ops::InsertCommandRequest::parse(std::move(insert));
+            BatchedCommandRequest batchRequest(insertCommandRequest);
+            WriteCommandRef cmdRef{batchRequest};
+
+            configureReadLimiter();
+
+            WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
+                localOpCtx, cmdRef, false /* skipRegistration */);
+
+            const auto& opDebug = CurOp::get(localOpCtx)->debug();
+            ASSERT_FALSE(opDebug.hasQueryStatsInfo(kInsertOpIndex));
+        });
     };
 
     runTest([&] { readLimiter.configureSampleBased(1000, 42); });
