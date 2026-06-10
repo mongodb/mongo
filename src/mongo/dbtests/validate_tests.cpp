@@ -4611,6 +4611,253 @@ public:
     }
 };
 
+// Test that a textIndexVersion 3 index whose fields contain no embedded dots is not falsely
+// reported as needing a rebuild due to SERVER-76875 when it has a genuine missing index entry.
+// Legacy and current key generation only diverge for fields with embedded dots, so for an index
+// without them the missing-entry alternative check must never attribute the discrepancy to legacy
+// behavior.
+class ValidateTextIndexNoDottedFieldsNoFalseRebuild : public ValidateBase {
+public:
+    ValidateTextIndexNoDottedFieldsNoFalseRebuild()
+        : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        SharedBufferFragmentBuilder pooledBuilder(
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+        // Create a new collection.
+        lockDb(MODE_X);
+
+        {
+            beginTransaction();
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            _db->createCollection(&_opCtx, _nss);
+            commitTransaction();
+        }
+
+        // A document whose text field has multiple terms, indexed by a text index with no fields
+        // containing embedded dots. Legacy and current key generation produce identical keys here.
+        BSONObj doc = BSON("_id" << 1 << "prefix" << 5 << "text" << "alpha bravo charlie");
+        {
+            beginTransaction();
+            insertDocument(doc);
+            commitTransaction();
+        }
+
+        const auto indexName = "text_index";
+        auto status = createIndexFromSpec(BSON(
+            "name" << indexName << "key" << BSON("prefix" << 1 << "_fts" << "text" << "_ftsx" << 1)
+                   << "weights" << BSON("text" << 1) << "v" << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        // Create a genuine missing index entry by removing exactly one of the document's keys,
+        // leaving its other keys in place. This discrepancy has nothing to do with embedded-dot
+        // legacy behavior.
+        {
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            ASSERT(entry);
+            auto iam = entry->accessMethod()->asSortedData();
+            ASSERT(iam);
+
+            beginTransaction();
+            auto rs = coll()->getRecordStore();
+            auto cursor = rs->getCursor(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx));
+            auto record = cursor->next();
+            ASSERT(record);
+            auto recordDoc = record->data.toBson();
+
+            KeyStringSet keys;
+            iam->getKeys(
+                &_opCtx,
+                coll(),
+                entry,
+                pooledBuilder,
+                recordDoc,
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                record->id);
+            ASSERT_GT(keys.size(), 1U);
+
+            KeyStringSet oneKey;
+            oneKey.insert(*keys.begin());
+
+            InsertDeleteOptions options;
+            options.dupsAllowed = true;
+            int64_t numDeleted = 0;
+            auto removeStatus = iam->removeKeys(&_opCtx,
+                                                *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                coll(),
+                                                entry,
+                                                oneKey,
+                                                options,
+                                                &numDeleted);
+            ASSERT_OK(removeStatus);
+            ASSERT_EQUALS(numDeleted, 1);
+            commitTransaction();
+        }
+
+        releaseDb();
+
+        {
+            ValidateResults results;
+
+            ASSERT_OK(collection_validation::validate(
+                &_opCtx,
+                _nss,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
+                                  kLogDiagnostics},
+                &results));
+
+            ScopeGuard dumpOnErrorGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
+            });
+
+            // The index legitimately has a missing entry, so validation fails...
+            ASSERT_FALSE(results.isValid());
+
+            // ...but the discrepancy must not be misattributed to SERVER-76875 legacy embedded-dot
+            // behavior, since this index has no fields with embedded dots.
+            auto indexResultsIt = results.getIndexResultsMap().find(indexName);
+            ASSERT(indexResultsIt != results.getIndexResultsMap().end());
+            const auto& indexResults = indexResultsIt->second;
+
+            for (const auto& error : indexResults.getErrors()) {
+                ASSERT_EQ(std::string::npos,
+                          error.find("legacy version of text index key generation"))
+                    << "Unexpected legacy-rebuild error on non-dotted text index: " << error;
+            }
+            for (const auto& warning : results.getWarnings()) {
+                ASSERT_EQ(std::string::npos, warning.find("SERVER-76875"))
+                    << "Unexpected SERVER-76875 warning on non-dotted text index: " << warning;
+            }
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
+class ValidateTextIndexAttributionKeyGenThrowIsHandled : public ValidateBase {
+public:
+    ValidateTextIndexAttributionKeyGenThrowIsHandled()
+        : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        SharedBufferFragmentBuilder pooledBuilder(
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+        // Create a new collection.
+        lockDb(MODE_X);
+
+        {
+            beginTransaction();
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            _db->createCollection(&_opCtx, _nss);
+            commitTransaction();
+        }
+
+        BSONObj doc = BSON("_id" << 1 << "a.b" << BSON_ARRAY(1 << 2 << 3) << "text"
+                                 << "hello world");
+        {
+            beginTransaction();
+            insertDocument(doc);
+            commitTransaction();
+        }
+
+        const auto indexName = "text_index";
+        auto status = createIndexFromSpec(BSON(
+            "name" << indexName << "key" << BSON("a.b" << 1 << "_fts" << "text" << "_ftsx" << 1)
+                   << "weights" << BSON("text" << 1) << "v" << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        // Create a genuine missing index entry by removing one of the document's keys.
+        {
+            const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
+            auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
+            ASSERT(entry);
+            auto iam = entry->accessMethod()->asSortedData();
+            ASSERT(iam);
+
+            beginTransaction();
+            auto rs = coll()->getRecordStore();
+            auto cursor = rs->getCursor(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx));
+            auto record = cursor->next();
+            ASSERT(record);
+            auto recordDoc = record->data.toBson();
+
+            KeyStringSet keys;
+            iam->getKeys(
+                &_opCtx,
+                coll(),
+                entry,
+                pooledBuilder,
+                recordDoc,
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                record->id);
+            ASSERT_GT(keys.size(), 1U);
+
+            KeyStringSet oneKey;
+            oneKey.insert(*keys.begin());
+
+            InsertDeleteOptions options;
+            options.dupsAllowed = true;
+            int64_t numDeleted = 0;
+            auto removeStatus = iam->removeKeys(&_opCtx,
+                                                *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                coll(),
+                                                entry,
+                                                oneKey,
+                                                options,
+                                                &numDeleted);
+            ASSERT_OK(removeStatus);
+            ASSERT_EQUALS(numDeleted, 1);
+            commitTransaction();
+        }
+
+        releaseDb();
+
+        {
+            ValidateResults results;
+
+            ASSERT_OK(collection_validation::validate(
+                &_opCtx,
+                _nss,
+                ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                  collection_validation::RepairMode::kNone,
+                                  kLogDiagnostics},
+                &results));
+
+            ScopeGuard dumpOnErrorGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
+            });
+
+            // Validation should fail due to the genuine missing entry...
+            ASSERT_FALSE(results.isValid());
+
+            // ...the attribution check must not abort validation with an uncaught exception...
+            for (const auto& warning : results.getWarnings()) {
+                ASSERT_EQ(std::string::npos, warning.find("exception during collection validation"))
+                    << "Validation aborted by an uncaught exception: " << warning;
+            }
+
+            // ...and the genuine missing entry must still be reported rather than swallowed.
+            ASSERT_GTE(results.getMissingIndexEntries().size(), static_cast<size_t>(1));
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
 class ValidateInvalidBSONOnClusteredCollection : public ValidateBase {
 public:
     explicit ValidateInvalidBSONOnClusteredCollection(bool background)
@@ -5277,6 +5524,8 @@ public:
 
         // Test that validates text index legacy key generation detection.
         add<ValidateTextIndexLegacyNeedsRebuild>();
+        add<ValidateTextIndexNoDottedFieldsNoFalseRebuild>();
+        add<ValidateTextIndexAttributionKeyGenThrowIsHandled>();
 
         // Tests that validation works on clustered collections.
         add<ValidateInvalidBSONOnClusteredCollection>(false);

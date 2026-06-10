@@ -37,6 +37,8 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/recovery_unit.h"
 
+#include <algorithm>
+#include <iterator>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -84,38 +86,54 @@ FTSAccessMethod::checkMissingIndexEntryAlternative(OperationContext* opCtx,
         return boost::none;
     }
 
-    // Generate keys using the legacy pre-SERVER-76875 behavior.
-    // This will include keys for fields with embedded dots.
-    KeyStringSet legacyKeys =
-        generateKeysLegacyDottedPath_forValidationOnly(opCtx, &entry, document, recordId);
+    try {
+        // Keys generated pre-SERVER-76875 should only diverge from the current behavior for fields
+        // with embedded dots. Therefore, the set difference defines the set of indexes that errored
+        // validation due to this change.
+        KeyStringSet legacyKeys =
+            generateKeysLegacyDottedPath_forValidationOnly(opCtx, &entry, document, recordId);
+        KeyStringSet currentKeys =
+            generateKeysCurrent_forValidationOnly(opCtx, &entry, document, recordId);
 
-    // Check if any legacy keys exist in the index.
-    if (!legacyKeys.empty()) {
-        auto sortedDataInterface = getSortedDataInterface();
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        auto cursor = sortedDataInterface->newCursor(opCtx, ru);
+        KeyStringSet legacyOnlyKeys;
+        std::set_difference(legacyKeys.begin(),
+                            legacyKeys.end(),
+                            currentKeys.begin(),
+                            currentKeys.end(),
+                            std::inserter(legacyOnlyKeys, legacyOnlyKeys.end()));
 
-        // Look for any of the legacy keys in the actual index.
-        bool foundMatchingKey =
-            std::any_of(legacyKeys.begin(), legacyKeys.end(), [&](const auto& keyVersionX) {
-                // seekForKeyString returns the KeyStringEntry if the key exists.
-                auto ksEntry = cursor->seekForKeyString(ru, keyVersionX.getView());
-                // Verify both the key exists AND it points to this record.
-                return ksEntry && ksEntry->loc == recordId;
-            });
+        // Check if any legacy-only key exists in the index.
+        if (!legacyOnlyKeys.empty()) {
+            auto sortedDataInterface = getSortedDataInterface();
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+            auto cursor = sortedDataInterface->newCursor(opCtx, ru);
 
-        if (foundMatchingKey) {
-            // We found a legacy key in the index.
-            const std::string indexName = entry.descriptor()->indexName();
-            std::string errorMsg = "Index '" + indexName +
-                "' was created with a legacy version of text index key generation that included "
-                "fields with embedded dots. This index needs to be rebuilt, please drop and "
-                "recreate it.";
-            std::string warningMsg = "Index '" + indexName +
-                "' needs to be rebuilt due to SERVER-76875 "
-                "(fields with embedded dots in text indexes).";
-            return std::make_pair(errorMsg, warningMsg);
+            // Look for any of the legacy-only keys in the actual index.
+            bool foundMatchingKey = std::any_of(
+                legacyOnlyKeys.begin(), legacyOnlyKeys.end(), [&](const auto& keyVersionX) {
+                    // seekForKeyString returns the KeyStringEntry if the key exists.
+                    auto ksEntry = cursor->seekForKeyString(ru, keyVersionX.getView());
+                    // Verify both the key exists AND it points to this record.
+                    return ksEntry && ksEntry->loc == recordId;
+                });
+
+            if (foundMatchingKey) {
+                // We found a legacy-only key in the index.
+                const std::string indexName = entry.descriptor()->indexName();
+                std::string errorMsg = "Index '" + indexName +
+                    "' was created with a legacy version of text index key generation that "
+                    "included "
+                    "fields with embedded dots. This index needs to be rebuilt, please drop and "
+                    "recreate it.";
+                std::string warningMsg = "Index '" + indexName +
+                    "' needs to be rebuilt due to SERVER-76875 "
+                    "(fields with embedded dots in text indexes).";
+                return std::make_pair(errorMsg, warningMsg);
+            }
         }
+    } catch (...) {
+        // Key generation can throw - fall back to normal missing-entry reporting rather than
+        // aborting validation.
     }
 
     // No alternative explanation found - this is a genuine missing index entry.
@@ -140,6 +158,26 @@ KeyStringSet FTSAccessMethod::generateKeysLegacyDottedPath_forValidationOnly(
         getSortedDataInterface()->getKeyStringVersion(),
         getSortedDataInterface()->getOrdering(),
         id);
+
+    return keys;
+}
+
+KeyStringSet FTSAccessMethod::generateKeysCurrent_forValidationOnly(OperationContext* opCtx,
+                                                                    const IndexCatalogEntry* entry,
+                                                                    const BSONObj& obj,
+                                                                    const RecordId& id) const {
+    KeyStringSet keys;
+    SharedBufferFragmentBuilder pooledBufferBuilder{
+        key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+
+    // Use the current FTS key generation function.
+    fts::FTSIndexFormat::getKeys(pooledBufferBuilder,
+                                 _ftsSpec,
+                                 obj,
+                                 &keys,
+                                 getSortedDataInterface()->getKeyStringVersion(),
+                                 getSortedDataInterface()->getOrdering(),
+                                 id);
 
     return keys;
 }

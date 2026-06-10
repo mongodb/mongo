@@ -91,6 +91,14 @@ public:
 
 private:
     /**
+     * Helper to generate keys using the current (post-SERVER-76875) behavior for validation.
+     */
+    KeyStringSet generateKeysCurrent_forValidationOnly(OperationContext* opCtx,
+                                                       const IndexCatalogEntry* entry,
+                                                       const BSONObj& obj,
+                                                       const RecordId& id) const;
+
+    /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
      *
      * This function ignores the 'multikeyPaths' and 'multikeyMetadataKeys' pointers because text
