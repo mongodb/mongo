@@ -1070,7 +1070,7 @@ class MLoadScriptedProxyHandler : public MUnaryInstruction, public ObjectPolicy<
   INSTRUCTION_HEADER(LoadScriptedProxyHandler)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
@@ -1222,7 +1222,7 @@ class MWasmI31RefGet : public MUnaryInstruction, public NoTypePolicy::Data {\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, input))\
   AliasSet getAliasSet() const override { return AliasSet::None(); }\
-  bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
+  bool congruentTo(const MDefinition* ins) const override;\
 };\
 \
 class MBooleanToInt32 : public MUnaryInstruction, public BooleanPolicy<0>::Data {\
@@ -2435,7 +2435,7 @@ class MGuardIsNativeObject : public MUnaryInstruction, public ObjectPolicy<0>::D
   INSTRUCTION_HEADER(GuardIsNativeObject)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
@@ -2466,7 +2466,7 @@ class MGuardIsProxy : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
   INSTRUCTION_HEADER(GuardIsProxy)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
@@ -2480,7 +2480,7 @@ class MGuardIsNotDOMProxy : public MUnaryInstruction, public ObjectPolicy<0>::Da
   INSTRUCTION_HEADER(GuardIsNotDOMProxy)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, proxy))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
@@ -2494,7 +2494,7 @@ class MGuardIsNotProxy : public MUnaryInstruction, public ObjectPolicy<0>::Data 
   INSTRUCTION_HEADER(GuardIsNotProxy)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   MDefinition* foldsTo(TempAllocator& alloc) override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
@@ -2745,7 +2745,7 @@ class MGuardHasProxyHandler : public MUnaryInstruction, public ObjectPolicy<0>::
   INSTRUCTION_HEADER(GuardHasProxyHandler)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \
@@ -3369,7 +3369,7 @@ class MIsConstructor : public MUnaryInstruction, public ObjectPolicy<0>::Data {\
   INSTRUCTION_HEADER(IsConstructor)\
   TRIVIAL_NEW_WRAPPERS\
   NAMED_OPERANDS((0, object))\
-  AliasSet getAliasSet() const override { return AliasSet::None(); }\
+  AliasSet getAliasSet() const override;\
   bool congruentTo(const MDefinition* ins) const override { return congruentIfOperandsEqual(ins); }\
 };\
 \

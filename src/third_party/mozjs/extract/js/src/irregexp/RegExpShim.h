@@ -789,6 +789,12 @@ class FixedIntegerArray : public ByteArray {
     f.setValue(object.value());
     return f;
   }
+
+  uint32_t length() const {
+    uint32_t byteLength = ByteArray::length();
+    MOZ_ASSERT(byteLength % sizeof(T) == 0);
+    return byteLength / sizeof(T);
+  }
 };
 
 using FixedUInt16Array = FixedIntegerArray<uint16_t>;

@@ -10,6 +10,7 @@
 #include "gc/Barrier.h"
 #include "gc/WeakMap.h"
 #include "gc/ZoneAllocator.h"
+#include "js/friend/CycleCollector.h"
 #include "js/GCHashTable.h"
 #include "js/GCVector.h"
 
@@ -81,6 +82,8 @@ class FinalizationObservers {
   bool addWeakRefTarget(Handle<JSObject*> target, Handle<JSObject*> weakRef);
   void removeWeakRefTarget(Handle<JSObject*> target,
                            Handle<WeakRefObject*> weakRef);
+  void maybeClearWeakRefTargets(JS::ShouldClearWeakRefTargetCallback callback,
+                                void* data);
 
   void unregisterWeakRefWrapper(JSObject* wrapper, WeakRefObject* weakRef);
 

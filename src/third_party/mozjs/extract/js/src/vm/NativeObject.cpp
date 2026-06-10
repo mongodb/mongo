@@ -1162,11 +1162,6 @@ template bool js::NativeLookupOwnProperty<NoGC>(JSContext* cx,
 
 static bool CallJSAddPropertyOp(JSContext* cx, JSAddPropertyOp op,
                                 HandleObject obj, HandleId id, HandleValue v) {
-  AutoCheckRecursionLimit recursion(cx);
-  if (!recursion.check(cx)) {
-    return false;
-  }
-
   cx->check(obj, id, v);
   return op(cx, obj, id, v);
 }

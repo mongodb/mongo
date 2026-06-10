@@ -3081,6 +3081,30 @@ void DebugEnvironments::onPopModule(JSContext* cx, const EnvironmentIter& ei) {
   onPopGeneric<ModuleEnvironmentObject, ModuleScope>(cx, ei);
 }
 
+void DebugEnvironments::onPopWasm(JSContext* cx, AbstractFramePtr frame) {
+  MOZ_ASSERT(frame.isWasmDebugFrame());
+
+  DebugEnvironments* envs = cx->realm()->debugEnvs();
+  if (!envs) {
+    return;
+  }
+
+  Rooted<WasmInstanceObject*> instance(cx, frame.wasmInstance()->object());
+  uint32_t funcIndex = frame.asWasmDebugFrame()->funcIndex();
+  Rooted<Scope*> wasmFunctionScope(
+      cx, instance->getExistingFunctionScope(funcIndex));
+  if (!wasmFunctionScope) {
+    return;
+  }
+
+  MissingEnvironmentKey key(frame, wasmFunctionScope);
+  if (MissingEnvironmentMap::Ptr p = envs->missingEnvs.lookup(key)) {
+    EnvironmentObject& env = p->value()->environment();
+    envs->liveEnvs.remove(&env);
+    envs->missingEnvs.remove(p);
+  }
+}
+
 void DebugEnvironments::onRealmUnsetIsDebuggee(Realm* realm) {
   if (DebugEnvironments* envs = realm->debugEnvs()) {
     envs->proxiedEnvs.clear();

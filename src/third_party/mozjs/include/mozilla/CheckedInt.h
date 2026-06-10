@@ -557,7 +557,7 @@ class CheckedInt {
 
   /** @returns the actual value */
   constexpr T value() const {
-    MOZ_DIAGNOSTIC_ASSERT(
+    MOZ_RELEASE_ASSERT(
         mIsValid,
         "Invalid checked integer (division by zero or integer overflow)");
     return mValue;
