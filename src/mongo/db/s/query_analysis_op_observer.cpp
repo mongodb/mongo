@@ -68,9 +68,8 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
             for (auto it = begin; it != end; ++it) {
                 const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(it->doc));
                 opCtx->recoveryUnit()->onCommit(
-                    [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
-                        analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
-                            parsedDoc);
+                    [this, parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                        _onInserts(opCtx, parsedDoc);
                     });
             }
         }
@@ -91,10 +90,10 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
                    args.coll->ns() == MongosType::ConfigNS) {
             const auto parsedDoc =
                 uassertStatusOK(MongosType::fromBSON(args.updateArgs->updatedDoc));
-            opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
-                                                        boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(parsedDoc);
-            });
+            opCtx->recoveryUnit()->onCommit(
+                [this, parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    _onUpdate(opCtx, parsedDoc);
+                });
         }
     }
 
@@ -141,11 +140,44 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());
             const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(doc));
-            opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
-                                                        boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(parsedDoc);
-            });
+            opCtx->recoveryUnit()->onCommit(
+                [this, parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    _onDelete(opCtx, parsedDoc);
+                });
         }
+    }
+}
+
+void QueryAnalysisOpObserver::_onInserts(OperationContext* opCtx, const MongosType& doc) {
+    try {
+        _coordinatorFactory->getQueryAnalysisCoordinator(opCtx)->onSamplerInsert(doc);
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(10690305,
+                    "Failed to insert sampler",
+                    "sampler"_attr = doc,
+                    "error"_attr = ex.toString());
+    }
+}
+
+void QueryAnalysisOpObserver::_onUpdate(OperationContext* opCtx, const MongosType& doc) {
+    try {
+        _coordinatorFactory->getQueryAnalysisCoordinator(opCtx)->onSamplerUpdate(doc);
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(10690306,
+                    "Failed to update sampler",
+                    "sampler"_attr = doc,
+                    "error"_attr = ex.toString());
+    }
+}
+
+void QueryAnalysisOpObserver::_onDelete(OperationContext* opCtx, const MongosType& doc) {
+    try {
+        _coordinatorFactory->getQueryAnalysisCoordinator(opCtx)->onSamplerDelete(doc);
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(10690307,
+                    "Failed to delete sampler",
+                    "sampler"_attr = doc,
+                    "error"_attr = ex.toString());
     }
 }
 

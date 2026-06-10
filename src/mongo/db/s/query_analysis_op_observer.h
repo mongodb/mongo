@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/s/query_analysis_coordinator.h"
+#include "mongo/s/catalog/type_mongos.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -37,13 +39,15 @@ namespace analyze_shard_key {
 /**
  * OpObserver for query analysis.
  */
-class QueryAnalysisOpObserver final : public OpObserver {
+class QueryAnalysisOpObserver : public OpObserver {
     QueryAnalysisOpObserver(const QueryAnalysisOpObserver&) = delete;
     QueryAnalysisOpObserver& operator=(const QueryAnalysisOpObserver&) = delete;
 
 public:
-    QueryAnalysisOpObserver() = default;
-    ~QueryAnalysisOpObserver() = default;
+    QueryAnalysisOpObserver(std::unique_ptr<QueryAnalysisCoordinatorFactory> coordinatorFactory =
+                                std::make_unique<QueryAnalysisCoordinatorFactory>())
+        : _coordinatorFactory(std::move(coordinatorFactory)) {}
+    ~QueryAnalysisOpObserver() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kAll, NamespaceFilter::kAll};
@@ -252,9 +256,16 @@ public:
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final{};
 
+protected:
+    void _onInserts(OperationContext* opCtx, const MongosType& doc);
+    void _onUpdate(OperationContext* opCtx, const MongosType& doc);
+    void _onDelete(OperationContext* opCtx, const MongosType& doc);
+
 private:
     void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final {
     }
+
+    std::unique_ptr<QueryAnalysisCoordinatorFactory> _coordinatorFactory;
 };
 
 }  // namespace analyze_shard_key
