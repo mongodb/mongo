@@ -175,7 +175,10 @@ JoinHint JoinHint::fromBSON(const BSONObj& obj) {
         if (elem.fieldNameStringData() == "node") {
             uassertExpectedType(elem, BSONType::numberInt);
             auto i = elem.numberInt();
-            uassert(12016305, "Expectected 'node' to be non-negative", i >= 0);
+            uassert(12016305,
+                    str::stream() << "Expected 'node' to be in range [0, " << kHardMaxNodesInJoin
+                                  << "), found " << i,
+                    i >= 0 && static_cast<size_t>(i) < kHardMaxNodesInJoin);
             hint.node = i;
         } else if (elem.fieldNameStringData() == "method") {
             uassertExpectedType(elem, BSONType::string);

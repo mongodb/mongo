@@ -27,7 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/query/compiler/optimizer/join/hint.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
@@ -106,6 +110,35 @@ DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, DuplicateMethodHints, "113916
          PlanEnumerationMode::ALL,
          JoinHint{.node = boost::none, .method = JoinMethod::INLJ, .isLeftChild = boost::none}},
     });
+}
+
+TEST(JoinHintParseTest, NodeOutOfRangeFailsToParse) {
+    // A node id must be a valid index into the NodeSet bitset, i.e. in range
+    // [0, kHardMaxNodesInJoin). Out-of-range ids that are otherwise valid int32s must be rejected
+    // at parse time rather than crashing the bitset.
+    ASSERT_THROWS_CODE(JoinHint::fromBSON(BSON("node" << -1)), DBException, 12016305);
+    ASSERT_THROWS_CODE(JoinHint::fromBSON(BSON("node" << static_cast<int>(kHardMaxNodesInJoin))),
+                       DBException,
+                       12016305);
+    ASSERT_THROWS_CODE(JoinHint::fromBSON(BSON("node" << 1000000)), DBException, 12016305);
+}
+
+TEST(JoinHintParseTest, NodeInRangeParses) {
+    // The largest in-range node id (kHardMaxNodesInJoin - 1) must parse successfully.
+    auto hint = JoinHint::fromBSON(BSON("node" << static_cast<int>(kHardMaxNodesInJoin - 1)));
+    ASSERT_TRUE(hint.node.has_value());
+    ASSERT_EQ(*hint.node, kHardMaxNodesInJoin - 1);
+}
+
+TEST(JoinHintParseTest, OutOfRangeNodeInEnumerationStrategyFailsToParse) {
+    // Reproduces the parser path exercised by $_internalJoinHint: an out-of-range node hint must
+    // surface as a clean uassert instead of a std::out_of_range from the NodeSet bitset.
+    auto spec =
+        BSON("perSubsetLevelMode" << BSON_ARRAY(
+                 BSON("level" << 0 << "mode"
+                              << "CHEAPEST"
+                              << "hint" << BSON("node" << static_cast<int>(kHardMaxNodesInJoin)))));
+    ASSERT_THROWS_CODE(EnumerationStrategy::fromBSON(spec), DBException, 12016305);
 }
 
 class JoinPlanEnumeratorHintingTest : public JoinOrderingTestFixture {
