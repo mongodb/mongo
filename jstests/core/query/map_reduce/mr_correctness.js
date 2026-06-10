@@ -10,6 +10,8 @@
 //   requires_getmore,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
+//   # Map reduce requires a stable collection UUID, but MoveCollection drops the collection and recreates it with a new UUID.
+//   assumes_stable_collection_uuid,
 // ]
 const coll = db.mr_correctness;
 coll.drop();
