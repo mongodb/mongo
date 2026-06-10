@@ -524,7 +524,8 @@ void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
             LOGV2_DEBUG(10346900, 4, "Noting stale config response", "status"_attr = status);
             if (const auto info = status.extraInfo<StaleConfigInfo>()) {
                 _lastRoundStaleVersions.try_emplace(
-                    info->getNss(), std::make_pair(info->getShardId(), info->getVersionReceived()));
+                    info->getNss(),
+                    std::make_pair(info->getShardRef(), info->getVersionReceived()));
             }
         }
         routingCtx.onStaleError(status);

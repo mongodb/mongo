@@ -103,18 +103,18 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     const auto scopedCSR = CollectionShardingRuntime::acquireShared(opCtx, nss);
     const auto metadataAfterSplit = scopedCSR->getCurrentMetadataIfKnown();
 
-    ShardId shardId = ShardingState::get(opCtx)->shardId();
+    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
 
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
                             boost::none /* wantedVersion */,
-                            shardId),
+                            shardRef),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
             metadataAfterSplit);
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
                             ShardVersion::UNTRACKED() /* wantedVersion */,
-                            shardId),
+                            shardRef),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
             metadataAfterSplit->isSharded());
     const auto placementVersion = metadataAfterSplit->getShardPlacementVersion();
@@ -122,7 +122,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
                             ShardVersionFactory::make(*metadataAfterSplit) /* wantedVersion */,
-                            shardId),
+                            shardRef),
             str::stream() << "Collection " << nss.toStringForErrorMsg()
                           << " changed since split start",
             epoch == expectedEpoch &&

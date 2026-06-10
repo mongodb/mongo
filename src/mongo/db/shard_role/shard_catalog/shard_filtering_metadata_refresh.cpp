@@ -1112,7 +1112,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                                                               ? *chunkVersionReceived
                                                               : ChunkVersion::IGNORED()),
                                 boost::none /* wantedVersion */,
-                                ShardingState::get(opCtx)->shardId()),
+                                ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
                 str::stream() << "Exhausted maximum number (" << maxNoProgressAttempts
                               << ") of consecutive no-progress authoritative collection metadata "
                                  "recovery attempts for "

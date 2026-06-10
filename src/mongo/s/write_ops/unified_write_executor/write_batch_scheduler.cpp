@@ -45,12 +45,13 @@ namespace {
 bool checkMetadataRefreshed(
     const RoutingContext& routingCtx,
     const std::vector<NamespaceString>& nssList,
-    const stdx::unordered_map<NamespaceString, std::pair<ShardId, ShardVersion>>& prevStaleVersions,
+    const stdx::unordered_map<NamespaceString, std::pair<ShardRef, ShardVersion>>&
+        prevStaleVersions,
     const stdx::unordered_map<DatabaseName, DatabaseVersion>& prevStaleDbVersions) {
     // Check StaleConfig: compare shard-specific ShardVersions (not the collection-level max) to
     // avoid false positives on multi-shard collections.
     for (const auto& [nss, shardAndVersion] : prevStaleVersions) {
-        const auto& [shardId, prevVersion] = shardAndVersion;
+        const auto& [shardRef, prevVersion] = shardAndVersion;
         if (!routingCtx.hasNss(nss)) {
             // StaleConfig errors can carry the internal buckets namespace (system.buckets.*)
             // rather than the user-facing timeseries namespace, which is what _nssSet tracks.
@@ -69,7 +70,9 @@ bool checkMetadataRefreshed(
             if (prevVersion != ShardVersion::UNTRACKED()) {
                 return true;
             }
-        } else if (cri.getShardVersion(shardId) != prevVersion) {
+            // TODO (SERVER-128349) : remove this conversion once the collection routing info works
+            // with shard refs.
+        } else if (cri.getShardVersion(shardRef.getShardId()) != prevVersion) {
             return true;
         }
     }

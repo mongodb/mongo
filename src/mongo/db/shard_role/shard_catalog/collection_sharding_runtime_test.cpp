@@ -72,6 +72,8 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -988,7 +990,34 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CheckCriticalSectionMetric
     ASSERT_EQ(metrics["totalTimeWaiting"].safeNumberLong(), 0);
 }
 
-TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsReportWaiters) {
+class CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader
+    : public CollectionShardingRuntimeTestWithMockedLoader,
+      public testing::WithParamInterface<bool> {
+protected:
+    void setUp() override {
+        _featureFlagScope.emplace("featureFlagUniqueShardIdentifiers", GetParam());
+        CollectionShardingRuntimeTestWithMockedLoader::setUp();
+    }
+
+    void tearDown() override {
+        CollectionShardingRuntimeTestWithMockedLoader::tearDown();
+        _featureFlagScope.reset();
+    }
+
+private:
+    boost::optional<RAIIServerParameterControllerForTest> _featureFlagScope;
+};
+
+INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,
+                         CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
+                         testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& info) {
+                             return info.param ? "WithUniqueShardIdentifiers"
+                                               : "WithoutUniqueShardIdentifiers";
+                         });
+
+TEST_P(CollectionShardingRuntimeUniqueShardIdentifiersTestWithMockedLoader,
+       CriticalSectionMetricsReportWaiters) {
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
         // Enter the critical section.
@@ -1019,7 +1048,7 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsRepo
             ASSERT_EQ(kNss, exInfo->getNss());
             ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
             ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardName, exInfo->getShardId());
+            ASSERT_EQ(kMyShardHandle.toShardRef(operationContext()), exInfo->getShardRef());
             const auto& signal = exInfo->getCriticalSectionSignal();
             sleepmillis(10);
             auto metrics = getStatistics();

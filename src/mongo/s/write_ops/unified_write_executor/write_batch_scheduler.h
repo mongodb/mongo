@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
@@ -128,10 +129,10 @@ protected:
     boost::optional<OID> _targetEpoch;
 
 private:
-    // The StaleConfig receivedVersion and originating ShardId per namespace from the previous
+    // The StaleConfig receivedVersion and originating ShardRef per namespace from the previous
     // round. Compared against the new RoutingContext's shard-specific version to detect productive
     // StaleConfig refreshes.
-    stdx::unordered_map<NamespaceString, std::pair<ShardId, ShardVersion>> _prevStaleVersions;
+    stdx::unordered_map<NamespaceString, std::pair<ShardRef, ShardVersion>> _prevStaleVersions;
 
     // The StaleDbVersion receivedVersion per database from the previous round, compared against
     // the current round's DatabaseVersion to detect productive database-version refreshes.

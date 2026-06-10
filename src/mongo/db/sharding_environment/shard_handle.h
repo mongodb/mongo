@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -59,8 +61,20 @@ public:
         return _uuid;
     }
 
-    ShardRef toShardRef() const {
-        return _uuid ? ShardRef{*_uuid} : ShardRef{_name.toString()};
+    ShardRef toShardRef(OperationContext* opCtx) const {
+        // On mongoS, the FCV snapshot will always be latest, making the feature flag enabled on
+        // binary 9.0. Since mongoS binaries are changed first during a downgrade, the shards will
+        // still be able to handle a mongoS using a uuid. We don't have the same guarantee on mongod
+        // so we default to last LTS.
+        if (uuid() &&
+            feature_flags::gFeatureFlagUniqueShardIdentifiers
+                .isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            return ShardRef(*uuid());
+        } else {
+            return ShardRef(name());
+        }
     }
 
     bool operator==(const ShardHandle& other) const {

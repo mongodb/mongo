@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
-#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/util/modules.h"
@@ -58,16 +58,16 @@ public:
     StaleConfigInfo(NamespaceString nss,
                     ShardVersion received,
                     boost::optional<ShardVersion> wanted,
-                    ShardId shardId,
+                    ShardRef shardRef,
                     boost::optional<CriticalSectionSignal> criticalSectionSignal = boost::none,
                     boost::optional<OperationType> duringOperationType = boost::none)
         : _nss(std::move(nss)),
           _received(received),
           _wanted(wanted),
-          _shardId(shardId),
+          _shardRef(std::move(shardRef)),
           _criticalSectionSignal(std::move(criticalSectionSignal)),
           _duringOperationType{duringOperationType} {
-        tassert(11993000, "Invalid ShardId.", shardId.isValid());
+        tassert(11993000, "Invalid ShardRef.", ShardRef::validate(_shardRef).isOK());
     }
 
     const auto& getNss() const {
@@ -82,8 +82,8 @@ public:
         return _wanted;
     }
 
-    const auto& getShardId() const {
-        return _shardId;
+    const auto& getShardRef() const {
+        return _shardRef;
     }
 
     auto getCriticalSectionSignal() const {
@@ -101,7 +101,7 @@ private:
     NamespaceString _nss;
     ShardVersion _received;
     boost::optional<ShardVersion> _wanted;
-    ShardId _shardId;
+    ShardRef _shardRef;
 
     // The following fields are not serialized and therefore do not get propagated to the router.
     boost::optional<CriticalSectionSignal> _criticalSectionSignal;

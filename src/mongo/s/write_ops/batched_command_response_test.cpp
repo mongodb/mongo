@@ -88,7 +88,7 @@ TEST(BatchedCommandResponseTest, StaleConfigInfo) {
         NamespaceString::createNamespaceString_forTest("TestDB.TestColl"),
         ShardVersionFactory::make(ChunkVersion({epoch, Timestamp(100, 0)}, {1, 0})),
         ShardVersionFactory::make(ChunkVersion({epoch, Timestamp(100, 0)}, {2, 0})),
-        ShardId("TestShard"));
+        ShardRef("TestShard"));
 
     BSONObjBuilder builder(BSON("index" << 0 << "code" << ErrorCodes::StaleConfig << "errmsg"
                                         << "StaleConfig error"));
@@ -110,7 +110,7 @@ TEST(BatchedCommandResponseTest, StaleConfigInfo) {
     auto extraInfo = response.getErrDetailsAt(0).getStatus().extraInfo<StaleConfigInfo>();
     ASSERT_EQ(staleInfo.getVersionReceived(), extraInfo->getVersionReceived());
     ASSERT_EQ(*staleInfo.getVersionWanted(), *extraInfo->getVersionWanted());
-    ASSERT_EQ(staleInfo.getShardId(), extraInfo->getShardId());
+    ASSERT_EQ(staleInfo.getShardRef(), extraInfo->getShardRef());
 }
 
 TEST(BatchedCommandResponseTest, TooManySmallErrors) {
@@ -183,7 +183,7 @@ TEST(BatchedCommandResponseTest, CompatibilityFromWriteErrorToBatchCommandRespon
                                                          "TestDB", "TestColl"),
                                                      versionReceived,
                                                      boost::none,
-                                                     ShardId("TestShard")),
+                                                     ShardRef("TestShard")),
                                      "Test stale config")),
     });
 
@@ -196,7 +196,7 @@ TEST(BatchedCommandResponseTest, CompatibilityFromWriteErrorToBatchCommandRespon
     ASSERT_EQ("TestDB.TestColl", staleInfo->getNss().ns_forTest());
     ASSERT_EQ(versionReceived, staleInfo->getVersionReceived());
     ASSERT(!staleInfo->getVersionWanted());
-    ASSERT_EQ(ShardId("TestShard"), staleInfo->getShardId());
+    ASSERT_EQ(ShardRef("TestShard"), staleInfo->getShardRef());
 }
 
 TEST(BatchedCommandResponseTest, ParseQueryStatsMetrics) {
