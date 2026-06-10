@@ -395,7 +395,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                 response->getErrDetails().back().setStatus(status);
 
                 auto txnRouterForAbort = TransactionRouter::get(opCtx);
-                if (txnRouterForAbort)
+                if (txnRouterForAbort && txnRouterForAbort.isInitialized())
                     txnRouterForAbort.implicitlyAbortTransaction(opCtx, status);
 
                 return false;
@@ -586,7 +586,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
         auto writeCmdStatus = response.toStatus();
-        if (!writeCmdStatus.isOK()) {
+        if (!writeCmdStatus.isOK() && txnRouter.isInitialized()) {
             txnRouter.implicitlyAbortTransaction(opCtx, writeCmdStatus);
         }
     }
