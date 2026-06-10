@@ -227,8 +227,9 @@ feature_flags:
     featureFlagMultiPlanLimiter:
         description: "Feature flag to enable MultiPlan rate limiter."
         cpp_varname: gfeatureFlagMultiPlanLimiter
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: released
 
     featureFlagSbeUpgradeBinaryTrees:
         description: "Feature flag to enable N-ary ABT nodes"
@@ -395,7 +396,7 @@ feature_flags:
         cpp_varname: gFeatureFlagCostBasedRanker
         default: true
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: released
 
     featureFlagSbeEqLookupUnwind:
         description: "Feature flag to enable $lookup-$unwind in SBE."
