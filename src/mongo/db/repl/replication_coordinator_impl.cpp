@@ -5452,10 +5452,8 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
                               "offendingConfigs"_attr = offendingConfigs);
     }
 
-    // If the SplitHorizon has changed, reply to all waiting hellos with an error.
-    _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, _selfIndex, myIndex);
-
     LOGV2(21392, "New replica set config in use", "config"_attr = _rsConfig.unsafePeek().toBSON());
+    const auto oldIndex = _selfIndex;
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
         LOGV2(21393,
@@ -5464,6 +5462,10 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     } else {
         LOGV2(21394, "This node is not a member of the config");
     }
+
+    // If the SplitHorizon has changed, reply to all waiting hellos with an error.
+    _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, oldIndex, myIndex);
+
     if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         // The feature flag check here needs to ignore the FCV since the
