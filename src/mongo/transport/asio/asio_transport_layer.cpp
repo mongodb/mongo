@@ -1130,6 +1130,9 @@ Status AsioTransportLayer::setup() {
             if (auto lastSlashIndex = addrStr.rfind('/'); lastSlashIndex != StringData::npos &&
                 addrStr.substr(lastSlashIndex + 1).starts_with("proxy")) {
                 setUnixDomainSocketPermissions(addrStr, kProxyUnixDomainSocketPerms);
+                if (serverGlobalParams.proxySocketGid) {
+                    setUnixDomainSocketGroup(addr.toString(), *serverGlobalParams.proxySocketGid);
+                }
             } else {
                 setUnixDomainSocketPermissions(addrStr, serverGlobalParams.unixSocketPermissions);
             }

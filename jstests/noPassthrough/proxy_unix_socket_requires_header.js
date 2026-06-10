@@ -15,24 +15,29 @@ if (_isWindows()) {
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+import {isMacOS} from "jstests/libs/os_helpers.js";
 
 const kInternalErrorCode = 1;
+const kExpectedGid = getCurrentGid();
 
 function makeProxySocketPath(prefix, port) {
     return `${prefix}/proxy-mongodb-${port}.sock`;
 }
 
 function assertConnectionFails(conn, path) {
-    assert.throws(() => new Mongo(path), [], `Expected direct connection to proxy socket to fail: ${path}`);
+    assert.throws(
+        () => new Mongo(path), [], `Expected direct connection to proxy socket to fail: ${path}`);
 
     assert(
-        checkLog.checkContainsOnceJsonStringMatch(conn, 6067900, "msg", "Error while parsing proxy protocol header"),
+        checkLog.checkContainsOnceJsonStringMatch(
+            conn, 6067900, "msg", "Error while parsing proxy protocol header"),
         "Expected connection to fail because the PROXY protocol header was missing",
     );
 }
 
 function testWithVersion(conn, ingressPort, egressPort, proxySocketPath, version, shouldSucceed) {
-    const proxyServer = new ProxyProtocolServer(ingressPort, egressPort, version, {egressUnixSocket: proxySocketPath});
+    const proxyServer = new ProxyProtocolServer(
+        ingressPort, egressPort, version, {egressUnixSocket: proxySocketPath});
     proxyServer.setTLVs([{"type": 0xe0, "value": "unix-proxy"}]);
     proxyServer.start();
     try {
@@ -48,9 +53,24 @@ function testWithVersion(conn, ingressPort, egressPort, proxySocketPath, version
     }
 }
 
+function getFileGid(path) {
+    const outFile = `${MongoRunner.dataDir}/socket_gid.txt`;
+    const statCmd =
+        isMacOS() ? `stat -f %g '${path}' > '${outFile}'` : `stat -c %g '${path}' > '${outFile}'`;
+    assert.eq(0, runNonMongoProgram("bash", "-c", statCmd), `stat failed for ${path}`);
+    return Number(cat(outFile).trim());
+}
+
+function getCurrentGid() {
+    const outFile = `${MongoRunner.dataDir}/current_gid.txt`;
+    assert.eq(0, runNonMongoProgram("bash", "-c", `id -g > '${outFile}'`));
+    return Number(cat(outFile).trim());
+}
+
 function runPeerCredentialValidationTest(conn, prefix) {
     const proxySocketPath = makeProxySocketPath(prefix, conn.port);
     assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
+    assert.eq(getFileGid(proxySocketPath), kExpectedGid);
 
     const proxyServer = new ProxyProtocolServer(allocatePort(), conn.port, 2, {
         egressUnixSocket: proxySocketPath,
@@ -60,22 +80,24 @@ function runPeerCredentialValidationTest(conn, prefix) {
 
     try {
         {
-            // Proxy server GID of 1000 should succeed.
-            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-                mode: "alwaysOn",
-                data: {expectedGid: NumberInt(1000), remoteGid: NumberInt(1000)},
-            });
+            // Matching remoteGid should succeed.
+            const fp =
+                configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+                    mode: "alwaysOn",
+                    data: {remoteGid: NumberInt(kExpectedGid)},
+                });
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             new Mongo(uri);
             fp.off();
         }
 
         {
-            // Proxy server GID of 1001 should fail when 1000 is expected.
-            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-                mode: "alwaysOn",
-                data: {expectedGid: NumberInt(1000), remoteGid: NumberInt(1001)},
-            });
+            // Differing remoteGid should fail.
+            const fp =
+                configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+                    mode: "alwaysOn",
+                    data: {remoteGid: NumberInt(kExpectedGid - 1)},
+                });
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             assert.throws(() => new Mongo(uri));
             checkLog.containsRelaxedJson(conn, 11793400, {}, 1, 30 * 1000);
@@ -101,10 +123,11 @@ function runPeerCredentialValidationTest(conn, prefix) {
 
         {
             // Test failure log if server is unable to validate.
-            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-                mode: "alwaysOn",
-                data: {code: kInternalErrorCode},
-            });
+            const fp =
+                configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+                    mode: "alwaysOn",
+                    data: {code: kInternalErrorCode},
+                });
             let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
             assert.throws(() => new Mongo(uri));
             checkLog.containsRelaxedJson(conn, 11793401, {}, 1, 30 * 1000);
@@ -119,7 +142,8 @@ function runTest(conn, prefix) {
     const proxySocketPath = makeProxySocketPath(prefix, conn.port);
     assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
 
-    // A direct connection to the proxy unix socket should fail since there is no proxy protocol header.
+    // A direct connection to the proxy unix socket should fail since there is no proxy protocol
+    // header.
     assertConnectionFails(conn, proxySocketPath);
 
     // Test with v1 and v2 proxy protocol header. Only V2 should be accepted.
@@ -137,6 +161,7 @@ function runMongodTest() {
 
     const mongod = MongoRunner.runMongod({
         proxyUnixSocketPrefix: prefix,
+        proxyUnixSocketFileGroupId: kExpectedGid,
         setParameter: {
             proxyProtocolTimeoutSecs: 1,
             logComponentVerbosity: {network: {verbosity: 4}},
@@ -160,6 +185,7 @@ function runMongosTest() {
         other: {
             mongosOptions: {
                 proxyUnixSocketPrefix: prefix,
+                proxyUnixSocketFileGroupId: kExpectedGid,
                 setParameter: {
                     proxyProtocolTimeoutSecs: 1,
                     logComponentVerbosity: {network: {verbosity: 4}},
