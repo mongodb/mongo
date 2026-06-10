@@ -358,8 +358,6 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 
     for (int i = 0; i < numSamples; ++i) {
         auto nextRandom = collectionIterator.getNextRandom();
-        const auto [rId, doc] = *nextRandom;
-        auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
         slowOplogSamplingReads.execute(
             [&](const BSONObj& dataObj) { sleepsecs(dataObj["delay"].numberInt()); });
         if (!nextRandom) {
@@ -377,6 +375,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
                 estimatedBytesPerMarker,
                 std::move(getRecordIdAndWallTime));
         }
+        const auto [rId, doc] = *nextRandom;
+        auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
 
         collectionEstimates.emplace_back(
             getRecordIdAndWallTime(Record{rId, RecordData{doc.objdata(), doc.objsize()}}));
