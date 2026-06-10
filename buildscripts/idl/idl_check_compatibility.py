@@ -560,8 +560,12 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompa
         return
 
     if array_check == ArrayTypeCheckResult.TRUE:
-        old_field.field_type = old_field.field_type.element_type
-        new_field.field_type = new_field.field_type.element_type
+        # Only unwrap values that are ArrayType instances. For unstable fields, the array check
+        # may pass even if only one side is an ArrayType, so each side is unwrapped independently.
+        if isinstance(old_field.field_type, syntax.ArrayType):
+            old_field.field_type = old_field.field_type.element_type
+        if isinstance(new_field.field_type, syntax.ArrayType):
+            new_field.field_type = new_field.field_type.element_type
 
     old_field_type = old_field.field_type
     new_field_type = new_field.field_type
@@ -1091,8 +1095,12 @@ def check_param_or_command_type(
         return
 
     if array_check == ArrayTypeCheckResult.TRUE:
-        old_field.field_type = old_field.field_type.element_type
-        new_field.field_type = new_field.field_type.element_type
+        # Only unwrap values that are ArrayType instances. For unstable fields, the array check
+        # may pass even if only one side is an ArrayType, so each side is unwrapped independently.
+        if isinstance(old_field.field_type, syntax.ArrayType):
+            old_field.field_type = old_field.field_type.element_type
+        if isinstance(new_field.field_type, syntax.ArrayType):
+            new_field.field_type = new_field.field_type.element_type
 
     old_type = old_field.field_type
     new_type = new_field.field_type
