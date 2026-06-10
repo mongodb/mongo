@@ -389,6 +389,11 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
                                const ShardKeyPattern& keyPattern);
 
 /**
+ * Returns true if the provenance is reshardcollection.
+ */
+bool isOrdinaryReshardCollection(const boost::optional<ProvenanceEnum>& provenance);
+
+/**
  * Returns true if the provenance is moveCollection or balancerMoveCollection.
  */
 bool isMoveCollection(const boost::optional<ProvenanceEnum>& provenance);

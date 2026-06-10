@@ -136,12 +136,23 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()))
                     .cm;
 
+            auto provenance = _doc.getProvenance();
+
+            BSONObj translatedKey;
+            if (cmOld.getTimeseriesFields().has_value() &&
+                resharding::isOrdinaryReshardCollection(provenance)) {
+                auto tsOptions = cmOld.getTimeseriesFields().get().getTimeseriesOptions();
+                translatedKey =
+                    shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, _doc.getKey());
+            }
+
             StateDoc newDoc(_doc);
             newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
             newDoc.setOldCollectionUUID(cmOld.getUUID());
             _updateStateDocument(opCtx, std::move(newDoc));
 
-            ConfigsvrReshardCollection configsvrReshardCollection(nss(), _doc.getKey());
+            auto finalShardKey = translatedKey.isEmpty() ? _doc.getKey() : translatedKey;
+            ConfigsvrReshardCollection configsvrReshardCollection(nss(), finalShardKey);
             configsvrReshardCollection.setDbName(nss().dbName());
             configsvrReshardCollection.setUnique(_doc.getUnique());
             configsvrReshardCollection.setCollation(_doc.getCollation());
@@ -185,7 +196,6 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
             configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());
 
-            auto provenance = _doc.getProvenance();
             if (resharding::isMoveCollection(provenance)) {
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream()

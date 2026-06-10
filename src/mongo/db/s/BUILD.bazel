@@ -791,6 +791,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s:session_catalog_migration_destination_test.cpp",
         "//src/mongo/db/s:session_catalog_migration_source_test.cpp",
         "//src/mongo/db/s:shard_key_index_util_test.cpp",
+        "//src/mongo/db/s:shard_key_util_test.cpp",
         "//src/mongo/db/s:shard_local_test.cpp",
         "//src/mongo/db/s:shard_metadata_util_test.cpp",
         "//src/mongo/db/s:shard_server_catalog_cache_loader_test.cpp",

@@ -98,6 +98,8 @@ export var ReshardingTest = class {
         // For timeseries resharding.
         /** @private */
         this._bucketNs = undefined;
+        /** @private */
+        this._timeseriesMetaField = undefined;
 
         // Properties set by startReshardingInBackground() and withReshardingInBackground().
         /** @private */
@@ -387,6 +389,7 @@ export var ReshardingTest = class {
 
             this._bucketNs = `${sourceDB.getName()}.${bucketCollName}`;
             this._sourceCollectionUUID = bucketUUID;
+            this._timeseriesMetaField = collOptions.timeseries.metaField;
 
             tempCollNamePrefix = "system.buckets.resharding";
             this._underlyingSourceNs = this._bucketNs;
@@ -397,7 +400,6 @@ export var ReshardingTest = class {
         }
 
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
-
         this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
 
         return sourceCollection;
@@ -1009,6 +1011,30 @@ export var ReshardingTest = class {
         }
     }
 
+    /**
+     * Translates a user-provided shard key to the internal format for timeseries collections.
+     * For timeseries collections, the metaField name (e.g., "metadata") is replaced with "meta".
+     * For non-timeseries collections, returns the shard key unchanged.
+     * @private
+     */
+    _translateTimeseriesShardKey(shardKey) {
+        if (this._timeseriesMetaField === undefined) {
+            return shardKey;
+        }
+
+        const translatedKey = {};
+        for (const [field, value] of Object.entries(shardKey)) {
+            if (field === this._timeseriesMetaField) {
+                translatedKey["meta"] = value;
+            } else if (field.startsWith(this._timeseriesMetaField + ".")) {
+                translatedKey["meta" + field.substring(this._timeseriesMetaField.length)] = value;
+            } else {
+                translatedKey[field] = value;
+            }
+        }
+        return translatedKey;
+    }
+
     /** @private */
     _checkCoordinatorPostState(expectedErrorCode) {
         assert.eq(
@@ -1042,12 +1068,17 @@ export var ReshardingTest = class {
                    `didn't find config.collections entry for ${this._underlyingSourceNs}`);
 
         if (expectedErrorCode === ErrorCodes.OK) {
-            assert.eq(this._newShardKey,
-                      collEntry.key,
-                      "shard key pattern didn't change despite resharding having succeeded");
-            assert.neq(this._sourceCollectionUUID,
-                       collEntry.uuid,
-                       "collection UUID didn't change despite resharding having succeeded");
+            const expectedShardKey = this._translateTimeseriesShardKey(this._newShardKey);
+            assert.eq(
+                expectedShardKey,
+                collEntry.key,
+                "shard key pattern didn't change despite resharding having succeeded",
+            );
+            assert.neq(
+                this._sourceCollectionUUID,
+                collEntry.uuid,
+                "collection UUID didn't change despite resharding having succeeded",
+            );
         } else {
             assert.eq(this._currentShardKey,
                       collEntry.key,
