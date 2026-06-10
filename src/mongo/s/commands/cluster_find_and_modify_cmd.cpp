@@ -66,6 +66,7 @@
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -73,6 +74,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(findAndModifyChangeOwningShardThrowsInterruptedAtShutdown);
 
 constexpr size_t kMaxDatabaseCreationAttempts = 3u;
 
@@ -839,6 +842,11 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
     BSONObjBuilder* result) {
     RouterOperationContextSession routerSession(opCtx);
     try {
+        if (MONGO_unlikely(
+                findAndModifyChangeOwningShardThrowsInterruptedAtShutdown.shouldFail())) {
+            uasserted(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
+        }
+
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
@@ -894,8 +902,9 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         }
 
         auto txnRouterForAbort = TransactionRouter::get(opCtx);
-        if (txnRouterForAbort)
+        if (txnRouterForAbort && txnRouterForAbort.isInitialized()) {
             txnRouterForAbort.implicitlyAbortTransaction(opCtx, e.toStatus());
+        }
 
         throw;
     }
