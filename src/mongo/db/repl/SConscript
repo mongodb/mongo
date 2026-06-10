@@ -1031,6 +1031,7 @@ env.Library(
         'oplog_entry',
         'optime',
         'read_concern_args',
+        'repl_server_parameters',
     ],
 )
 

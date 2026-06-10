@@ -38,6 +38,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
@@ -81,6 +82,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
+MONGO_FAIL_POINT_DEFINE(hangBeforeFetcherFindCommandOnOplog);
 
 const auto kTermField = "term"_sd;
 
@@ -445,6 +447,14 @@ public:
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
             if (term && isOplogNss) {
+                if (MONGO_unlikely(hangBeforeFetcherFindCommandOnOplog.shouldFail())) {
+                    LOGV2(10616500,
+                          "Hit hangBeforeFetcherFindCommandOnOplog enabled, hanging while set");
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &hangBeforeFetcherFindCommandOnOplog,
+                        opCtx,
+                        "hangBeforeFetcherFindCommandOnOplog");
+                }
                 // We do not want to wait to take tickets for internal (replication) oplog reads.
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
