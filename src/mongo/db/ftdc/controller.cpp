@@ -34,22 +34,34 @@
 
 #include <memory>
 
+#include "mongo/base/counter.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/ftdc/collector.h"
+#include "mongo/db/ftdc/ftdc_controller_gen.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(ftdcThrowBSONObjectTooLarge);
+
+namespace {
+auto& totalDiscardedSamples = makeServerStatusMetric<Counter64>("ftdc.totalDiscardedSamples");
+}  // namespace
 
 Status FTDCController::setEnabled(bool enabled) {
     stdx::lock_guard<Latch> lock(_mutex);
@@ -190,9 +202,9 @@ void FTDCController::stop() {
     }
 }
 
-void FTDCController::doLoop() noexcept {
-    // Note: All exceptions thrown in this loop are considered process fatal. The default terminate
-    // is used to provide a good stack trace of the issue.
+void FTDCController::doLoop() {
+    // Note: All exceptions thrown in this loop are considered process fatal. Any uncaught exception
+    // propagating out of a thread will invoke std::terminate with a useful stack trace.
     Client::initThread(kFTDCThreadName);
     Client* client = &cc();
 
@@ -248,20 +260,47 @@ void FTDCController::doLoop() noexcept {
                 _mgr = uassertStatusOK(std::move(swMgr));
             }
 
-            auto collectSample = _periodicCollectors.collect(client);
+            try {
+                if (MONGO_unlikely(ftdcThrowBSONObjectTooLarge.shouldFail())) {
+                    uasserted(ErrorCodes::BSONObjectTooLarge,
+                              "Injected BSONObjectTooLarge exception for testing");
+                }
 
-            Status s = _mgr->writeSampleAndRotateIfNeeded(
-                client, std::get<0>(collectSample), std::get<1>(collectSample));
+                auto collectSample = _periodicCollectors.collect(client);
 
-            uassertStatusOK(s);
+                Status s = _mgr->writeSampleAndRotateIfNeeded(
+                    client, std::get<0>(collectSample), std::get<1>(collectSample));
 
-            // Store a reference to the most recent document from the periodic collectors
-            {
-                stdx::lock_guard<Latch> lock(_mutex);
-                _mostRecentPeriodicDocument = std::get<0>(collectSample);
+                uassertStatusOK(s);
+
+                // Store a reference to the most recent document from the periodic collectors
+                {
+                    stdx::lock_guard<Latch> lock(_mutex);
+                    _mostRecentPeriodicDocument = std::get<0>(collectSample);
+                }
+            } catch (const DBException& e) {
+                logCollectionError(e.toStatus());
+                // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
+                // catch the code directly because it does not have a definition in error_codes.yml.
+                if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
+                    gDiagnosticDataCollectionDiscardLargeSamples.load()) {
+                    totalDiscardedSamples.increment();
+                    continue;
+                }
+                throw;
+            } catch (...) {
+                logCollectionError(exceptionToStatus());
+                throw;
             }
         }
     }
+}
+
+void FTDCController::logCollectionError(Status error) {
+    LOGV2_DEBUG(11558500,
+                _serverStatusSectionsLogSeverity().toInt(),
+                "Encountered an error while collecting an FTDC sample",
+                "error"_attr = error);
 }
 
 }  // namespace mongo

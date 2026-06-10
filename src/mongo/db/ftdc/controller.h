@@ -37,6 +37,7 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -146,7 +147,9 @@ private:
     /**
      * Do periodic statistics collection, and all other work on the background thread.
      */
-    void doLoop() noexcept;
+    void doLoop();
+
+    void logCollectionError(Status error);
 
 private:
     /**
@@ -212,6 +215,9 @@ private:
 
     // Background collection and writing thread
     stdx::thread _thread;
+
+    logv2::SeveritySuppressor _serverStatusSectionsLogSeverity{
+        Minutes{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
 }  // namespace mongo

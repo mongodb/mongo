@@ -43,11 +43,15 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_controller_gen.h"
 #include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -157,6 +161,33 @@ public:
         builder.append("hostinfo", 37);
         builder.append("buildinfo", 53);
     }
+};
+
+class MockBSONObjectTooLargeCollector : public FTDCCollectorInterface {
+public:
+    void collect(OperationContext*, BSONObjBuilder&) final {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "MockBSONObjectTooLargeCollector");
+    }
+
+    std::string name() const final {
+        return "MockBSONObjectTooLargeCollector";
+    }
+};
+
+class MockLargeDataCollector : public FTDCCollectorInterface {
+public:
+    explicit MockLargeDataCollector(int32_t largeDataSize) : _largeDataSize(largeDataSize) {}
+
+    void collect(OperationContext*, BSONObjBuilder& builder) final {
+        builder.append("testingDataLarge", std::string(_largeDataSize, 'a'));
+    }
+
+    std::string name() const final {
+        return "MockLargeDataCollector";
+    }
+
+private:
+    int32_t _largeDataSize;
 };
 
 // Test a run of the controller and the data it logs to log file
@@ -281,6 +312,102 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
     auto alog = files[0];
 
     ValidateDocumentList(alog, allDocs, FTDCValidationMode::kStrict);
+}
+
+TEST_F(FTDCControllerTest, DiscardLargeSamplesWithBSONObjectTooLargeExceptionWhenEnabled) {
+    RAIIServerParameterControllerForTest discardLargeFTDCSamples(
+        "diagnosticDataCollectionDiscardLargeSamples", true);
+
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path dir(tempdir.path());
+
+    createDirectoryClean(dir);
+
+    FTDCConfig config;
+    config.enabled = true;
+    config.period = Milliseconds(1);
+    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
+    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
+
+    // c1 is used to count successful iterations; it must be added before
+    // MockBSONObjectTooLargeCollector so it gets called before the exception is thrown.
+    auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
+    auto c1Ptr = c1.get();
+    c1Ptr->setSignalOnCount(5);
+
+    FTDCController c(dir, config);
+    c.addPeriodicCollector(std::move(c1));
+    c.addPeriodicCollector(std::make_unique<MockBSONObjectTooLargeCollector>());
+
+    c.start();
+
+    // If BSONObjectTooLarge was not discarded, the controller would have crashed before
+    // c1 could reach its wait count.
+    c1Ptr->wait();
+
+    c.stop();
+}
+
+TEST_F(FTDCControllerTest, DiscardLargeSamplesWithBufBuilderExceptionWhenEnabled) {
+    RAIIServerParameterControllerForTest discardLargeFTDCSamples(
+        "diagnosticDataCollectionDiscardLargeSamples", true);
+
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path dir(tempdir.path());
+
+    createDirectoryClean(dir);
+
+    FTDCConfig config;
+    config.enabled = true;
+    config.period = Milliseconds(1);
+    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
+    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
+
+    // c1 is used to count successful iterations; it must be added before the large data
+    // collectors so it gets called before the BufBuilder overflow is triggered.
+    auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
+    auto c1Ptr = c1.get();
+    c1Ptr->setSignalOnCount(5);
+
+    FTDCController c(dir, config);
+    c.addPeriodicCollector(std::move(c1));
+    c.addPeriodicCollector(std::make_unique<MockLargeDataCollector>(50 * 1024 * 1024));
+    c.addPeriodicCollector(std::make_unique<MockLargeDataCollector>(60 * 1024 * 1024));
+    c.addPeriodicCollector(std::make_unique<MockLargeDataCollector>(70 * 1024 * 1024));
+
+    c.start();
+
+    // If the BufBuilder overflow was not discarded, the controller would have crashed before
+    // c1 could reach its wait count.
+    c1Ptr->wait();
+
+    c.stop();
+}
+
+using FTDCControllerTestDeathTest = FTDCControllerTest;
+
+DEATH_TEST_REGEX_F(FTDCControllerTestDeathTest,
+                   LogAndTerminateWhenBSONObjectTooLargeExceptionThrown,
+                   "11558500.*Encountered an error while collecting an FTDC sample") {
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path dir(tempdir.path());
+
+    createDirectoryClean(dir);
+
+    FTDCConfig config;
+    config.enabled = true;
+    config.period = Milliseconds(1);
+    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
+    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
+
+    FTDCController c(dir, config);
+    c.addPeriodicCollector(std::make_unique<MockBSONObjectTooLargeCollector>());
+
+    c.start();
+
+    // The controller background thread will terminate the process after encountering the
+    // unhandled exception. Sleep to allow the thread to run and crash.
+    mongo::sleepFor(Seconds(60));
 }
 
 }  // namespace mongo

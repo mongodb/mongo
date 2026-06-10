@@ -20,12 +20,14 @@ ftdcEnv.Library(
         'file_manager.cpp',
         'file_reader.cpp',
         'file_writer.cpp',
+        'ftdc_controller.idl',
         'util.cpp',
         'varint.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/s2/s2',  # For VarInt
