@@ -649,7 +649,8 @@ bool MultiPlanStage::hasBackupPlan() const {
 [[nodiscard]] PlanExplainerData MultiPlanStage::extractPlanExplainerData() {
     tassert(11540200,
             "expected some plans to have been rejected before extracting their explain data",
-            _rejected.size() > 0 || (hasBackupPlan() && _candidates.size() == 2));
+            _candidates.size() == 1 || _rejected.size() > 0 ||
+                (hasBackupPlan() && _candidates.size() == 2));
     PlanExplainerData planExplainerData;
     planExplainerData.rejectedPlansWithStages.reserve(_rejected.size());
 

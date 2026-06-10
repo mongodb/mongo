@@ -85,13 +85,15 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
 
     auto& solutions = rctx.solutions;
 
+    // This strategy uses MultiPlanStage internally, which changes explain output
+    // (allPlansExecution) and can make explain fail if the trial phase hits an execution error
+    // (e.g. sort memory limit). Single solutions don't need ranking anyway.
     if (solutions.size() == 1) {
-        // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
-        // so it applies everywhere. Only one solution, no need to rank.
         PlanRankingResult out;
         out.solutions.push_back(std::move(solutions.front()));
         return out;
     }
+
     auto solutionsSize = solutions.size();  // Caching the value before moving it.
     _multiPlanner.emplace(std::move(plannerData), std::move(solutions), PlanExplainerData{});
     // Cap the number of works per plan during this first trials phase so that the total works

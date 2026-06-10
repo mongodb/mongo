@@ -150,15 +150,6 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     auto& solutions = rctx.solutions;
 
     size_t numSolutions = solutions.size();
-
-    if (solutions.size() == 1) {
-        // TODO SERVER-115496 Make sure this short circuit logic is also taken to main plan_ranking
-        // so it applies everywhere. Only one solution, no need to rank.
-        PlanRankingResult out;
-        out.solutions.push_back(std::move(solutions.front()));
-        return out;
-    }
-
     // Analyze all solutions for some structural properties
     size_t skipCount = 0;
     // TODO SERVER-115645 use the child of LIMIT/SORT nodes to estimate plan productivity

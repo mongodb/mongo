@@ -151,17 +151,6 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     numPlansTotal.increment(numSolutions);
     invocationCount.increment();
 
-    if (solutions.size() == 1 &&
-        (!query.getExplain() ||
-         // TODO(SERVER-118659): Remove this disjunction once we support costing count_scan
-         QueryPlannerAnalysis::isCountScan(solutions[0].get()))) {
-        // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
-        // so it applies everywhere. Only one solution, no need to rank.
-        std::vector<std::unique_ptr<QuerySolution>> solns;
-        solns.push_back(std::move(solutions[0]));
-        return PlanRankingResult{.solutions = std::move(solns)};
-    }
-
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
     std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
     if (plannerParams.planRankerMode == QueryPlanRankerModeEnum::kExactCE) {
