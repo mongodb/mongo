@@ -691,15 +691,6 @@ public:
 
             hangAfterConfigServerChangedFCV.pauseWhileSet(opCtx);
 
-            if (role && role->has(ClusterRole::ShardServer)) {
-                // This helper function is only for any actions that should be done specifically on
-                // shard servers during phase 1 of the 3-phase setFCV protocol for sharded clusters.
-                // For example, before completing phase 1, we must wait for backward incompatible
-                // ShardingCoordinators to finish.
-                // We do not expect any other feature-specific work to be done in the 'start' phase.
-                _shardServerPhase1Tasks(opCtx, requestedVersion);
-            }
-
             if (role && role->has(ClusterRole::ConfigServer)) {
                 uassert(ErrorCodes::Error(6794600),
                         "Failing downgrade due to "
@@ -723,10 +714,14 @@ public:
                       "toVersion"_attr = requestedVersion);
                 _sendEnterSetFCVPhaseRequestToShard(
                     opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
+            }
 
-                // The config server may also be a shard, so have it run any shard server tasks.
-                // Run this after sending the first phase to shards so they enter the transition
-                // state even if this throws.
+            if (role && role->has(ClusterRole::ShardServer)) {
+                // This helper function is only for any actions that should be done specifically on
+                // shard servers during phase 1 of the 3-phase setFCV protocol for sharded clusters.
+                // For example, before completing phase 1, we must wait for backward incompatible
+                // ShardingCoordinators to finish.
+                // We do not expect any other feature-specific work to be done in the 'start' phase.
                 _shardServerPhase1Tasks(opCtx, requestedVersion);
             }
         }

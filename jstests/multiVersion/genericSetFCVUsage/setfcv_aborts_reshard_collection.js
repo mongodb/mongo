@@ -4,12 +4,13 @@
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-function runTest({forcePooledConnectionsDropped, withUUID}) {
-    const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+function runTest({forcePooledConnectionsDropped, withUUID, configShard}) {
+    const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true, configShard});
     reshardingTest.setup();
 
     const donorShardNames = reshardingTest.donorShardNames;
@@ -27,7 +28,12 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
     let mongos = inputCollection.getMongo();
 
     jsTestLog(
-        "Testing with forcePooledConnectionsDropped: " + forcePooledConnectionsDropped + " withUUID: " + withUUID,
+        "Testing with forcePooledConnectionsDropped: " +
+            forcePooledConnectionsDropped +
+            " withUUID: " +
+            withUUID +
+            " configShard: " +
+            configShard,
     );
 
     for (let x = 0; x < 1000; x++) {
@@ -193,3 +199,6 @@ runTest({forcePooledConnectionsDropped: true});
 // to completely clear the config server's state collection.  Because this test takes a while
 // we don't try all combinations of forcePooledCollectionsDropped and withUUID.
 runTest({forcePooledConnectionsDropped: false, withUUID: true});
+
+// Run on Config Shard topology (regression test for SERVER-128025).
+runTest({forcePooledConnectionsDropped: false, configShard: true});
