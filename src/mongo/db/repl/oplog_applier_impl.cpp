@@ -802,12 +802,16 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                         "Failed to apply batch of operations. Number of operations in "
                         "batch: {numOperationsInBatch}. First operation: {firstOperation}. "
                         "Last operation: "
-                        "{lastOperation}. Oplog application failed in writer thread "
+                        "{lastOperation}. First operation opTime: {firstOperationOpTime}. "
+                        "Last operation opTime: "
+                        "{lastOperationOpTime}. Oplog application failed in writer thread "
                         "{failedWriterThread}: {error}",
                         "Failed to apply batch of operations",
                         "numOperationsInBatch"_attr = ops.size(),
                         "firstOperation"_attr = redact(ops.front().toBSONForLogging()),
                         "lastOperation"_attr = redact(ops.back().toBSONForLogging()),
+                        "firstOperationOpTime"_attr = ops.front().getOpTime(),
+                        "lastOperationOpTime"_attr = ops.back().getOpTime(),
                         "failedWriterThread"_attr = std::distance(statusVector.cbegin(), it),
                         "error"_attr = redact(status));
                     return status;

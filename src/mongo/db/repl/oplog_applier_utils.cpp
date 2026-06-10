@@ -568,11 +568,13 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                     continue;
                 }
 
-                LOGV2_FATAL_CONTINUE(21237,
-                                     "Error applying operation ({oplogEntry}): {error}",
-                                     "Error applying operation",
-                                     "oplogEntry"_attr = redact(op->toBSONForLogging()),
-                                     "error"_attr = causedBy(redact(status)));
+                LOGV2_FATAL_CONTINUE(
+                    21237,
+                    "Error applying operation ({oplogEntry}) at optime {opTime}: {error}",
+                    "Error applying operation",
+                    "opTime"_attr = op->getOpTime(),
+                    "oplogEntry"_attr = redact(op->toBSONForLogging()),
+                    "error"_attr = causedBy(redact(status)));
                 return status;
             }
         } catch (const DBException& e) {
@@ -589,11 +591,13 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                 continue;
             }
 
-            LOGV2_FATAL_CONTINUE(21238,
-                                 "writer worker caught exception: {error} on: {oplogEntry}",
-                                 "Writer worker caught exception",
-                                 "error"_attr = redact(e),
-                                 "oplogEntry"_attr = redact(op->toBSONForLogging()));
+            LOGV2_FATAL_CONTINUE(
+                21238,
+                "writer worker caught exception: {error} on: {oplogEntry} at opTime {opTime}",
+                "Writer worker caught exception",
+                "error"_attr = redact(e),
+                "opTime"_attr = op->getOpTime(),
+                "oplogEntry"_attr = redact(op->toBSONForLogging()));
             return e.toStatus();
         }
     }
