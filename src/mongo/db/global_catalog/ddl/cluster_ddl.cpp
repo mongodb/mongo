@@ -242,14 +242,6 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
 
     const bool isSharded = !request.getUnsplittable();
     auto cmdObjWithWc = [&]() {
-        // TODO SERVER-77915: Remove the check "isSharded && nss.isConfigDB()" once 8.0 becomes last
-        // LTS. This is a special check for config.system.sessions since the request comes from
-        // the CSRS which is upgraded first
-        if (isSharded && nss.isConfigDB()) {
-            generic_argument_util::setMajorityWriteConcern(request);
-            return request.toBSON();
-        }
-
         // Upgrade the request WC to 'majority', unless it is part of a transaction
         // (where only the implicit default value can be applied).
         if (!opCtx->inMultiDocumentTransaction()) {

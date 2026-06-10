@@ -245,8 +245,6 @@ public:
                     }
 
                     bool mustTrackOnMoveCollection =
-                        feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabled(
-                            (*optFixedFcvRegion)->acquireFCVSnapshot()) &&
                         request().getRegisterExistingCollectionInGlobalCatalog();
 
                     if (!mustTrackOnMoveCollection && !isFromCreateUnsplittableCommand) {

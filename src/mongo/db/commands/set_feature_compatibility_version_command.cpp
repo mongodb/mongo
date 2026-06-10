@@ -926,24 +926,6 @@ private:
                             return ofcv == originalVersion;
                         });
             } else {
-                // TODO SERVER-77915: Remove once v8.0 branches out
-                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection
-                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                      originalVersion)) {
-                    ShardingCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, CoordinatorTypeEnum::kRenameCollection);
-                }
-
-                // TODO SERVER-77915: Remove once v8.0 branches out.
-                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection
-                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                      originalVersion)) {
-                    ShardingCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                                   CoordinatorTypeEnum::kCollMod);
-                }
-
                 // TODO (SERVER-97816): Remove once 9.0 becomes last lts.
                 if (feature_flags::gUseTopologyChangeCoordinators
                         .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,

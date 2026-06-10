@@ -300,15 +300,11 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 
         if (!collection.exists()) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(opCtx, ns));
-            // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
             // TODO (SERVER-82066): Update handling for direct connections.
             // TODO (SERVER-86254): Update handling for transactions and retryable writes.
             boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
                 allowCollectionCreation;
-            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            if (!fcvSnapshot.isVersionInitialized() ||
-                !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
-                !OperationShardingState::get(opCtx).isShardingAware(opCtx) ||
+            if (!OperationShardingState::get(opCtx).isShardingAware(opCtx) ||
                 (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
                 allowCollectionCreation.emplace(opCtx, ns);
             }
@@ -1061,15 +1057,11 @@ UpdateResult performUpdate(OperationContext* opCtx,
     if (!collection.exists() && upsert) {
         CollectionWriter collectionWriter(opCtx, &collection);
         uassertStatusOK(userAllowedCreateNS(opCtx, nsString));
-        // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
         // TODO (SERVER-82066): Update handling for direct connections.
         // TODO (SERVER-86254): Update handling for transactions and retryable writes.
         boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
             allowCollectionCreation;
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        if (!fcvSnapshot.isVersionInitialized() ||
-            !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
-            !OperationShardingState::get(opCtx).isShardingAware(opCtx) ||
+        if (!OperationShardingState::get(opCtx).isShardingAware(opCtx) ||
             (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
             allowCollectionCreation.emplace(opCtx, nsString);
         }

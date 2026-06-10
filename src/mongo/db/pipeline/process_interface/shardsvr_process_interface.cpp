@@ -470,61 +470,29 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
                                                           const DatabaseName& dbName,
                                                           const BSONObj& cmdObj,
                                                           boost::optional<ShardId> dataShard) {
-    // TODO (SERVER-77915): Remove the FCV check and keep only the 'else' branch
-    if (!feature_flags::g80CollectionCreationPath.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        sharding::router::DBPrimaryRouter router(opCtx, dbName);
-        router.createDbImplicitlyOnRoute(dataShard);
-        router.route("ShardServerProcessInterface::_createCollectionCommon",
-                     [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                         BSONObjBuilder finalCmdBuilder(cmdObj);
-                         finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                                                opCtx->getWriteConcern().toBSON());
-                         BSONObj finalCmdObj = finalCmdBuilder.obj();
-                         auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                             opCtx,
-                             dbName,
-                             cdb,
-                             finalCmdObj,
-                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                             Shard::RetryPolicy::kIdempotent);
-                         uassertStatusOKWithContext(response.swResponse,
-                                                    str::stream() << "failed while running command "
-                                                                  << finalCmdObj);
-                         auto result = response.swResponse.getValue().data;
-                         uassertStatusOKWithContext(getStatusFromCommandResult(result),
-                                                    str::stream() << "failed while running command "
-                                                                  << finalCmdObj);
-                         uassertStatusOKWithContext(
-                             getWriteConcernStatusFromCommandResult(result),
-                             str::stream()
-                                 << "write concern failed while running command " << finalCmdObj);
-                     });
-    } else {
-        const auto collName = cmdObj.firstElement().String();
-        const auto nss = NamespaceStringUtil::deserialize(dbName, collName);
+    const auto collName = cmdObj.firstElement().String();
+    const auto nss = NamespaceStringUtil::deserialize(dbName, collName);
 
-        // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj guarantees
-        // to propagate the apiVersion and apiStrict paramers. Note that shardsvrCreateCollection as
-        // internal command will skip the apiVersionCheck. However in case of view, the create
-        // command might run an aggregation. Having those fields propagated guarantees the api
-        // version check will keep working within the aggregation framework.
-        auto request = ShardsvrCreateCollectionRequest::parse(cmdObj, IDLParserContext("create"));
+    // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj guarantees
+    // to propagate the apiVersion and apiStrict paramers. Note that shardsvrCreateCollection as
+    // internal command will skip the apiVersionCheck. However in case of view, the create
+    // command might run an aggregation. Having those fields propagated guarantees the api
+    // version check will keep working within the aggregation framework.
+    auto request = ShardsvrCreateCollectionRequest::parse(cmdObj, IDLParserContext("create"));
 
-        ShardsvrCreateCollection shardsvrCollCommand(nss);
-        request.setUnsplittable(true);
+    ShardsvrCreateCollection shardsvrCollCommand(nss);
+    request.setUnsplittable(true);
 
-        // Configure the data shard if one was requested.
-        request.setDataShard(dataShard);
+    // Configure the data shard if one was requested.
+    request.setDataShard(dataShard);
 
-        shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
-        sharding::router::DBPrimaryRouter router(opCtx, dbName);
-        router.createDbImplicitlyOnRoute(dataShard);
-        router.route("ShardServerProcessInterface::_createCollectionCommon",
-                     [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                         cluster::createCollection(opCtx, shardsvrCollCommand);
-                     });
-    }
+    shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
+    sharding::router::DBPrimaryRouter router(opCtx, dbName);
+    router.createDbImplicitlyOnRoute(dataShard);
+    router.route("ShardServerProcessInterface::_createCollectionCommon",
+                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                     cluster::createCollection(opCtx, shardsvrCollCommand);
+                 });
 }
 
 void ShardServerProcessInterface::createCollection(OperationContext* opCtx,

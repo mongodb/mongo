@@ -56,25 +56,6 @@ feature_flags:
         version: 8.0
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
-    # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
-    featureFlagTrackUnshardedCollectionsUponMoveCollection:
-        description: "Feature flag for enabling the tracking of user unsharded collection upon moveCollection"
-        cpp_varname: feature_flags::gTrackUnshardedCollectionsUponMoveCollection
-        default: true
-        version: 8.0
-        fcv_gated: true
-        check_against_fcv: legacy_fcv_snapshot_only
-    # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
-    featureFlag80CollectionCreationPath:
-        description:
-            "Feature flag protecting all codepaths that rely on the 8.0 way of collection creation in a
-            sharded cluster. Namely, no implicit creations by the shards and no usage of the
-            storage-level create command."
-        cpp_varname: feature_flags::g80CollectionCreationPath
-        default: true
-        version: 8.0
-        fcv_gated: true
-        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagCreateDatabaseDDLCoordinator:
         description: >
             Feature flag for enabling the sharding DDL coordinator for database creation.

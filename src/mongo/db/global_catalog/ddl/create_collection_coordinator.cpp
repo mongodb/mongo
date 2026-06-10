@@ -1289,14 +1289,8 @@ boost::optional<UUID> createCollectionAndIndexes(
     LOGV2_DEBUG(
         5277903, 2, "Create collection createCollectionAndIndexes", logAttrs(translatedNss));
 
-    // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
-    boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
-        allowCollectionCreation;
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (!fcvSnapshot.isVersionInitialized() ||
-        feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot)) {
-        allowCollectionCreation.emplace(opCtx, originalNss);
-    }
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE allowCollectionCreation(
+        opCtx, originalNss);
 
     auto translatedRequest = request;
     translatedRequest.setCollation(translatedRequestParams.getCollation());

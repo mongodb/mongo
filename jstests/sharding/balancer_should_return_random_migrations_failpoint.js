@@ -2,7 +2,6 @@
  * Testing random migration failpoint
  * @tags: [
  *  requires_fcv_80,
- *  featureFlagTrackUnshardedCollectionsUponMoveCollection,
  * ]
  */
 
