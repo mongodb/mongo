@@ -38,6 +38,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -179,22 +180,24 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
             return duplicateKey;
         }
 
-        WriteUnitOfWork wuow(opCtx);
-        if (auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-            uassertStatusOK(container_write::remove(
-                opCtx,
-                *shard_role_details::getRecoveryUnit(opCtx),
-                std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get(),
-                record->id.getLong()));
-        } else {
-            rs.deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
-        }
-
         constraintsCursor->save();
-        wuow.commit();
+        writeConflictRetry(opCtx, "DuplicateKeyTracker::checkConstraints", coll->ns(), [&] {
+            WriteUnitOfWork wuow{opCtx};
+            if (auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                fcvSnapshot.isVersionInitialized() &&
+                feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                uassertStatusOK(container_write::remove(
+                    opCtx,
+                    *shard_role_details::getRecoveryUnit(opCtx),
+                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer())
+                        .get(),
+                    record->id.getLong()));
+            } else {
+                rs.deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
+            }
+            wuow.commit();
+        });
         constraintsCursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
 
         {

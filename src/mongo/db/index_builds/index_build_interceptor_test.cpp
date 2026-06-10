@@ -752,6 +752,39 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
     }
 }
 
+TEST_F(IndexBuilderInterceptorTest, CheckDuplicateKeyConstraintsSurvivesWriteConflict) {
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto indexBuildInfo =
+        buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    auto entry = getIndexEntry("a_1");
+
+    key_string::HeapBuilder ksBuilder{key_string::Version::kLatestVersion};
+    ksBuilder.appendNumberLong(10);
+    auto keyString = ksBuilder.release();
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(interceptor->recordDuplicateKey(
+            operationContext(), _coll->getCollectionPtr(), entry, keyString));
+        wuow.commit();
+    }
+    ASSERT_EQ(getDuplicateKeyTableContents(indexBuildInfo).size(), 1);
+
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        auto initialTimesEntered = failPoint->initialTimesEntered();
+        ASSERT_OK(interceptor->checkDuplicateKeyConstraints(
+            operationContext(), _coll->getCollectionPtr(), entry));
+        EXPECT_EQ((*failPoint)->waitForTimesEntered(initialTimesEntered), initialTimesEntered + 1);
+    }
+    EXPECT_EQ(getDuplicateKeyTableContents(indexBuildInfo).size(), 0);
+}
+
 TEST_F(IndexBuilderInterceptorTest, DeferredTableCreation) {
     auto indexBuildInfo =
         buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
