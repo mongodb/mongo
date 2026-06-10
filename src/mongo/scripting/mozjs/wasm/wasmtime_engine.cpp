@@ -98,8 +98,6 @@ mongo::Scope* WasmtimeScriptEngine::createScopeForCurrentThread(
     return new WasmtimeImplScope(createWasmEngineContext(), resolvedLimit);
 }
 
-// TODO (SERVER-122128): Implement interrupt support
-// Registering is primarily used for interrupt to find the right scope to kill.
 void WasmtimeScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
     if (opCtx && (*opCtx)[operationWasmtimeScopeDecoration]) {
         (*opCtx)[operationWasmtimeScopeDecoration]->kill();
