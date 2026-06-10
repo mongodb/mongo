@@ -209,8 +209,10 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
 
         const [expectedWithoutTieBreaking, expectedWithTieBreaking] = (() => {
             if (isSBE) {
-                // Planning for SBE selects longer index.
-                return [abcIndex, abcIndex];
+                // Without the tie-breaking heuristic, planning for SBE selects the longer index.
+                // With the heuristic enabled, the classic multiplanner (used regardless of SBE
+                // execution) prefers the shorter index prefix, same as classic multiplanning.
+                return [abcIndex, abIndex];
             }
             if (isCBR) {
                 // CBR costs the plan using the shorter index lower, as fewer seeks will be required.
