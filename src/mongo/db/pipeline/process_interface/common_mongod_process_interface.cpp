@@ -108,6 +108,7 @@
 #include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -128,6 +129,7 @@
 
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(hangAfterFirstListCatalogRead);
 namespace {
 
 // Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and each
@@ -345,6 +347,11 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         // the system.views collections.
         docs.clear();
 
+        if (MONGO_unlikely(hangAfterFirstListCatalogRead.shouldFail())) {
+            LOGV2(12223800, "Hanging after first listCatalog read");
+            hangAfterFirstListCatalogRead.pauseWhileSet(opCtx);
+        }
+
         // We want to read all the system.views as well as _mdb_catalog (again) using a consistent
         // snapshot.
         auto primaryNss = systemViewsNamespaces.front().nss();
@@ -372,7 +379,6 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
                        });
         auto acquisitions = acquireCollectionsMaybeLockFree(opCtx, requests);
 
-
         // Read _mdb_catalog again using the same snapshot set up by our collection(s) lock helper.
         // If _mdb_catalog contains a different set of system.views namespaces from the first time
         // we read it, we should discard this set of results and retry from the top (with the
@@ -383,6 +389,7 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         if (!std::equal(systemViewsNamespaces.cbegin(),
                         systemViewsNamespaces.cend(),
                         systemViewsNamespacesFromSecondCatalogRead.cbegin(),
+                        systemViewsNamespacesFromSecondCatalogRead.cend(),
                         [](const auto& lhs, const auto& rhs) { return lhs.nss() == rhs.nss(); })) {
             continue;
         }
