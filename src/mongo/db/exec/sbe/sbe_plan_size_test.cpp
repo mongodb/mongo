@@ -45,7 +45,6 @@
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/merge_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -233,20 +232,6 @@ TEST_F(PlanSizeTest, LimitSkip) {
 TEST_F(PlanSizeTest, LoopJoin) {
     auto stage =
         makeS<LoopJoinStage>(mockS(), mockS(), makeSV(), makeSV(), nullptr, kEmptyPlanNodeId);
-    assertPlanSize(*stage);
-}
-
-TEST_F(PlanSizeTest, MakeObj) {
-    auto stage = makeS<MakeObjStage>(mockS(),
-                                     generateSlotId(),
-                                     generateSlotId(),
-                                     MakeObjFieldBehavior::keep,
-                                     std::vector<std::string>(),
-                                     std::vector<std::string>(),
-                                     makeSV(),
-                                     true,
-                                     false,
-                                     kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
 
