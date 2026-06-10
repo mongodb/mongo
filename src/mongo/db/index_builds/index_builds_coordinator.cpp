@@ -2214,15 +2214,20 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
         }
 
         if (!resumeSucceeded) {
-            uassertStatusOK(index_builds::primary_driven::abort(
-                opCtx,
-                build.dbName,
-                build.collectionUUID,
-                buildUUID,
-                build.indexes,
-                build.indexBuildIdent,
-                {ErrorCodes::InterruptedDueToReplStateChange,
-                 "Aborting primary-driven index build upon step up"}));
+            writeConflictRetry(opCtx,
+                               "abortPrimaryDrivenIndexBuildOnStepUp",
+                               {build.dbName, build.collectionUUID},
+                               [&] {
+                                   uassertStatusOK(index_builds::primary_driven::abort(
+                                       opCtx,
+                                       build.dbName,
+                                       build.collectionUUID,
+                                       buildUUID,
+                                       build.indexes,
+                                       build.indexBuildIdent,
+                                       {ErrorCodes::InterruptedDueToReplStateChange,
+                                        "Aborting primary-driven index build upon step up"}));
+                               });
             LOGV2(11130400,
                   "Index build: failed to resume primary-driven index build, aborting instead",
                   "buildUUID"_attr = buildUUID);
