@@ -81,6 +81,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/join.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -157,8 +158,17 @@ public:
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
+            const auto& updates = UncommittedCatalogUpdates::get(opCtx);
+            std::vector<std::string> collectionsToCreate;
+            for (const auto& update : updates.entries()) {
+                if (update.action == UncommittedCatalogUpdates::Entry::Action::kCreatedCollection) {
+                    collectionsToCreate.push_back(update.nss.toStringForErrorMsg());
+                }
+            }
+            std::string collectionsToCreateCSV = boost::algorithm::join(collectionsToCreate, ", ");
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                    "Cannot create new collections inside distributed transactions",
+                    str::stream() << "Cannot create new collections: " << collectionsToCreateCSV
+                                  << " inside distributed transactions",
                     UncommittedCatalogUpdates::get(opCtx).isEmpty());
 
             uassert(ErrorCodes::NoSuchTransaction,
