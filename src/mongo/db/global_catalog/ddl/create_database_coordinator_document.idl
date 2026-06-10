@@ -58,7 +58,7 @@ structs:
                 description: "Coordinator phase."
                 default: kUnset
             primaryShard:
-                type: shard_id
+                type: shard_ref
                 description: >-
                     Resolved primary shard either from the received parameter or selected by the
                     DDL coordinator.

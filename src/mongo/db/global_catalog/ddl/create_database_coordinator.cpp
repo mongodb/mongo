@@ -117,7 +117,7 @@ void CreateDatabaseCoordinator::_setupPrimaryShard(OperationContext* opCtx) {
     // Selects the primary candidate shard if not specified by the user or selected by the
     // coordinator already. Persists the primary shard information for later phases.
     StateDoc newDoc(_doc);
-    newDoc.setPrimaryShard(sharding_util::selectLeastLoadedNonDrainingShard(opCtx));
+    newDoc.setPrimaryShard(ShardRef{sharding_util::selectLeastLoadedNonDrainingShard(opCtx)});
     _updateStateDocument(opCtx, std::move(newDoc));
 }
 

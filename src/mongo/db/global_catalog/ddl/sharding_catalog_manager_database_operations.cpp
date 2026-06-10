@@ -102,7 +102,7 @@ namespace mongo {
 DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const boost::optional<ShardId>& optResolvedPrimaryShard,
+    const boost::optional<ShardRef>& optResolvedPrimaryShard,
     const SerializationContext& serializationContext) {
     // Make sure to force update of any stale metadata
     ON_BLOCK_EXIT([&] { RoutingInformationCache::get(opCtx)->purgeDatabase(dbName); });
