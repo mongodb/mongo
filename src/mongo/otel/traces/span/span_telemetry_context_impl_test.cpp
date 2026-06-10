@@ -30,6 +30,7 @@
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
 #include "mongo/otel/traces/tracing_utils.h"
+#include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/baggage/baggage_context.h>
@@ -77,6 +78,25 @@ TEST_F(SpanTelemetryContextImplTest, KeepSpanValueIsFalseAfterSettingToTrue) {
 
     impl.keepSpan(false);
     ASSERT_FALSE(impl.shouldKeepSpan());
+}
+
+TEST_F(SpanTelemetryContextImplTest, SamplingRollIsInUnitInterval) {
+    PseudoRandom prng(int64_t{1});
+    SpanTelemetryContextImpl impl(getSpanContext(), &prng);
+    double roll = impl.getSamplingValue();
+    ASSERT_GTE(roll, 0.0);
+    ASSERT_LT(roll, 1.0);
+}
+
+TEST_F(SpanTelemetryContextImplTest, SamplingRollIsMemoized) {
+    PseudoRandom prng(int64_t{1});
+    SpanTelemetryContextImpl impl(getSpanContext(), &prng);
+    double first = impl.getSamplingValue();
+
+    // A second call must return the value drawn on the first call. This is the "one roll per
+    // telemetry context" invariant.
+    double second = impl.getSamplingValue();
+    ASSERT_EQ(first, second);
 }
 
 }  // namespace

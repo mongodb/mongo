@@ -31,8 +31,10 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/otel/telemetry_context.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional.hpp>
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/context.h>
 
@@ -56,8 +58,8 @@ constexpr OtelStringView falseValue = "false";
  */
 class MONGO_MOD_NEEDS_REPLACEMENT SpanTelemetryContextImpl : public TelemetryContext {
 public:
-    explicit SpanTelemetryContextImpl(OtelContext ctx);
-    SpanTelemetryContextImpl() : _ctx() {}
+    explicit SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng = nullptr);
+    SpanTelemetryContextImpl() = default;
 
     /**
      * Sets whether spans created with this context should be kept (exported) or not.
@@ -68,6 +70,17 @@ public:
      * Returns whether spans created with this context should be kept (exported) or not.
      */
     bool shouldKeepSpan() const;
+
+    /**
+     * Returns this telemetry context's sampling roll: a value in [0, 1) used to make sampling
+     * decisions. The value is drawn lazily from the constructor-supplied PRNG on the first call and
+     * then memoized, so every span created on this context observes the same value.
+     *
+     * Drawing a single value per telemetry context (rather than rolling independently per span) is
+     * what keeps the overall trace rate constant when sampling-eligible spans overlap within one
+     * operation -- e.g. when a request traverses both the sharded and DSC paths.
+     */
+    double getSamplingValue();
 
     /**
      * Sets the provided span as the current span on this context.
@@ -96,6 +109,11 @@ public:
 private:
     OtelContext _ctx;
     bool _keepSpan{false};
+    PseudoRandom* _prng{nullptr};
+
+    // The sampling roll for this telemetry context: a value in [0, 1) drawn lazily on first use
+    // and reused for the lifetime of the context. See getSamplingValue().
+    boost::optional<double> _samplingRoll;
 };
 
 }  // namespace traces

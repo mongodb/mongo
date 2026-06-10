@@ -31,6 +31,7 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/tracing_utils.h"
+#include "mongo/util/assert_util.h"
 
 #include <opentelemetry/baggage/baggage_context.h>
 #include <opentelemetry/trace/span_context.h>
@@ -39,13 +40,15 @@ namespace mongo {
 namespace otel {
 namespace traces {
 
-SpanTelemetryContextImpl::SpanTelemetryContextImpl(OtelContext ctx)
-    : _ctx(ctx), _keepSpan([&] {
+SpanTelemetryContextImpl::SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng)
+    : _ctx(ctx),
+      _keepSpan([&] {
           auto baggage = opentelemetry::baggage::GetBaggage(ctx);
           std::string value;
           auto exists = baggage->GetValue(keepSpanKey, value);
           return exists && (value == trueValue);
-      }()) {}
+      }()),
+      _prng(prng) {}
 
 void SpanTelemetryContextImpl::keepSpan(bool keepSpan) {
     _keepSpan = keepSpan;
@@ -53,6 +56,14 @@ void SpanTelemetryContextImpl::keepSpan(bool keepSpan) {
 
 bool SpanTelemetryContextImpl::shouldKeepSpan() const {
     return _keepSpan;
+}
+
+double SpanTelemetryContextImpl::getSamplingValue() {
+    if (!_samplingRoll) {
+        invariant(_prng, "PRNG must be supplied at construction before calling getSamplingValue");
+        _samplingRoll = _prng->nextCanonicalDouble();
+    }
+    return *_samplingRoll;
 }
 
 void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
