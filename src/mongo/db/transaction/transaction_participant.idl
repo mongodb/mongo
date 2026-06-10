@@ -83,6 +83,22 @@ server_parameters:
         validator: {gte: 1}
         redact: false
 
+    maxConcurrentMultiDocumentTransactions:
+        description: >-
+            Maximum number of concurrently open multi-document transactions allowed for external
+            clients on this server. When this limit is reached, new multi-document transactions
+            from external clients will be rejected with TooManyOpenTransactions. Process-internal
+            clients are exempt from this rejection. The count of currently open transactions is
+            server-wide, so process-internal transactions may still contribute to the total used
+            when enforcing this limit for external clients. A value of 0 disables the limit.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gMaxConcurrentMultiDocumentTransactions
+        default: 10000
+        validator:
+            gte: 0
+        redact: false
+
     transactionSizeLimitBytes:
         description: >-
             Maximum total size of operations in a multi-document transaction.
