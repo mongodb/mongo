@@ -1276,6 +1276,90 @@ bool needsCollectionRouter(const LiteParsedPipeline& lpp, const RetryState& stat
             !sharded_agg_helpers::checkIfMustRunOnAllShards(state.currentNamespaces.executionNss,
                                                             pipelineDataSource));
 }
+
+void handleViewKickback(
+    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
+    RetryState& state,
+    OperationContext* opCtx,
+    const NamespaceString& requestedNss,
+    const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
+    BSONObjBuilder* result) {
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangBeforeRetryingAggregateAfterViewKickback,
+        opCtx,
+        "hangBeforeRetryingAggregateAfterViewKickback");
+
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter.onViewResolutionError(opCtx, requestedNss);
+    }
+
+    // When the featureFlagExtensionsInsideHybridSearch IFR flag is on, the
+    // shard discovers that any involved namespace is a view and performs proactive
+    // involved-namespace resolution, sending back a single ResolvedView containing all view
+    // resolution information.
+    // TODO SERVER-121094 Remove when feature flag is removed.
+    auto kickedBackView = ex.extraInfo<ResolvedView>();
+    const bool hybridSearchFlagEnabled = ifrContext &&
+        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+
+    bool foundNewViewEntry = false;
+    if (hybridSearchFlagEnabled && !kickedBackView->getAdditionalResolvedNamespaces().empty()) {
+        for (const auto& rn : kickedBackView->getAdditionalResolvedNamespaces()) {
+            auto it = state.preResolvedNamespaces.find(rn.getNamespace());
+            if (it == state.preResolvedNamespaces.end()) {
+                foundNewViewEntry = true;
+                auto [insertedIt, _] = state.preResolvedNamespaces.emplace(rn.getNamespace(), rn);
+                insertedIt->second.setLiteParserOptions(std::make_shared<LiteParserOptions>(
+                    LiteParserOptions{.ifrContext = ifrContext}));
+            } else {
+                // Already had an entry for this namespace; treat as a non-progressing
+                // re-kickback for this entry. Keep the existing entry to preserve any
+                // earlier work.
+            }
+        }
+    }
+
+    ScopeGuard resetResult([result]() { result->resetToEmpty(); });
+
+    // TODO SERVER-121094 Remove hybrid search flag check when feature flag is removed.
+    if (hybridSearchFlagEnabled && kickedBackView->hasSentinelPrimary()) {
+        uassert(12451400,
+                "Aggregation kickback from shard did not converge: the proactive "
+                "involved-namespace resolution closure was already known on mongos, "
+                "so retrying would re-trigger the same kickback. This typically means "
+                "the request was not rewritten between retries.",
+                foundNewViewEntry);
+        return;
+    }
+
+    // Legacy single-view kickback path: save the resolved view in the state so the next
+    // retry iteration rewrites the pipeline to run against the view's backing namespace.
+    state.resolvedView = chainViews(std::move(state.resolvedView), *kickedBackView);
+
+    // Pre-disable mongot extensions for views. This is an optimization, because we know
+    // these extensions are not eligible to run on views. If we do not implement this
+    // optimization, we will eventually throw the IFR flag kickback retry and end up
+    // restarting ClusterAggregate again.
+    // TODO SERVER-121094 Remove when feature flag is removed.
+    if (!hybridSearchFlagEnabled) {
+        if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension)) {
+            state.ifrFlagsToDisableOnRetries.insert(
+                &feature_flags::gFeatureFlagVectorSearchExtension);
+        }
+        if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension)) {
+            state.ifrFlagsToDisableOnRetries.insert(&feature_flags::gFeatureFlagSearchExtension);
+        }
+    }
+}
+
+void handleIFRFlagRetry(const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
+                        RetryState& state,
+                        BSONObjBuilder* result) {
+    disableIfrFlagAndResetResult(IncrementalRolloutFeatureFlag::findByName(
+                                     ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
+                                 state,
+                                 result);
+}
 }  // namespace
 
 Status ClusterAggregate::runAggregate(
@@ -1518,89 +1602,14 @@ Status ClusterAggregate::runAggregate(
         return finalStatus;
     };
 
-    // Error handler for CommandOnShardedViewNotSupportedOnMongod.
-    // TODO SERVER-128370 Refactor into a dedicated helper.
-    auto onViewError = [&](const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&
-                               ex,
-                           RetryState& state) {
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeRetryingAggregateAfterViewKickback,
-            opCtx,
-            "hangBeforeRetryingAggregateAfterViewKickback");
+    auto onViewError =
+        [&](const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
+            RetryState& state) {
+            handleViewKickback(ex, state, opCtx, namespaces.requestedNss, ifrContext, result);
+        };
 
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter.onViewResolutionError(opCtx, namespaces.requestedNss);
-        }
-
-        // When the featureFlagExtensionsInsideHybridSearch IFR flag is on, the
-        // shard discovers that any involved namespace is a view and performs proactive
-        // involved-namespace resolution, sending back a single ResolvedView containing all view
-        // resolution information.
-        // TODO SERVER-121094 Remove when feature flag is removed.
-        auto kickedBackView = ex.extraInfo<ResolvedView>();
-        const bool hybridSearchFlagEnabled = ifrContext &&
-            ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
-
-        bool foundNewViewEntry = false;
-        if (hybridSearchFlagEnabled && !kickedBackView->getAdditionalResolvedNamespaces().empty()) {
-            for (const auto& rn : kickedBackView->getAdditionalResolvedNamespaces()) {
-                auto it = state.preResolvedNamespaces.find(rn.getNamespace());
-                if (it == state.preResolvedNamespaces.end()) {
-                    foundNewViewEntry = true;
-                    auto [insertedIt, _] =
-                        state.preResolvedNamespaces.emplace(rn.getNamespace(), rn);
-                    insertedIt->second.setLiteParserOptions(std::make_shared<LiteParserOptions>(
-                        LiteParserOptions{.ifrContext = ifrContext}));
-                } else {
-                    // Already had an entry for this namespace; treat as a non-progressing
-                    // re-kickback for this entry. Keep the existing entry to preserve any
-                    // earlier work.
-                }
-            }
-        }
-
-        ScopeGuard resetResult([&result]() { result->resetToEmpty(); });
-
-        // TODO SERVER-121094 Remove hybrid search flag check when feature flag is removed.
-        if (hybridSearchFlagEnabled && kickedBackView->hasSentinelPrimary()) {
-            uassert(12451400,
-                    "Aggregation kickback from shard did not converge: the proactive "
-                    "involved-namespace resolution closure was already known on mongos, "
-                    "so retrying would re-trigger the same kickback. This typically means "
-                    "the request was not rewritten between retries.",
-                    foundNewViewEntry);
-            return;
-        }
-
-        // Legacy single-view kickback path: save the resolved view in the state so the next
-        // retry iteration rewrites the pipeline to run against the view's backing namespace.
-        state.resolvedView = chainViews(std::move(state.resolvedView), *kickedBackView);
-
-        // Pre-disable mongot extensions for views. This is an optimization, because we know
-        // these extensions are not eligible to run on views. If we do not implement this
-        // optimization, we will eventually throw the IFR flag kickback retry and end up
-        // restarting ClusterAggregate again.
-        // TODO SERVER-121094 Remove when feature flag is removed.
-        if (!hybridSearchFlagEnabled) {
-            if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension)) {
-                state.ifrFlagsToDisableOnRetries.insert(
-                    &feature_flags::gFeatureFlagVectorSearchExtension);
-            }
-            if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension)) {
-                state.ifrFlagsToDisableOnRetries.insert(
-                    &feature_flags::gFeatureFlagSearchExtension);
-            }
-        }
-    };
-
-    // Error handler for IFRFlagRetry.
-    // TODO SERVER-128370 Refactor into a dedicated helper.
     auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex, RetryState& state) {
-        // Save the flag to be disabled upon retry.
-        disableIfrFlagAndResetResult(IncrementalRolloutFeatureFlag::findByName(
-                                         ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()),
-                                     state,
-                                     result);
+        handleIFRFlagRetry(ex, state, result);
     };
 
     try {
