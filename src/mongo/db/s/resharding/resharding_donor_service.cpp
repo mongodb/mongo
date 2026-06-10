@@ -495,9 +495,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
             {
                 auto opCtx = _makeOperationContext(factory);
 
-                const bool mustClearMetadata = !feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                    resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                const bool mustClearMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
+                    ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
 
                 // Clear filtering metadata for the temp resharding namespace;
                 // We force a refresh to make sure that the placement information is updated
@@ -985,9 +984,8 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         WriteBlockBypass::get(opCtx.get()).set(true);
         resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
 
-        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                resharding::getVersionContextOrDefault(_metadata.getForwardableOpMetadata()),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             // TODO SERVER-127215: Mark this as not upgrading once rename recovers from disk once it
             // finishes.
             //
@@ -1016,9 +1014,8 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
 
-        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             shard_catalog_commit_for_resharding::commitDropCollection(
                 opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
             // Make sure to also clear out the state of the temporary resharding as it now no longer

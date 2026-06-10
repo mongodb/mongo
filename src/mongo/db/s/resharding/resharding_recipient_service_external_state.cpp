@@ -101,9 +101,8 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 
-    if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-            resharding::getVersionContextOrDefault(metadata.getForwardableOpMetadata()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (metadata.getAuthoritativeMetadataAccessLevel() >=
+        ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
         tassert(12776700,
                 "Expected to have primary shard id given",
                 metadata.getPrimaryShardId().has_value());

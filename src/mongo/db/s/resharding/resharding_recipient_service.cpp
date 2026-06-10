@@ -553,10 +553,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                         auto opCtx = _makeOperationContext(factory);
 
                         bool mustClearFilteringMetadata =
-                            !feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                                resharding::getVersionContextOrDefault(
-                                    _metadata.getForwardableOpMetadata()),
-                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                            _metadata.getAuthoritativeMetadataAccessLevel() ==
+                            ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
 
                         if (mustClearFilteringMetadata) {
                             _externalState->clearFilteringMetadataOnTempReshardingCollection(
@@ -1566,9 +1564,8 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
 
         resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
 
-        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                resharding::getVersionContextOrDefault(_metadata.getForwardableOpMetadata()),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             // TODO SERVER-127215: Mark this as not upgrading once rename recovers from disk once it
             // finishes.
             //
@@ -1624,9 +1621,8 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
 
-        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (_metadata.getAuthoritativeMetadataAccessLevel() >=
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             shard_catalog_commit_for_resharding::commitDropCollection(
                 opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
         }

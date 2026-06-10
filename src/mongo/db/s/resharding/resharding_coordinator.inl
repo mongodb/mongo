@@ -2099,9 +2099,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                 // Additionally, ensure that no more stale chunks are present on the authoritative
                 // shard catalog. At this point there are no users of the old chunks anymore, so
                 // this can be done outside of a critical section.
-                if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                        resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                if (coordinatorDoc.getAuthoritativeMetadataAccessLevel() >=
+                    ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                     resharding::tellAllParticipantsToCleanupStaleChunks(
                         opCtx.get(),
                         _getNewSession(opCtx.get()),
