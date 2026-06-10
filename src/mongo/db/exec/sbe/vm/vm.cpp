@@ -58,112 +58,99 @@ void ByteCode::allocStackImpl(size_t newSizeDelta) noexcept {
 
 ByteCode::TopBottomArgs::~TopBottomArgs() {}
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTags objTag,
-                                                                  value::Value objValue,
-                                                                  value::TypeTags fieldTag,
-                                                                  value::Value fieldValue) {
-    if (!value::isString(fieldTag)) {
-        return {false, value::TypeTags::Nothing, 0};
+value::TagValueView ByteCode::getField(value::TagValueView obj, value::TagValueView field) {
+    if (!value::isString(field.tag)) {
+        return value::TagValueView::nothing();
     }
-
-    auto fieldStr = value::getStringView(fieldTag, fieldValue);
-
-    return getField(objTag, objValue, fieldStr);
+    return getField(obj, value::getStringView(field.tag, field.value));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTags objTag,
-                                                                  value::Value objValue,
-                                                                  StringData fieldStr) {
-    if (MONGO_likely(objTag == value::TypeTags::bsonObject)) {
-        auto be = value::bitcastTo<const char*>(objValue);
-        auto [tag, val] = bson::getField(be, fieldStr);
-        return {false, tag, val};
-    } else if (objTag == value::TypeTags::Object) {
-        auto [tag, val] = value::getObjectView(objValue)->getField(fieldStr);
-        return {false, tag, val};
+value::TagValueView ByteCode::getField(value::TagValueView obj, StringData fieldStr) {
+    if (MONGO_likely(obj.tag == value::TypeTags::bsonObject)) {
+        auto be = value::bitcastTo<const char*>(obj.value);
+        return bson::getField(be, fieldStr);
+    } else if (obj.tag == value::TypeTags::Object) {
+        return value::getObjectView(obj.value)->getField(fieldStr);
     }
-    return {false, value::TypeTags::Nothing, 0};
+    return value::TagValueView::nothing();
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::TypeTags arrTag,
-                                                                    value::Value arrValue,
-                                                                    value::TypeTags idxTag,
-                                                                    value::Value idxValue) {
+value::TagValueView ByteCode::getElement(value::TagValueView arr, value::TagValueView idx) {
     // We need to ensure that 'size_t' is wide enough to store 32-bit index.
     static_assert(sizeof(size_t) >= sizeof(int32_t), "size_t must be at least 32-bits");
 
-    if (!value::isArray(arrTag)) {
-        return {false, value::TypeTags::Nothing, 0};
+    if (!value::isArray(arr.tag)) {
+        return value::TagValueView::nothing();
     }
 
-    if (idxTag != value::TypeTags::NumberInt32) {
-        return {false, value::TypeTags::Nothing, 0};
+    if (idx.tag != value::TypeTags::NumberInt32) {
+        return value::TagValueView::nothing();
     }
 
-    const auto idxInt32 = value::bitcastTo<int32_t>(idxValue);
+    const auto idxInt32 = value::bitcastTo<int32_t>(idx.value);
     const bool isNegative = idxInt32 < 0;
 
-    size_t idx = 0;
+    size_t i = 0;
     if (isNegative) {
         // Upcast 'idxInt32' to 'int64_t' prevent overflow during the sign change.
-        idx = static_cast<size_t>(-static_cast<int64_t>(idxInt32));
+        i = static_cast<size_t>(-static_cast<int64_t>(idxInt32));
     } else {
-        idx = static_cast<size_t>(idxInt32);
+        i = static_cast<size_t>(idxInt32);
     }
 
-    if (arrTag == value::TypeTags::Array) {
-        // If 'arr' is an SBE array, use Array::getAt() to retrieve the element at index 'idx'.
-        auto arrayView = value::getArrayView(arrValue);
+    if (arr.tag == value::TypeTags::Array) {
+        // If 'arr' is an SBE array, use Array::getAt() to retrieve the element at index 'i'.
+        auto arrayView = value::getArrayView(arr.value);
 
-        size_t convertedIdx = idx;
+        size_t convertedIdx = i;
         if (isNegative) {
-            if (idx > arrayView->size()) {
-                return {false, value::TypeTags::Nothing, 0};
+            if (i > arrayView->size()) {
+                return value::TagValueView::nothing();
             }
-            convertedIdx = arrayView->size() - idx;
+            convertedIdx = arrayView->size() - i;
         }
 
-        auto [tag, val] = value::getArrayView(arrValue)->getAt(convertedIdx);
-        return {false, tag, val};
-    } else if (arrTag == value::TypeTags::bsonArray || arrTag == value::TypeTags::ArraySet ||
-               arrTag == value::TypeTags::ArrayMultiSet) {
-        value::ArrayEnumerator enumerator(arrTag, arrValue);
+        return arrayView->getAt(convertedIdx);
+    } else if (value::tagIn(arr.tag,
+                            value::TypeTags::bsonArray,
+                            value::TypeTags::ArraySet,
+                            value::TypeTags::ArrayMultiSet)) {
+        value::ArrayEnumerator enumerator(arr.tag, arr.value);
 
         if (!isNegative) {
-            // Loop through array until we meet element at position 'idx'.
-            size_t i = 0;
-            while (i < idx && !enumerator.atEnd()) {
-                i++;
+            // Loop through array until we meet element at position 'i'.
+            size_t j = 0;
+            while (j < i && !enumerator.atEnd()) {
+                j++;
                 enumerator.advance();
             }
-            // If the array didn't have an element at index 'idx', return Nothing.
+            // If the array didn't have an element at index 'i', return Nothing.
             if (enumerator.atEnd()) {
-                return {false, value::TypeTags::Nothing, 0};
+                return value::TagValueView::nothing();
             }
-            auto [tag, val] = enumerator.getViewOfValue();
-            return {false, tag, val};
+            return enumerator.getViewOfValue();
         }
 
         // For negative indexes we use two pointers approach. We start two array enumerators at the
-        // distance of 'idx' and move them at the same time. Once one of the enumerators reaches the
-        // end of the array, the second one points to the element at position '-idx'.
+        // distance of 'i' and move them at the same time. Once one of the enumerators reaches the
+        // end of the array, the second one points to the element at position '-i'.
         //
-        // First, move one of the enumerators 'idx' elements forward.
-        size_t i = 0;
-        while (i < idx && !enumerator.atEnd()) {
+        // First, move one of the enumerators 'i' elements forward.
+        size_t j = 0;
+        while (j < i && !enumerator.atEnd()) {
             enumerator.advance();
-            i++;
+            j++;
         }
 
-        if (i != idx) {
+        if (j != i) {
             // Array is too small to have an element at the requested index.
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueView::nothing();
         }
 
         // Initiate second enumerator at the start of the array. Now the distance between
-        // 'enumerator' and 'windowEndEnumerator' is exactly 'idx' elements. Move both enumerators
+        // 'enumerator' and 'windowEndEnumerator' is exactly 'i' elements. Move both enumerators
         // until the first one reaches the end of the array.
-        value::ArrayEnumerator windowEndEnumerator(arrTag, arrValue);
+        value::ArrayEnumerator windowEndEnumerator(arr.tag, arr.value);
         while (!enumerator.atEnd() && !windowEndEnumerator.atEnd()) {
             enumerator.advance();
             windowEndEnumerator.advance();
@@ -173,32 +160,27 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::TypeT
                 "Enumerator should not have reached the end of the array",
                 !windowEndEnumerator.atEnd());
 
-        auto [tag, val] = windowEndEnumerator.getViewOfValue();
-        return {false, tag, val};
+        return windowEndEnumerator.getViewOfValue();
     } else {
-        // Earlier in this function we bailed out if the 'arrTag' wasn't Array, ArraySet or
+        // Earlier in this function we bailed out if the 'arr.tag' wasn't Array, ArraySet or
         // bsonArray, so it should be impossible to reach this point.
         MONGO_UNREACHABLE_TASSERT(11122951);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::getFieldOrElement(
-    value::TypeTags objTag,
-    value::Value objValue,
-    value::TypeTags fieldTag,
-    value::Value fieldValue) {
+value::TagValueView ByteCode::getFieldOrElement(value::TagValueView obj,
+                                                value::TagValueView field) {
     // If this is an array and we can convert the "field name" to a reasonable number then treat
     // this as getElement call.
-    if (value::isArray(objTag) && value::isString(fieldTag)) {
+    if (value::isArray(obj.tag) && value::isString(field.tag)) {
         int idx;
-        auto status = NumberParser{}(value::getStringView(fieldTag, fieldValue), &idx);
+        auto status = NumberParser{}(value::getStringView(field.tag, field.value), &idx);
         if (!status.isOK()) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueView::nothing();
         }
-        return getElement(
-            objTag, objValue, value::TypeTags::NumberInt32, value::bitcastFrom<int>(idx));
+        return getElement(obj, value::TagValueView::numberInt32(idx));
     } else {
-        return getField(objTag, objValue, fieldTag, fieldValue);
+        return getField(obj, field);
     }
 }
 

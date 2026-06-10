@@ -442,10 +442,8 @@ public:
     typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
         MultiAccState;
 
-    FastTuple<bool, value::TypeTags, value::Value> getField_test(value::TypeTags objTag,
-                                                                 value::Value objValue,
-                                                                 StringData fieldStr) {
-        return getField(objTag, objValue, fieldStr);
+    value::TagValueView getField_test(value::TagValueView obj, StringData fieldStr) {
+        return getField(obj, fieldStr);
     }
 
 private:
@@ -500,23 +498,13 @@ private:
                                               ArityType arity);
     value::TagValueOwned genericNot(value::TypeTags tag, value::Value value);
 
-    FastTuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
-                                                            value::Value objValue,
-                                                            value::TypeTags fieldTag,
-                                                            value::Value fieldValue);
+    value::TagValueView getField(value::TagValueView obj, value::TagValueView field);
 
-    FastTuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
-                                                            value::Value objValue,
-                                                            StringData fieldStr);
+    value::TagValueView getField(value::TagValueView obj, StringData fieldStr);
 
-    FastTuple<bool, value::TypeTags, value::Value> getElement(value::TypeTags objTag,
-                                                              value::Value objValue,
-                                                              value::TypeTags fieldTag,
-                                                              value::Value fieldValue);
-    FastTuple<bool, value::TypeTags, value::Value> getFieldOrElement(value::TypeTags objTag,
-                                                                     value::Value objValue,
-                                                                     value::TypeTags fieldTag,
-                                                                     value::Value fieldValue);
+    value::TagValueView getElement(value::TagValueView arr, value::TagValueView idx);
+
+    value::TagValueView getFieldOrElement(value::TagValueView obj, value::TagValueView field);
 
     void traverseP(const CodeFragment* code);
     void traverseP(const CodeFragment* code,

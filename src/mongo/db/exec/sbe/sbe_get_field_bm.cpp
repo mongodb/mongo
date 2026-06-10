@@ -56,7 +56,7 @@ public:
         size_t i = 0;
         for (auto _ : state) {
             StringData fieldName = PresencePolicy::template selectField<FieldNamePolicy>(i++);
-            benchmark::DoNotOptimize(byteCode.getField_test(type, val, fieldName));
+            benchmark::DoNotOptimize(byteCode.getField_test({type, val}, fieldName));
         }
     }
 };
