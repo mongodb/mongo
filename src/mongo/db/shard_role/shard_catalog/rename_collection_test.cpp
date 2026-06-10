@@ -70,6 +70,8 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_writes_block_reason_gen.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -1100,6 +1102,21 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithoutLocks) {
     _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
     ASSERT_FALSE(_opObserver->onInsertsIsTargetDatabaseExclusivelyLocked);
+}
+
+TEST_F(RenameCollectionTest,
+       RenameCollectionAcrossDatabasesBlockedAtStartIfReplicaSetWriteBlockIsEnabled) {
+    _createCollection(_opCtx.get(), _sourceNss);
+    _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
+
+    auto* writeBlockState = ReplicaSetWriteBlockState::get(_opCtx.get());
+    ON_BLOCK_EXIT([&] { writeBlockState->disableReplicaSetWriteBlocking(); });
+    writeBlockState->enableReplicaSetWriteBlocking(
+        ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    ASSERT_THROWS_CODE(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}),
+                       DBException,
+                       ErrorCodes::ReplicaSetWritesBlocked);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithLocks) {

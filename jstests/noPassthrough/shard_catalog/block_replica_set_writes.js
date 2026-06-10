@@ -448,6 +448,63 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         );
     });
 
+    it("Test that new rename across databases is blocked when blockReplicaSetWrites is enabled", function () {
+        const sourceCollName = "crossDbRenameTestColl";
+        const targetDBName = this.testDBName + "_crossDbTarget";
+
+        // The rename must be rejected with ReplicaSetWritesBlocked when issued directly against the shard's replica set primary and through mongos. The two paths differ only in the connection used, so run the same flow against both.
+        // in the connection used, so run the same flow against both.
+        for (const {label, conn} of [
+            {label: "mongos", conn: this.st.s},
+            {label: "shard's replica set primary", conn: this.shard0Primary},
+        ]) {
+            const sourceColl = conn.getDB(this.testDBName).getCollection(sourceCollName);
+            const targetDB = conn.getDB(targetDBName);
+            assert.commandWorked(sourceColl.insert({x: 1}));
+
+            // Enable write blocking on shard0 and check that cross-database rename is
+            // blocked.
+            enableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            assert.commandFailedWithCode(
+                conn.adminCommand({
+                    renameCollection: `${this.testDBName}.${sourceCollName}`,
+                    to: `${targetDBName}.${sourceCollName}`,
+                }),
+                ErrorCodes.ReplicaSetWritesBlocked,
+                `Cross-DB rename issued via ${label} should be blocked`,
+            );
+
+            // Source collection should still exist after the blocked rename.
+            assert.eq(
+                1,
+                sourceColl.find({x: 1}).itcount(),
+                "Source collection should still exist after blocked cross-DB rename",
+            );
+
+            // Disable write blocking and check that cross-database rename succeeds.
+            disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+            assert.commandWorked(
+                conn.adminCommand({
+                    renameCollection: `${this.testDBName}.${sourceCollName}`,
+                    to: `${targetDBName}.${sourceCollName}`,
+                }),
+            );
+
+            assert.eq(
+                1,
+                targetDB.getCollection(sourceCollName).find({x: 1}).itcount(),
+                "Target collection should contain the document after successful cross-DB rename",
+            );
+
+            // Clean up the target database via the same connection used for the rename.
+            assert.commandWorked(targetDB.dropDatabase());
+        }
+    });
+
     it("Test that new QE compact and cleanup are blocked when allowDeletions: false", function () {
         // blockedColl is a non-existent collection, so when the commands are not blocked we expect
         // them to fail with NamespaceNotFound. The deletions check fires before collection validation, so a

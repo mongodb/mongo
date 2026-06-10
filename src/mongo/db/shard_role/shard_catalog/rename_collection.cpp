@@ -86,6 +86,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -820,6 +821,13 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     uassert(ErrorCodes::InvalidOptions,
             "Cannot provide an expected collection UUID when renaming across databases",
             !options.expectedSourceUUID && !options.expectedTargetUUID);
+
+    // If the replica set write block is enabled, reject the operation.
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().isReplSet() && replCoord->canAcceptWritesFor(opCtx, target)) {
+        ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(
+            opCtx, target, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
+    }
 
     // Acquire database locks, which are held for the entire duration (data copy, then rename+drop).
     auto [sourceDB, targetDB] = [&]() -> std::pair<AutoGetDb, AutoGetDb> {

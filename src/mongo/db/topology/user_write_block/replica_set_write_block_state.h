@@ -48,8 +48,10 @@ namespace mongo {
 // Identifies the kind of write rejected by checkReplicaSetWritesAllowed so the matching counter
 // can be incremented. Deletes are not included since they are validated separately by
 // checkReplicaSetDeletionsAllowed and tracked through their own counter.
-enum class ReplicaSetWriteBlockRejectedWriteOp { kInsert, kUpdate };
+// TODO (SERVER-125476): Change the enum modularity to PRIVATE
+enum class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockRejectedWriteOp { kInsert, kUpdate };
 
+// TODO (SERVER-125476): Change the class modularity to PRIVATE
 class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockState {
 public:
     ReplicaSetWriteBlockState() = default;

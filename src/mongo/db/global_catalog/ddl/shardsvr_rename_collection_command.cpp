@@ -46,6 +46,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/rename_collection.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 
@@ -112,6 +113,12 @@ public:
                     !fromNss.isAdminDB());
 
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
+
+            // Reject the operation if the replica set write block is enabled. When user
+            // write block is enabled, if there is an in-flight operation, identical requests get
+            // rejected rather than joining the already-running operation.
+            ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(
+                opCtx, toNss, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
 
             auto renameCollectionCoordinator = [&]() {
                 auto coordinatorDoc = RenameCollectionCoordinatorDocument();
