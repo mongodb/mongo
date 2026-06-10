@@ -329,7 +329,8 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
 
             auto oplogEntries = fassertNoTrace(
                 31004,
-                getNextApplierBatch(opCtx.get(), batchLimits, Milliseconds(oplogBatchDelayMillis)));
+                getNextApplierBatch(
+                    opCtx.get(), batchLimits, Milliseconds(oplogBatchDelayMillis.load())));
             for (const auto& oplogEntry : oplogEntries) {
                 ops.emplace_back(oplogEntry);
             }

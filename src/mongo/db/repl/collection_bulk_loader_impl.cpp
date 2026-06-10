@@ -187,7 +187,8 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
                     return Status::OK();
                 };
 
-                while (insertIter != end && bytesInBlock < collectionBulkLoaderBatchSizeInBytes) {
+                while (insertIter != end &&
+                       bytesInBlock < collectionBulkLoaderBatchSizeInBytes.load()) {
                     const auto& doc = *insertIter++;
                     bytesInBlock += doc.objsize();
                     // This version of insert will not update any indexes.
