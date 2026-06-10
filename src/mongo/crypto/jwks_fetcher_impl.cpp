@@ -30,7 +30,7 @@
 #include "mongo/crypto/jwks_fetcher_impl.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/crypto/jwt_parameters_gen.h"
+#include "mongo/db/auth/oauth_authorization_server_metadata_gen.h"
 #include "mongo/db/auth/oauth_discovery_factory.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/util/clock_source.h"
@@ -40,7 +40,7 @@
 namespace mongo::crypto {
 
 JWKSFetcherImpl::JWKSFetcherImpl(ClockSource* clock, StringData issuer)
-    : _issuer(issuer), _clock(clock), _lastFetchQuiesceTime(Date_t::min()) {}
+    : _issuer(issuer), _clock(clock), _lastAttemptedFetchTime(Date_t::min()) {}
 
 JWKSet JWKSFetcherImpl::fetch() {
     try {
@@ -54,9 +54,9 @@ JWKSet JWKSFetcherImpl::fetch() {
         OAuthDiscoveryFactory discoveryFactory(makeHTTPClient());
         auto metadata = discoveryFactory.acquire(_issuer);
 
+        _lastAttemptedFetchTime = _clock->now();
         auto jwksUri = metadata.getJwksUri();
         auto getJWKs = makeHTTPClient()->get(jwksUri);
-        _lastFetchQuiesceTime = _clock->now();
 
         ConstDataRange cdr = getJWKs.getCursor();
         StringData str;
@@ -67,15 +67,6 @@ JWKSet JWKSFetcherImpl::fetch() {
         ex.addContext(str::stream() << "Failed loading keys from " << _issuer);
         throw;
     }
-}
-
-bool JWKSFetcherImpl::quiesce() const {
-    return _clock->now() <
-        (_lastFetchQuiesceTime.get() + Seconds(gJWKSMinimumQuiescePeriodSecs.load()));
-}
-
-void JWKSFetcherImpl::setQuiesce(Date_t quiesce) {
-    _lastFetchQuiesceTime = quiesce;
 }
 
 }  // namespace mongo::crypto

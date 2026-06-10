@@ -47,14 +47,14 @@ public:
     MockJWKSFetcher(ClockSource* clock, BSONObj keys)
         : JWKSFetcherImpl(clock, kMockIssuer), _keys(std::move(keys)) {}
 
-    JWKSet fetch() {
+    JWKSet fetch() override {
+        _lastAttemptedFetchTime = _clock->now();
         if (_shouldFail) {
             uasserted(ErrorCodes::NetworkTimeout,
                       "Mock JWKS fetcher configured to simulate timeout");
         }
 
         auto jwkSet = JWKSet::parse(IDLParserContext("JWKSet"), _keys);
-        _lastFetchQuiesceTime = _clock->now();
         return jwkSet;
     }
 
