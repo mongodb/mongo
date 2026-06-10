@@ -116,6 +116,14 @@ public:
         const auto& allElem = cmdObj["all"];
         bool includeAllSections = allElem.type() ? allElem.trueValue() : false;
 
+        const auto& noneElem = cmdObj["none"];
+        bool excludeAllSections = noneElem.type() ? noneElem.trueValue() : false;
+
+        if (MONGO_unlikely(includeAllSections && excludeAllSections)) {
+            // {all: 1} and {none: 1} cannot both be specified.
+            uasserted(ErrorCodes::InvalidOptions, "Cannot provide both 'all' and 'none' options");
+        }
+
         // --- all sections
         auto registry = ServerStatusSectionRegistry::get();
         for (auto i = registry->begin(); i != registry->end(); ++i) {
@@ -125,7 +133,7 @@ public:
                 continue;
             }
 
-            bool include = section->includeByDefault();
+            bool include = !excludeAllSections && section->includeByDefault();
             const auto& elem = cmdObj[section->getSectionName()];
             if (elem.type()) {
                 include = elem.trueValue();
@@ -144,7 +152,7 @@ public:
         // --- counters
         MetricTree* metricTree = globalMetricTree(/* create */ false);
         auto metricsEl = cmdObj["metrics"_sd];
-        if (metricTree && (metricsEl.eoo() || metricsEl.trueValue())) {
+        if (metricTree && ((!excludeAllSections && metricsEl.eoo()) || metricsEl.trueValue())) {
             if (metricsEl.type() == BSONType::Object) {
                 metricTree->appendTo(BSON("metrics" << metricsEl.embeddedObject()), result);
             } else {
