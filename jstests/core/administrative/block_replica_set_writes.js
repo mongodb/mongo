@@ -600,6 +600,38 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         );
     });
 
+    it("Test that new cloneCollectionAsCapped is blocked by replica set write block", function () {
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const srcColl = testDB.getCollection("srcColl");
+        assert.commandWorked(srcColl.insert([{_id: 1}, {_id: 2}]));
+
+        // Enable replica set write block and check that cloneCollectionAsCapped is blocked.
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandFailedWithCode(
+            testDB.runCommand({
+                cloneCollectionAsCapped: "srcColl",
+                toCollection: "dstColl",
+                size: 1024 * 1024,
+            }),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+
+        // Disable write block and check that cloneCollectionAsCapped succeeds.
+        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        assert.commandWorked(
+            testDB.runCommand({
+                cloneCollectionAsCapped: "srcColl",
+                toCollection: "dstColl",
+                size: 1024 * 1024,
+            }),
+        );
+        assert.eq(2, testDB.getCollection("dstColl").countDocuments({}));
+    });
+
     it("Test that new QE compact and cleanup are blocked when allowDeletions: false", function () {
         // blockedColl is a non-existent collection, so when the commands are not blocked we expect
         // them to fail with NamespaceNotFound. The deletions check fires before collection validation, so a

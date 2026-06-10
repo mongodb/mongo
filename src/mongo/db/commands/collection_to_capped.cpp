@@ -50,6 +50,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -134,6 +135,9 @@ public:
 
         NamespaceString fromNs(NamespaceStringUtil::deserialize(dbName, from));
         NamespaceString toNs(NamespaceStringUtil::deserialize(dbName, to));
+
+        ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(
+            opCtx, toNs, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
 
         ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
             opCtx, std::vector<NamespaceString>{fromNs, toNs});
