@@ -162,18 +162,13 @@ multiversion_service = MultiversionService(
 
 version_constants = multiversion_service.calculate_version_constants()
 
-LAST_LTS_BIN_VERSION = version_constants.get_last_lts_fcv()
-LAST_CONTINUOUS_BIN_VERSION = version_constants.get_last_continuous_fcv()
-
 LAST_LTS_FCV = version_constants.get_last_lts_fcv()
 LAST_CONTINUOUS_FCV = version_constants.get_last_continuous_fcv()
 LATEST_FCV = version_constants.get_latest_fcv()
 
-LAST_CONTINUOUS_MONGO_BINARY = version_constants.build_last_continuous_binary("mongo")
 LAST_CONTINUOUS_MONGOD_BINARY = version_constants.build_last_continuous_binary("mongod")
 LAST_CONTINUOUS_MONGOS_BINARY = version_constants.build_last_continuous_binary("mongos")
 
-LAST_LTS_MONGO_BINARY = version_constants.build_last_lts_binary("mongo")
 LAST_LTS_MONGOD_BINARY = version_constants.build_last_lts_binary("mongod")
 LAST_LTS_MONGOS_BINARY = version_constants.build_last_lts_binary("mongos")
 
