@@ -100,12 +100,6 @@ public:
                   "implemented");
     }
 
-    bool shouldForceUpdateWithFullDocument() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider::shouldForceUpdateWithFullDocument method not "
-                  "implemented");
-    }
-
     bool shouldStepDownForShutdown() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::shouldStepDownForShutdown() method not implemented");

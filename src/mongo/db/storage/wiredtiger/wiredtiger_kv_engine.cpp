@@ -1823,8 +1823,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
                                                                 boost::optional<UUID> uuid) {
     std::unique_ptr<WiredTigerRecordStore> ret;
     auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    bool forceUpdateWithFullDocument =
-        options.forceUpdateWithFullDocument || provider.shouldForceUpdateWithFullDocument();
     if (options.isOplog) {
         const bool isLogged = WiredTigerUtil::useTableLogging(
             provider, nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
@@ -1840,7 +1838,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
                                                  .tracksSizeAdjustments = true,
                                                  .isLogged = isLogged,
                                                  .forceUpdateWithFullDocument =
-                                                     forceUpdateWithFullDocument});
+                                                     options.forceUpdateWithFullDocument});
         getOplogManager()->stop(nullptr);
         getOplogManager()->start(opCtx, *this, *ret, _isReplSet);
     } else {
@@ -1865,7 +1863,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             // preventing overwrites.
             .overwrite = options.allowOverwrite,
             .isLogged = isLogged,
-            .forceUpdateWithFullDocument = forceUpdateWithFullDocument,
+            .forceUpdateWithFullDocument = options.forceUpdateWithFullDocument,
             .inMemory = _wtConfig.inMemory,
             .sizeStorer = _sizeStorer.get(),
             .tracksSizeAdjustments = true,
@@ -2019,9 +2017,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getInternalRecordStore(Recovery
     params.keyFormat = keyFormat;
     params.overwrite = true;
     params.isLogged = isLogged;
-    auto& provider =
-        rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
-    params.forceUpdateWithFullDocument = provider.shouldForceUpdateWithFullDocument();
+    params.forceUpdateWithFullDocument = false;
     params.inMemory = _wtConfig.inMemory;
     // Temporary collections do not need to persist size information to the size storer.
     params.sizeStorer = nullptr;

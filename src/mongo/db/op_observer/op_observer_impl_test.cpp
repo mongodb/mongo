@@ -776,9 +776,6 @@ public:
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         return true;
     }
-    bool shouldForceUpdateWithFullDocument() const override {
-        return true;
-    }
     bool shouldUseReplicatedFastCount() const override {
         return true;
     }

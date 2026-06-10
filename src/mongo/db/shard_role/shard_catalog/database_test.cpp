@@ -862,9 +862,6 @@ public:
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         return true;
     }
-    bool shouldForceUpdateWithFullDocument() const override {
-        return true;
-    }
 };
 
 class RecordIdsReplicatedDatabaseTest : public DatabaseTest {

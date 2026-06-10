@@ -70,10 +70,6 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
         return false;
     }
 
-    bool shouldForceUpdateWithFullDocument() const override {
-        return true;
-    }
-
     bool shouldUseReplicatedRecordIds() const override {
         return false;
     }

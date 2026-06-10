@@ -499,10 +499,6 @@ public:
         return true;
     }
 
-    bool shouldForceUpdateWithFullDocument() const override {
-        return true;
-    }
-
     bool supportsAsyncOplogMarkerGeneration() const override {
         return false;
     }
