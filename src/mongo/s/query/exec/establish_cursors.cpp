@@ -148,7 +148,7 @@ private:
 
     /**
      * Favors interruption/unyield failures > UUID mismatch error with actual ns > UUID mismatch
-     * error > other errors > retargeting errors
+     * error > other errors > retargeting errors > retriable system-overload errors.
      */
     void _prioritizeFailures(Status newError, bool isInterruption);
 
@@ -405,7 +405,7 @@ void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption
         return;
     }
     if (isInterruption) {
-        if (newError.code() == ErrorCodes::CallbackCanceled && !_currentErrorIsRetargetingError()) {
+        if (newError.code() == ErrorCodes::CallbackCanceled) {
             // Do not clobber an already existing error with a 'CallbackCanceled' error.
             return;
         }
@@ -414,9 +414,15 @@ void CursorEstablisher::_prioritizeFailures(Status newError, bool isInterruption
         return;
     }
 
-    // Prefer other non-retargeting related errors that could be operation-fatal.
+    // Prefer other non-retargeting related errors that could be operation-fatal, except for
+    // retriable system-overload errors. Those may not be retried by the ARS if it receives a
+    // retargeting error in the same batch, so keep the retargeting error and let the router refresh
+    // and retry the command rather than failing with an error that nothing upstream retries.
     if (_currentErrorIsRetargetingError()) {
-        _maybeFailure = std::move(newError);
+        if (!(newError.isA<ErrorCategory::SystemOverloadedError>() &&
+              newError.isA<ErrorCategory::RetriableError>())) {
+            _maybeFailure = std::move(newError);
+        }
         return;
     }
 
