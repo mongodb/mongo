@@ -11,7 +11,6 @@
  * ]
  */
 
-import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
@@ -168,9 +167,6 @@ export const $config = (function () {
         readFromView: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
     };
 
-    let originalTransactionLifetimeLimitSeconds = null;
-    let originalMaxSubPipelineViewDepth = null;
-
     function setup(db, collName, cluster) {
         // TODO SERVER-88936: Remove this field and associated checks once the flag is active on
         // last-lts.
@@ -188,11 +184,10 @@ export const $config = (function () {
         // server since they will hold locks. We lower the value to the default 60 seconds since
         // otherwise it will be 24 hours during testing. This is needed since this workload is run
         // in suites that run multi-document transactions.
-        originalTransactionLifetimeLimitSeconds = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "transactionLifetimeLimitSeconds",
-            newValue: 60,
-            onMongos: false,
+        this.originalTransactionLifetimeLimitSeconds = {};
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
         });
 
         const coll = db[collName];
@@ -210,39 +205,39 @@ export const $config = (function () {
         // resolution of views with pipelines containing $lookups on other views can result in deep
         // nesting of subpipelines. For the purposes of this test, the limit needs to be higher than
         // the default.
-        originalMaxSubPipelineViewDepth = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalMaxSubPipelineViewDepth",
-            newValue: 100,
-            onMongos: false,
+        cluster.executeOnMongodNodes((db) => {
+            // Store the old value of the max subpipeline view depth so we can restore it at the end
+            // of the test.
+            const maxSubPipelineViewDepthParam = db.adminCommand({getParameter: 1, internalMaxSubPipelineViewDepth: 1});
+            assert(maxSubPipelineViewDepthParam.hasOwnProperty("internalMaxSubPipelineViewDepth"));
+            this.oldMaxSubPipelineViewDepth = maxSubPipelineViewDepthParam.internalMaxSubPipelineViewDepth;
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalMaxSubPipelineViewDepth: 100}));
         });
     }
 
     function teardown(db, collName, cluster) {
-        if (this.shouldSkipTest) {
-            return;
-        }
-
         // Restore the old max subpipeline view depth.
-        if (originalMaxSubPipelineViewDepth != null) {
-            setParameterOnAllNodes({
-                cluster: cluster,
-                paramName: "internalMaxSubPipelineViewDepth",
-                newValue: originalMaxSubPipelineViewDepth,
-                onMongos: false,
+        if (this.oldMaxSubPipelineViewDepth) {
+            cluster.executeOnMongodNodes((db) => {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        internalMaxSubPipelineViewDepth: this.oldMaxSubPipelineViewDepth,
+                    }),
+                );
             });
         }
 
         // TODO SERVER-89663: We restore the original transaction lifetime limit since there may be
         // concurrent executions that relied on the old value.
-        if (originalTransactionLifetimeLimitSeconds != null) {
-            setParameterOnAllNodes({
-                cluster: cluster,
-                paramName: "transactionLifetimeLimitSeconds",
-                newValue: originalTransactionLifetimeLimitSeconds,
-                onMongos: false,
-            });
-        }
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    transactionLifetimeLimitSeconds: this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
+                }),
+            );
+        });
     }
 
     return {

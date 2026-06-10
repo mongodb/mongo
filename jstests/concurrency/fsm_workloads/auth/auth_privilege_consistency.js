@@ -9,7 +9,6 @@
  * ]
  */
 import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
-import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
 
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
@@ -18,6 +17,7 @@ export const $config = (function () {
     const kTestUserPassword = "secret";
     const kMaxCmdTimeMs = 60000;
     const kMaxTxnLockReqTimeMs = 100;
+    const kDefaultTxnLockReqTimeMs = 5;
 
     function doRetry(cb) {
         const kNumRetries = 5;
@@ -180,13 +180,13 @@ export const $config = (function () {
         observe: {observe: 1},
     };
 
-    let originalMaxTxnLockReqTimeMs;
-
     function setup(db, collName, cluster) {
-        originalMaxTxnLockReqTimeMs = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "maxTransactionLockRequestTimeoutMillis",
-            newValue: kMaxTxnLockReqTimeMs,
+        cluster.executeOnMongodNodes(function (db) {
+            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+        });
+
+        cluster.executeOnMongosNodes(function (db) {
+            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
         });
 
         db.createUser({user: this.getUserName(), pwd: kTestUserPassword, roles: []});
@@ -199,10 +199,18 @@ export const $config = (function () {
         dropRoles(db, pattern);
         db.dropUser(this.getUserName());
 
-        setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "maxTransactionLockRequestTimeoutMillis",
-            newValue: originalMaxTxnLockReqTimeMs,
+        cluster.executeOnMongodNodes(function (db) {
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kDefaultTxnLockReqTimeMs,
+            });
+        });
+
+        cluster.executeOnMongosNodes(function (db) {
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kDefaultTxnLockReqTimeMs,
+            });
         });
     }
 

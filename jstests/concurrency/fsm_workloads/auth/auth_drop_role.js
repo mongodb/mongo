@@ -9,14 +9,13 @@
  *  requires_auth,
  * ]
  */
-import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
-
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
 
 export const $config = (function () {
     const kMaxCmdTimeMs = 60000;
     const kMaxTxnLockReqTimeMs = 100;
+    const kDefaultTxnLockReqTimeMs = 5;
 
     let data = {
         // Use the workload name as a prefix for the role name,
@@ -105,21 +104,29 @@ export const $config = (function () {
 
     let transitions = {init: {createAndDropRole: 1}, createAndDropRole: {createAndDropRole: 1}};
 
-    let originalMaxTxnLockReqTimeMs;
-
     function setup(db, collName, cluster) {
-        originalMaxTxnLockReqTimeMs = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "maxTransactionLockRequestTimeoutMillis",
-            newValue: kMaxTxnLockReqTimeMs,
+        cluster.executeOnMongodNodes(function (db) {
+            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+        });
+
+        cluster.executeOnMongosNodes(function (db) {
+            db.adminCommand({setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
         });
     }
 
     function teardown(db, collName, cluster) {
-        setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "maxTransactionLockRequestTimeoutMillis",
-            newValue: originalMaxTxnLockReqTimeMs,
+        cluster.executeOnMongodNodes(function (db) {
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kDefaultTxnLockReqTimeMs,
+            });
+        });
+
+        cluster.executeOnMongosNodes(function (db) {
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kDefaultTxnLockReqTimeMs,
+            });
         });
     }
 

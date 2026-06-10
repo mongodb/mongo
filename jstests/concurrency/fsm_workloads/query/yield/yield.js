@@ -12,8 +12,6 @@
  * ]
  */
 
-import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
-
 export const $config = (function () {
     // The explain used to build the assertion message in advanceCursor() is the only command not
     // allowed in a transaction used in the query state function. With shard stepdowns, getMores
@@ -142,26 +140,15 @@ export const $config = (function () {
         query: {update: 0.333, remove: 0.333, query: 0.334},
     };
 
-    let originalYieldIterations;
-    let originalYieldPeriodMS;
-
     /*
      * Sets up the indices, sets a failpoint and lowers some yielding parameters to encourage
      * more yielding, and inserts the documents to be used.
      */
     function setup(db, collName, cluster) {
         // Lower the following parameters to force even more yields.
-        originalYieldIterations = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalQueryExecYieldIterations",
-            newValue: 5,
-            onMongos: false,
-        });
-        originalYieldPeriodMS = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalQueryExecYieldPeriodMS",
-            newValue: 1,
-            onMongos: false,
+        cluster.executeOnMongodNodes(function lowerYieldParams(db) {
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
         });
         // Set up some data to query.
         let N = this.nDocs;
@@ -180,17 +167,9 @@ export const $config = (function () {
      * Reset parameters and disable failpoint.
      */
     function teardown(db, collName, cluster) {
-        setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalQueryExecYieldIterations",
-            newValue: originalYieldIterations,
-            onMongos: false,
-        });
-        setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalQueryExecYieldPeriodMS",
-            newValue: originalYieldPeriodMS,
-            onMongos: false,
+        cluster.executeOnMongodNodes(function resetYieldParams(db) {
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}));
         });
     }
 
