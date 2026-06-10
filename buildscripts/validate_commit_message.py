@@ -161,6 +161,7 @@ def get_non_merge_queue_squashed_commits(
         "query": f"""{{
             repository(owner: "{github_org}", name: "{github_repo}") {{
                 pullRequest(number: {pr_number}) {{
+                    author {{ login }}
                     viewerMergeHeadlineText(mergeType: SQUASH)
                     viewerMergeBodyText(mergeType: SQUASH)
                 }}
@@ -180,11 +181,20 @@ def get_non_merge_queue_squashed_commits(
     # Response will look like
     # {'data': {'repository': {'pullRequest':
     # {
+    #   'author': {'login': 'some-user'},
     #   'viewerMergeHeadlineText': 'SERVER-1234 Add a ton of great support (#32823)',
     #   'viewerMergeBodyText': 'This PR adds back support for a lot of things\nMany great things!'
     # }}}}
     LOGGER.info("Squashed content", content=resp)
     pr_info = resp["data"]["repository"]["pullRequest"]
+
+    author_login = (pr_info.get("author") or {}).get("login")
+    if author_login == "dependabot[bot]":
+        LOGGER.info(
+            "Skipping commit message validation for Dependabot PR", author_login=author_login
+        )
+        return []
+
     fake_repo = Repo()
     return [
         Commit(
