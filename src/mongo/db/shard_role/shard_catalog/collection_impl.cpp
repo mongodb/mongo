@@ -1118,11 +1118,19 @@ CollectionSizeCount CollectionImpl::latestSizeCount(OperationContext* opCtx) con
 }
 
 CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) const {
-    return (shouldReadFromReplicatedFastCount(opCtx, _ns))
-        ? replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
-              .findPersisted(opCtx, uuid())
-        : CollectionSizeCount{_shared->_recordStore->dataSize(),
-                              _shared->_recordStore->numRecords()};
+    if (!shouldReadFromReplicatedFastCount(opCtx, _ns)) {
+        return CollectionSizeCount{_shared->_recordStore->dataSize(),
+                                   _shared->_recordStore->numRecords()};
+    }
+
+    auto persisted =
+        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
+            .findPersisted(opCtx, uuid());
+    massert(12793500,
+            fmt::format("Expected the size/count store to contain an entry for UUID={}",
+                        uuid().toString()),
+            persisted.has_value());
+    return persisted->first;
 }
 
 int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,

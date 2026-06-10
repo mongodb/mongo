@@ -86,11 +86,12 @@ namespace {
 constexpr auto systemBucketsDot = "system.buckets."_sd;
 
 /**
- * Removes 'recordIdsReplicated' from the 'info' sub-document of a single listCollections result
- * entry. The field is internal and can be inconsistent across shards, so it must not be exposed
- * via the router.
+ * Removes shard local fields from the 'info' sub-document of a single listCollections result entry.
+ * 'recordIdsReplicated' and 'fastCount' are shard local and can be inconsistent across shards (a
+ * router would only surface the DB-primary shard's values), so they must not be exposed via the
+ * router.
  */
-static BSONObj scrubRecordIdsReplicatedFromCollectionEntry(BSONObj entry) {
+static BSONObj scrubShardLocalFieldsFromCollectionEntry(BSONObj entry) {
     auto infoElem = entry["info"];
     if (infoElem.eoo() || infoElem.type() != BSONType::object) {
         return entry;
@@ -98,7 +99,9 @@ static BSONObj scrubRecordIdsReplicatedFromCollectionEntry(BSONObj entry) {
     BSONObjBuilder entryBuilder;
     for (auto&& field : entry) {
         if (field.fieldNameStringData() == "info"_sd) {
-            entryBuilder.append("info"_sd, infoElem.Obj().removeField("recordIdsReplicated"_sd));
+            entryBuilder.append("info"_sd,
+                                infoElem.Obj().removeFields(
+                                    StringDataSet{"recordIdsReplicated"_sd, "fastCount"_sd}));
         } else {
             entryBuilder.append(field);
         }
@@ -300,7 +303,7 @@ public:
                         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                         Grid::get(opCtx)->getCursorManager(),
                         privileges,
-                        scrubRecordIdsReplicatedFromCollectionEntry));
+                        scrubShardLocalFieldsFromCollectionEntry));
 
                     CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, &output);
                     uassertStatusOK(getStatusFromCommandResult(output.asTempObj()));

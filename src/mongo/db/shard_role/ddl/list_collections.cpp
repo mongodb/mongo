@@ -65,6 +65,8 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/list_collections_filter.h"
@@ -82,6 +84,7 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/views/view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -162,20 +165,91 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
     return {};
 }
 
+// Carries replicated fast count emission state through a single listCollections response. The fast
+// count timestamp store is a singleton, so it is read once for the whole response and emitted on
+// the first eligible collection that is actually returned to the client. This type makes the three
+// possible states explicit:
+//   - disabled():           the feature is off (or rawData was not requested); no fast count fields
+//                           are emitted for any collection.
+//   - enabled(ts), pending: the feature is on; 'ts' (boost::none for an empty store) still needs to
+//                           be emitted on an eligible collection.
+//   - enabled, consumed:    the timestamp store value was already emitted on an earlier collection
+//                           that passed the matcher, and must not be repeated.
+//
+// Consumption is deliberately deferred until a collection entry carrying the timestamp passes the
+// matcher in _addWorkingSetMember. Building a collection's BSON only reads the pending value
+// (getTimestampStoreTs); _addWorkingSetMember consumes it once a doc carrying the timestamp clears
+// the matcher. If that entry is instead filtered out, the timestamp remains pending so the next
+// eligible, matching collection can emit it.
+class FastCountListCollectionsState {
+public:
+    static FastCountListCollectionsState disabled() {
+        return FastCountListCollectionsState{};
+    }
+
+    static FastCountListCollectionsState enabled(boost::optional<Timestamp> timestampStoreTs) {
+        FastCountListCollectionsState state;
+        state._enabled = true;
+        state._timestampStoreTs = timestampStoreTs;
+        return state;
+    }
+
+    bool isEnabled() const {
+        return _enabled;
+    }
+
+    bool isConsumed() const {
+        return _consumed;
+    }
+
+    // Returns the pending timestamp store value, or boost::none if the feature is disabled, the
+    // store was empty, or the value has already been consumed by an earlier collection entry. This
+    // is a pure read and does not mark the value as consumed.
+    boost::optional<Timestamp> getTimestampStoreTs() const {
+        if (_consumed || !_enabled) {
+            return boost::none;
+        }
+        return _timestampStoreTs;
+    }
+
+    // Marks the timestamp as consumed so future calls to getTimestampStoreTs() return boost::none.
+    // Called from _addWorkingSetMember once we know the entry carrying the timestamp passed the
+    // matcher and will appear in the listCollections output, enforcing that it is included once.
+    void consume() {
+        _consumed = true;
+    }
+
+private:
+    bool _enabled = false;
+    bool _consumed = false;
+    boost::optional<Timestamp> _timestampStoreTs;
+};
+
 /**
  * Uses 'matcher' to determine if the collection's information should be added to 'root'. If so,
  * allocates a WorkingSetMember containing information about 'collection', and adds it to
  * 'results'.
  *
  * Does not add any information about non-existent collections.
+ *
+ * If 'maybe' carries the replicated fast count timestamp store value, that value is marked consumed
+ * only once 'maybe' has passed the matcher and is being added to 'results'. This guarantees the
+ * singleton timestamp is not lost on an entry that the matcher filters out. View and timeseries
+ * entries pass a disabled state and never carry the timestamp, so they never consume it.
  */
 void _addWorkingSetMember(OperationContext* opCtx,
                           const BSONObj& maybe,
                           const MatchExpression* matcher,
                           WorkingSet* ws,
-                          std::vector<WorkingSetID>& results) {
+                          std::vector<WorkingSetID>& results,
+                          FastCountListCollectionsState& fastCountState) {
     if (matcher && !exec::matcher::matchesBSON(matcher, maybe)) {
         return;
+    }
+
+    if (fastCountState.isEnabled() && !fastCountState.isConsumed() &&
+        maybe.getObjectField("info").getObjectField("fastCount").hasField("timestampStoreTs")) {
+        fastCountState.consume();
     }
 
     WorkingSetID id = ws->allocate();
@@ -187,11 +261,17 @@ void _addWorkingSetMember(OperationContext* opCtx,
     results.emplace_back(std::move(id));
 }
 
+// 'fastCountState' carries the replicated fast count emission state for the whole listCollections
+// response (see FastCountListCollectionsState). Views (including viewful timeseries views) entries
+// pass a disabled state; only the collection path passes an enabled one. The pending timestamp
+// store value is emitted here but not consumed; _addWorkingSetMember consumes it once this entry
+// passes the matcher.
 BSONObj buildInfoField(OperationContext* opCtx,
                        bool readOnly,
                        const NamespaceString& nss,
                        boost::optional<UUID> uuid,
-                       boost::optional<bool> recordIdsReplicated) {
+                       boost::optional<bool> recordIdsReplicated,
+                       const FastCountListCollectionsState& fastCountState) {
     BSONObjBuilder infoBuilder;
     infoBuilder.append("readOnly", readOnly);
     if (uuid) {
@@ -209,6 +289,33 @@ BSONObj buildInfoField(OperationContext* opCtx,
             catalog::getConfigDebugDump(VersionContext::getDecoration(opCtx), nss);
         configDebugDump.has_value()) {
         infoBuilder.append("configDebugDump", *configDebugDump);
+    }
+
+    // Emit replicated fast count metadata so initial sync clients can seed local stores
+    // before applying oplog entries. Restrict to fast count eligible namespaces only.
+    // fastCountState.enabled() is true iff the caller (typedRun) already verified rawData was
+    // requested and the feature flags are enabled, so this check doubles as the feature-enabled
+    // gate with no per-collection FCV snapshot acquisition.
+    if (fastCountState.isEnabled() && uuid && isReplicatedFastCountEligible(nss)) {
+        auto& mgr =
+            replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext());
+        const auto entry = mgr.findPersisted(opCtx, *uuid);
+        // The timestamp store is a singleton; it is emitted on one eligible collection entry. Only
+        // read the pending value here; the caller marks it consumed once this entry passes the
+        // matcher (see _addWorkingSetMember), so it is not lost if the entry is filtered out.
+        const auto timestampStoreTs = fastCountState.getTimestampStoreTs();
+        if (entry || timestampStoreTs) {
+            BSONObjBuilder fastCountBuilder(infoBuilder.subobjStart("fastCount"));
+            if (entry) {
+                const auto& [sizeCount, validAsOf] = *entry;
+                fastCountBuilder.append("size", sizeCount.size);
+                fastCountBuilder.append("count", sizeCount.count);
+                fastCountBuilder.append("validAsOf", validAsOf);
+            }
+            if (timestampStoreTs) {
+                fastCountBuilder.append("timestampStoreTs", *timestampStoreTs);
+            }
+        }
     }
     return infoBuilder.obj();
 }
@@ -237,7 +344,8 @@ BSONObj buildViewBson(OperationContext* opCtx, const ViewDefinition& view, bool 
                             true /*readOnly*/,
                             view.name(),
                             boost::none /*uuid*/,
-                            boost::none /*recordIdsReplicated*/));
+                            boost::none /*recordIdsReplicated*/,
+                            FastCountListCollectionsState::disabled()));
     return b.obj();
 }
 
@@ -260,7 +368,8 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const Collection* collectio
                                   opCtx->readOnly(),
                                   collection->ns(),
                                   boost::none /*uuid*/,
-                                  boost::none /*recordIdsReplicated*/));
+                                  boost::none /*recordIdsReplicated*/,
+                                  FastCountListCollectionsState::disabled()));
     return builder.obj();
 }
 
@@ -279,7 +388,8 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const NamespaceString& nss,
                                   opCtx->readOnly(),
                                   nss,
                                   boost::none /*uuid*/,
-                                  boost::none /*recordIdsReplicated*/));
+                                  boost::none /*recordIdsReplicated*/,
+                                  FastCountListCollectionsState::disabled()));
 
     return builder.obj();
 }
@@ -290,7 +400,8 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const NamespaceString& nss,
 BSONObj buildCollectionBson(OperationContext* opCtx,
                             const Collection* collection,
                             bool nameOnly,
-                            bool isRawData) {
+                            bool isRawData,
+                            const FastCountListCollectionsState& fastCountState) {
     if (!collection) {
         return {};
     }
@@ -334,7 +445,8 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
                             opCtx->readOnly(),
                             collection->ns(),
                             options.uuid,
-                            collection->areRecordIdsReplicated()));
+                            collection->areRecordIdsReplicated(),
+                            fastCountState));
 
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
     if (idIndex) {
@@ -438,6 +550,19 @@ public:
                 AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
                 auto catalog = CollectionCatalog::get(opCtx);
 
+                // The replicated fast count timestamp store is a singleton, so read it a single
+                // time for the whole response; buildCollectionBson emits it on the first eligible
+                // collection. Only emit the metadata for rawData requests (initial sync, the sole
+                // consumer, sets rawData) to avoid changing the user-facing listCollections output
+                // and to limit the added per-collection reads.
+                auto fastCountState = FastCountListCollectionsState::disabled();
+                if (isRawData && isReplicatedFastCountListCollectionsEnabled(opCtx)) {
+                    fastCountState = FastCountListCollectionsState::enabled(
+                        replicated_fast_count::ReplicatedFastCountManager::get(
+                            opCtx->getServiceContext())
+                            .findPersistedTimestampStoreTs(opCtx));
+                }
+
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListCollections,
                     opCtx,
@@ -470,8 +595,11 @@ public:
                                 auto collection =
                                     catalog->establishConsistentCollection(opCtx, nss, boost::none);
                                 if (collection) {
-                                    return buildCollectionBson(
-                                        opCtx, collection.get(), nameOnly, isRawData);
+                                    return buildCollectionBson(opCtx,
+                                                               collection.get(),
+                                                               nameOnly,
+                                                               isRawData,
+                                                               fastCountState);
                                 }
 
                                 std::shared_ptr<const ViewDefinition> view =
@@ -495,8 +623,12 @@ public:
                             }();
 
                             if (!collBson.isEmpty()) {
-                                _addWorkingSetMember(
-                                    opCtx, collBson, matcher.get(), ws.get(), results);
+                                _addWorkingSetMember(opCtx,
+                                                     collBson,
+                                                     matcher.get(),
+                                                     ws.get(),
+                                                     results,
+                                                     fastCountState);
                             }
                         }
                     } else {
@@ -519,7 +651,8 @@ public:
                                         buildTimeseriesBson(opCtx, collection, nameOnly),
                                         matcher.get(),
                                         ws.get(),
-                                        results);
+                                        results,
+                                        fastCountState);
                                 }
                             }
 
@@ -529,11 +662,15 @@ public:
                                 return true;
                             }
 
-                            BSONObj collBson =
-                                buildCollectionBson(opCtx, collection, nameOnly, isRawData);
+                            BSONObj collBson = buildCollectionBson(
+                                opCtx, collection, nameOnly, isRawData, fastCountState);
                             if (!collBson.isEmpty()) {
-                                _addWorkingSetMember(
-                                    opCtx, collBson, matcher.get(), ws.get(), results);
+                                _addWorkingSetMember(opCtx,
+                                                     collBson,
+                                                     matcher.get(),
+                                                     ws.get(),
+                                                     results,
+                                                     fastCountState);
                             }
 
                             return true;
@@ -578,15 +715,20 @@ public:
                                         buildTimeseriesBson(opCtx, view.name(), nameOnly),
                                         matcher.get(),
                                         ws.get(),
-                                        results);
+                                        results,
+                                        fastCountState);
                                 }
                                 return true;
                             }
 
                             BSONObj viewBson = buildViewBson(opCtx, view, nameOnly);
                             if (!viewBson.isEmpty()) {
-                                _addWorkingSetMember(
-                                    opCtx, viewBson, matcher.get(), ws.get(), results);
+                                _addWorkingSetMember(opCtx,
+                                                     viewBson,
+                                                     matcher.get(),
+                                                     ws.get(),
+                                                     results,
+                                                     fastCountState);
                             }
                             return true;
                         });

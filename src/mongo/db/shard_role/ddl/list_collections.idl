@@ -36,6 +36,41 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
+    ListCollectionsReplyInfoFastCount:
+        description: >-
+            Persisted replicated fast count metadata, surfaced via listCollections so initial
+            sync clients can seed local stores before applying oplog entries.
+        fields:
+            size:
+                type: safeInt64
+                description: >-
+                    Persisted replicated fast count `size` (bytes) for this collection. Emitted
+                    when a persisted entry exists for the collection UUID.
+                optional: true
+                stability: unstable
+            count:
+                type: safeInt64
+                description: >-
+                    Persisted replicated fast count `count` (documents) for this collection.
+                    Emitted when a persisted entry exists for the collection UUID.
+                optional: true
+                stability: unstable
+            validAsOf:
+                type: timestamp
+                description: >-
+                    Timestamp at which `size`/`count` were valid for this collection. Emitted
+                    when a persisted entry exists for the collection UUID.
+                optional: true
+                stability: unstable
+            timestampStoreTs:
+                type: timestamp
+                description: >-
+                    Value of the singleton replicated fast count timestamp store at the time this
+                    listCollections response was generated. Emitted once across the response, on
+                    an eligible collection entry (output order is not guaranteed).
+                optional: true
+                stability: unstable
+
     ListCollectionsReplyInfo:
         description: "Information about the collection."
         fields:
@@ -59,6 +94,14 @@ structs:
             recordIdsReplicated:
                 type: bool
                 description: "If true, the collection has record Ids replicated."
+                optional: true
+                stability: unstable
+            fastCount:
+                type: ListCollectionsReplyInfoFastCount
+                description: >-
+                    Replicated fast count metadata for this collection. Only emitted when
+                    listCollections is run with rawData and featureFlagReplicatedFastCount and
+                    featureFlagContainerWrites are enabled. For testing purposes only.
                 optional: true
                 stability: unstable
 

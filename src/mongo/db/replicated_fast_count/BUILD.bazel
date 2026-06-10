@@ -468,6 +468,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/rss:replicated_storage_service",
     ],
 )
@@ -483,6 +484,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         "replicated_fast_count_enabled",
+        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )

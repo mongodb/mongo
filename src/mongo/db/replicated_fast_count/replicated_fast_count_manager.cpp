@@ -33,7 +33,6 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_read.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -414,13 +413,23 @@ CollectionSizeCount ReplicatedFastCountManager::find(const UUID& uuid) const {
     return {};
 }
 
-CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* opCtx,
-                                                              UUID uuid) const {
+boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampStoreTs(
+    OperationContext* opCtx) const {
+    return _timestampStore->read(opCtx);
+}
+
+boost::optional<std::pair<CollectionSizeCount, Timestamp>>
+ReplicatedFastCountManager::findPersisted(OperationContext* opCtx, UUID uuid) const {
     if (MONGO_unlikely(useInMemoryReplicatedSizeCount.shouldFail())) {
-        return find(uuid);
+        return std::pair{find(uuid), Timestamp{}};
     }
 
-    return readPersisted(opCtx, *_sizeCountStore, uuid);
+    const auto entry = _sizeCountStore->read(opCtx, uuid);
+    if (!entry) {
+        return boost::none;
+    }
+    return std::pair{CollectionSizeCount{.size = entry->size, .count = entry->count},
+                     entry->timestamp};
 }
 
 void ReplicatedFastCountManager::flushAsync() {

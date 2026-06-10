@@ -29,6 +29,7 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -90,6 +91,17 @@ bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx) {
     return feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(
         VersionContext::getDecoration(opCtx),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
+    if (!getTestCommandsEnabled()) {
+        return false;
+    }
+    const auto vCtx = VersionContext::getDecoration(opCtx);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(vCtx,
+                                                                                  fcvSnapshot) &&
+        feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
 }
 
 }  // namespace mongo

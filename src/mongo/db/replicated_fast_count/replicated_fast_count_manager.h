@@ -179,9 +179,23 @@ public:
     CollectionSizeCount find(const UUID& uuid) const;
 
     /**
-     * Returns the persisted number of records (count) and data size for the collection with `uuid`.
+     * Returns the persisted singleton timestamp from the timestamp store, or boost::none if the
+     * store has no entry. Used by initial sync to read the donor's checkpoint timestamp.
+     *
+     * This returns an optional because it is possible that we try find the timestamp before the
+     * first flush persists one to disk.
      */
-    CollectionSizeCount findPersisted(OperationContext* opCtx, UUID uuid) const;
+    boost::optional<Timestamp> findPersistedTimestampStoreTs(OperationContext* opCtx) const;
+
+    /**
+     * Returns the persisted size/count and its `validAsOf` timestamp for the collection with
+     * `uuid`, or boost::none if no entry exists for that UUID.
+     *
+     * This returns an optional because it is possible that we try to find a uuid that is present in
+     * the catalog but doesn't have a persisted fast count entry because it hasn't been flushed yet.
+     */
+    boost::optional<std::pair<CollectionSizeCount, Timestamp>> findPersisted(
+        OperationContext* opCtx, UUID uuid) const;
 
     /**
      * Signals the background thread to perform a flush.

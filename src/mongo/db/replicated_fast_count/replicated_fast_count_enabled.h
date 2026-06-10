@@ -71,4 +71,9 @@ MONGO_MOD_PUBLIC bool shouldReadFromReplicatedFastCount(OperationContext* opCtx,
  */
 MONGO_MOD_PUBLIC bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx);
 
+/**
+ * Returns true if replicated fast count metadata should be emitted in listCollections output.
+ */
+MONGO_MOD_PUBLIC bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx);
+
 }  // namespace mongo

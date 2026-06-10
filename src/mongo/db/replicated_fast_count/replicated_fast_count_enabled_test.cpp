@@ -29,6 +29,7 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -125,6 +126,45 @@ TEST(ReplicatedFastCountEligibleNsTest, SystemProfileNotEligible) {
 
 TEST(ReplicatedFastCountEligibleNsTest, OplogEligible) {
     EXPECT_TRUE(isReplicatedFastCountEligible(NamespaceString::kRsOplogNamespace));
+}
+
+// TODO(SERVER-128304): Add persistence provider testing for
+// isReplicatedFastCountListCollectionsEnabled.
+TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenBothFlagsOff) {
+    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                               false);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", false);
+    EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenOnlyReplicatedFastCountOn) {
+    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                               true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", false);
+    EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenOnlyContainerWritesOn) {
+    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                               false);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsEnabledWhenBothFlagsOn) {
+    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                               true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    EXPECT_TRUE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenTestCommandsOff) {
+    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                               true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    setTestCommandsEnabled(false);
+    const auto restoreTestCommands = ScopeGuard([] { setTestCommandsEnabled(true); });
+    EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromSizeStorerWhenProviderOff) {

@@ -49,6 +49,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo::replicated_fast_count {
 namespace {
@@ -346,6 +347,51 @@ TEST_F(ReplicatedFastCountManagerCommitTest, CommitUpdatesRecordStoreSizeCount) 
     checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 111 - 11, .count = 17 - 4});
 }
 
+using ReplicatedFastCountManagerFindPersistedTest = ReplicatedFastCountManagerTest;
+
+TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsNoneWhenNoEntryExists) {
+    EXPECT_FALSE(manager->findPersisted(operationContext(), collA.uuid).has_value());
+}
+
+TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsPersistedSizeCountAndTimestamp) {
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp(7, 7), .size = 5, .count = 1});
+
+    const auto result = manager->findPersisted(operationContext(), collA.uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->first, (CollectionSizeCount{.size = 5, .count = 1}));
+    EXPECT_EQ(result->second, Timestamp(7, 7));
+}
+
+TEST_F(ReplicatedFastCountManagerFindPersistedTest, ReturnsEntryForRequestedUuidOnly) {
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp(7, 7), .size = 5, .count = 1});
+
+    // A different, unpersisted UUID still returns none.
+    EXPECT_FALSE(manager->findPersisted(operationContext(), collB.uuid).has_value());
+}
+
+using ReplicatedFastCountManagerFindPersistedTimestampStoreTsTest = ReplicatedFastCountManagerTest;
+
+TEST_F(ReplicatedFastCountManagerFindPersistedTimestampStoreTsTest, ReturnsNoneWhenStoreEmpty) {
+    EXPECT_FALSE(manager->findPersistedTimestampStoreTs(operationContext()).has_value());
+}
+
+TEST_F(ReplicatedFastCountManagerFindPersistedTimestampStoreTsTest, ReturnsPersistedTimestamp) {
+    test_helpers::insertSizeCountTimestamp(
+        operationContext(), sizeCountTimestampStore, Timestamp(3, 3));
+
+    const auto result = manager->findPersistedTimestampStoreTs(operationContext());
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, Timestamp(3, 3));
+}
+
 /**
  * Cold-boot fixture that bypasses `setUpReplicatedFastCount()` so tests can exercise
  * `initializeMetadata` against on-disk state that the manager has not yet been told about.
@@ -535,7 +581,7 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
             EXPECT_EQ(persistedCount, expectedCount);
             EXPECT_EQ(persistedSize, expectedSize);
 
-            ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
+            EXPECT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
         };
 
     checkFastCountMetadataInContainer(_coll1.uuid, expectedCount1, expectedSize1);
