@@ -42,7 +42,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
@@ -242,15 +241,15 @@ public:
 extern NoopOplogApplierObserver noopOplogApplierObserver;
 
 /**
- * Creates the default thread pool for writer tasks.
+ * Creates the thread pool for writer tasks.
  */
 std::unique_ptr<ThreadPool> makeReplWriterPool();
-std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount);
+std::unique_ptr<ThreadPool> makeReplWriterPool(size_t threadCount);
 
 /**
  * Creates a thread pool suitable for writer tasks, with the specified name
  */
-std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount,
+std::unique_ptr<ThreadPool> makeReplWriterPool(size_t threadCount,
                                                StringData name,
                                                bool isKillableByStepdown = false);
 

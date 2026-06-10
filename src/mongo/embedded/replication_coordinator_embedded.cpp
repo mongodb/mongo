@@ -322,6 +322,10 @@ void ReplicationCoordinatorEmbedded::appendSecondaryInfoData(BSONObjBuilder*) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+ThreadPool* ReplicationCoordinatorEmbedded::getDbWorkThreadPool() const {
+    MONGO_UNREACHABLE;
+}
+
 ReplSetConfig ReplicationCoordinatorEmbedded::getConfig() const {
     UASSERT_NOT_IMPLEMENTED;
 }

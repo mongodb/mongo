@@ -231,6 +231,8 @@ public:
 
     virtual void appendSecondaryInfoData(BSONObjBuilder* result) override;
 
+    virtual ThreadPool* getDbWorkThreadPool() const noexcept override;
+
     virtual ReplSetConfig getConfig() const override;
 
     virtual ConnectionString getConfigConnectionString() const override;

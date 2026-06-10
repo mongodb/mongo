@@ -17,6 +17,21 @@ env.Library(
 )
 
 env.Library(
+    target='repl_writer_thread_pool_server_parameters',
+    source=[
+        'repl_writer_thread_pool_server_parameters.idl',
+        "repl_worker_pool_thread_count.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/processinfo',
+        "repl_coordinator_interface",
+    ],
+)
+
+env.Library(
     target='tenant_migration_decoration',
     source=[
         'tenant_migration_decoration.cpp',
@@ -619,6 +634,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         'repl_coordinator_interface',
         'repl_server_parameters',
+        'repl_writer_thread_pool_server_parameters',
     ],
 )
 
@@ -1897,6 +1913,18 @@ env.CppUnitTest(
         'repl_coordinator_test_fixture',
         'repl_server_parameters',
         'topology_coordinator',
+    ],
+)
+
+env.CppUnitTest(
+    target='db_repl_worker_pool_thread_count_test',
+    source=[
+        'repl_worker_pool_thread_count_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/processinfo',
+        'repl_writer_thread_pool_server_parameters',
     ],
 )
 

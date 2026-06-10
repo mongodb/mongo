@@ -197,6 +197,8 @@ public:
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
+    virtual ThreadPool* getDbWorkThreadPool() const noexcept override;
+
     virtual ReplSetConfig getConfig() const;
 
     virtual ConnectionString getConfigConnectionString() const override;

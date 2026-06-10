@@ -32,6 +32,7 @@ global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
       - "mongo/client/read_preference.h"
+      - "mongo/db/repl/repl_worker_pool_thread_count.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -259,27 +260,6 @@ server_parameters:
         default: 10
         validator:
             gte: 0
-
-    # From oplog_applier.cpp
-    replWriterThreadCount:
-        description: The number of threads in the thread pool used to apply the oplog
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: replWriterThreadCount
-        default: 16
-        validator:
-            gte: 1
-            lte: 256
-
-    replWriterMinThreadCount:
-        description: The minimum number of threads in the thread pool used to apply the oplog
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: replWriterMinThreadCount
-        default: 0
-        validator:
-            gte: 0
-            lte: 256
 
     replBatchLimitOperations:
         description: The maximum number of operations to apply in a single batch

@@ -180,6 +180,8 @@ public:
 
     void appendSecondaryInfoData(BSONObjBuilder*) override;
 
+    ThreadPool* getDbWorkThreadPool() const override;
+
     repl::ReplSetConfig getConfig() const override;
 
     ConnectionString getConfigConnectionString() const override;
