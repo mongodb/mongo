@@ -421,6 +421,26 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(1, c->numCallsOnBecomeArbiter);
 }
 
+TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceSkipsStartupIfShutdownAlreadyCalled) {
+    auto sc = getGlobalServiceContext();
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto b = ServiceB::get(sc);
+    auto c = ServiceC::get(sc);
+
+    ASSERT_EQ(0, b->numCallsOnStartup);
+    ASSERT_EQ(0, c->numCallsOnStartup);
+
+    // Call onShutdown() before onStartup().
+    ReplicaSetAwareServiceRegistry::get(sc).onShutdown();
+    ReplicaSetAwareServiceRegistry::get(sc).onStartup(opCtx);
+
+    // No service should have had onStartup() called because shutdown was already called.
+    ASSERT_EQ(0, b->numCallsOnStartup);
+    ASSERT_EQ(0, c->numCallsOnStartup);
+}
+
 TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareServiceLogSlowServices) {
     std::string slowSingleServiceStepUpBeginMsg =
         "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpBegin for service exceeded "

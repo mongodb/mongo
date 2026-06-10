@@ -35,6 +35,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/modules.h"
 
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -298,6 +299,9 @@ public:
 private:
     void _registerService(ReplicaSetAwareInterface* service);
     void _unregisterService(ReplicaSetAwareInterface* service);
+
+    std::mutex _isShutdownMutex;
+    bool _isShutdown = false;  // GUARDED_BY(_isShutdownMutex)
 
     std::vector<ReplicaSetAwareInterface*> _services;
 };

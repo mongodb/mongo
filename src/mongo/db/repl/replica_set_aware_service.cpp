@@ -38,6 +38,7 @@
 #include "mongo/util/timer.h"
 
 #include <algorithm>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -60,9 +61,14 @@ ReplicaSetAwareServiceRegistry& ReplicaSetAwareServiceRegistry::get(
 }
 
 void ReplicaSetAwareServiceRegistry::onStartup(OperationContext* opCtx) {
-    std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+    for (auto* service : _services) {
+        // Make sure we do not call onStartup after onShutdown for any service.
+        std::lock_guard lk(_isShutdownMutex);
+        if (_isShutdown) {
+            return;
+        }
         service->onStartup(opCtx);
-    });
+    }
 }
 
 void ReplicaSetAwareServiceRegistry::onSetCurrentConfig(OperationContext* opCtx) {
@@ -80,6 +86,10 @@ void ReplicaSetAwareServiceRegistry::onConsistentDataAvailable(OperationContext*
 }
 
 void ReplicaSetAwareServiceRegistry::onShutdown() {
+    {
+        std::lock_guard lk(_isShutdownMutex);
+        _isShutdown = true;
+    }
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
         service->onShutdown();
     });
