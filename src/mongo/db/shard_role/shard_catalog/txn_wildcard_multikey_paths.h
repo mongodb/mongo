@@ -52,15 +52,10 @@ namespace mongo {
  * The parent transaction must be able to see those changes in subsequent statements, so we cache
  * them here.
  *
- * The cache lives as a Snapshot decoration on the parent transaction's RecoveryUnit, so it:
+ * The cache lives inside the parent transaction's RecoveryUnit::Snapshot MultikeyState decoration,
+ * so it:
  *   - Survives statement boundaries via TxnResources RU stash/unstash.
  *   - Is cleaned up when the parent RU is destroyed on transaction commit or abort.
- *
- * To keep the cost paid by hot non-wildcard read paths to a minimum, the decoration storage
- * holds a `boost::optional<TxnWildcardMultikeyPaths>`. Snapshot construction therefore does not
- * default-construct the underlying `absl::flat_hash_map`; only operations that actually need the
- * cache (write path or wildcard-multikey reads in a multi-document transaction) pay the
- * construction cost. See SERVER-128160.
  */
 class MONGO_MOD_PUBLIC TxnWildcardMultikeyPaths {
 public:

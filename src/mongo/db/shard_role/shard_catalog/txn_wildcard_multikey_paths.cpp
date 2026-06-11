@@ -30,33 +30,23 @@
 #include "mongo/db/shard_role/shard_catalog/txn_wildcard_multikey_paths.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/util/decorable.h"
+#include "mongo/db/shard_role/shard_catalog/multikey_state.h"
 
-#include <boost/optional/optional.hpp>
+#include <memory>
+#include <utility>
 
 namespace mongo {
-namespace {
-
-const auto getTxnWildcardMultikeyPathsSlot =
-    RecoveryUnit::Snapshot::declareDecoration<boost::optional<TxnWildcardMultikeyPaths>>();
-
-}  // namespace
 
 TxnWildcardMultikeyPaths& TxnWildcardMultikeyPaths::get(OperationContext* opCtx) {
-    auto& slot =
-        getTxnWildcardMultikeyPathsSlot(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
+    auto& slot = getMultikeyState(opCtx).wildcardPaths;
     if (!slot) {
-        slot.emplace();
+        slot = std::make_unique<TxnWildcardMultikeyPaths>();
     }
     return *slot;
 }
 
 const TxnWildcardMultikeyPaths* TxnWildcardMultikeyPaths::tryGet(OperationContext* opCtx) {
-    auto& slot =
-        getTxnWildcardMultikeyPathsSlot(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
-    return slot ? &*slot : nullptr;
+    return getMultikeyState(opCtx).wildcardPaths.get();
 }
 
 void TxnWildcardMultikeyPaths::append(const UUID& collectionUuid,

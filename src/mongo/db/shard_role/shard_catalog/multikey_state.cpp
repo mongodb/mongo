@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,15 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/shard_role/shard_catalog/uncommitted_multikey.h"
-
-#include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/multikey_state.h"
 
-namespace mongo {
+#include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/txn_wildcard_multikey_paths.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/decorable.h"
 
-UncommittedMultikey& UncommittedMultikey::get(OperationContext* opCtx) {
-    return getMultikeyState(opCtx).uncommittedMultikey;
+namespace mongo {
+namespace {
+
+const auto getMultikeyStateDecoration = RecoveryUnit::Snapshot::declareDecoration<MultikeyState>();
+
+}  // namespace
+
+MultikeyState& getMultikeyState(OperationContext* opCtx) {
+    return getMultikeyStateDecoration(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
 }
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,15 +27,30 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/shard_role/shard_catalog/uncommitted_multikey.h"
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role/shard_catalog/multikey_state.h"
+#include <memory>
 
 namespace mongo {
 
-UncommittedMultikey& UncommittedMultikey::get(OperationContext* opCtx) {
-    return getMultikeyState(opCtx).uncommittedMultikey;
-}
+class OperationContext;
+class TxnWildcardMultikeyPaths;
+
+/**
+ * Aggregates per-transaction multikey state behind a single RecoveryUnit::Snapshot decoration slot.
+ * This is an optimization to avoid the overhead of multiple Snapshot decorations in the hot-path.
+ */
+struct MultikeyState {
+    // The uncommitted multikey state for the current snapshot.
+    UncommittedMultikey uncommittedMultikey;
+    // Side-committed (via setMultikeyMetadata oplog entry) wildcard multikey state for
+    // multi-document transactions. Intentionally lazy initialized to avoid construction cost in hot
+    // path outside of multi-document transactions.
+    std::unique_ptr<TxnWildcardMultikeyPaths> wildcardPaths;
+};
+
+MultikeyState& getMultikeyState(OperationContext* opCtx);
 
 }  // namespace mongo

@@ -112,6 +112,7 @@ mongo_cc_library(
     srcs = [
         "collection_catalog.cpp",
         "historical_catalogid_tracker.cpp",
+        "multikey_state.cpp",
         "server_parameters_gen",
         "txn_wildcard_multikey_paths.cpp",
         "uncommitted_catalog_updates.cpp",
