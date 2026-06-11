@@ -43,9 +43,9 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace mongo {
 
@@ -98,6 +98,7 @@ public:
                         long long& nNonCompliantDocuments,
                         long long& nInvalidDocuments,
                         ValidateResults* results,
+                        std::span<const IndexCatalogEntry*> indexCatalogEntries,
                         ValidationVersion validationVersion = currentValidationVersion)
         -> ValidateRecordResult;
     /**

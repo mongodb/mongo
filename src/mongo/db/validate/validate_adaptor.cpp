@@ -79,6 +79,7 @@
 #include <string>
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -204,6 +205,7 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                      long long& nNonCompliantDocuments,
                                      long long& nInvalidDocuments,
                                      ValidateResults* results,
+                                     std::span<const IndexCatalogEntry*> indexCatalogEntries,
                                      ValidationVersion validationVersion) -> ValidateRecordResult {
     {
         const Status bsonValidationStatus = validateBSON(
@@ -289,8 +291,7 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
     SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
-    for (const auto& indexIdent : _validateState->getIndexIdents()) {
-        const auto indexEntry = coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
+    for (const auto* indexEntry : indexCatalogEntries) {
         if ((indexEntry->descriptor()->isPartial() &&
              !exec::matcher::matchesBSON(indexEntry->getFilterExpression(), recordBson)) ||
             !results->getIndexValidateResult(indexEntry->descriptor()->indexName())
@@ -529,6 +530,15 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         }
     }
 
+    // Acquire index catalog entries once to avoid repeated findIndexByIdent() per document.
+    static constexpr size_t kStackAllocatedSize{8};
+    boost::container::small_vector<const IndexCatalogEntry*, kStackAllocatedSize> indexEntries;
+    const auto& indexIdents = _validateState->getIndexIdents();
+    indexEntries.reserve(indexIdents.size());
+    for (const auto& indexIdent : indexIdents) {
+        indexEntries.push_back(coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent));
+    }
+
     for (auto record =
              traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
          record;
@@ -548,6 +558,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                            nNonCompliantDocuments,
                            nInvalid,
                            results,
+                           indexEntries,
                            validationVersion);
 
         if (_validateState->isCollHashValidation()) {
