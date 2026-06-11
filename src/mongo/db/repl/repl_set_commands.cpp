@@ -85,7 +85,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_utils.h"
@@ -104,12 +103,6 @@
 #define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(                               \
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
-
-// When active on a standby, causes it to handle replSetHeartbeat requests via the non-exhaust
-// path (i.e. as if the node predates exhaust heartbeat support), returning moreToCome=false on
-// every response. Used to test mixed-version compatibility where the standby is on an old version.
-// TODO(SERVER-125577): Remove once mixed-version support is no longer needed.
-MONGO_FAIL_POINT_DEFINE(simulateOldStandbyHeartbeat);
 
 namespace mongo {
 namespace repl {
@@ -765,8 +758,8 @@ public:
                              const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) override {
-        if (!opCtx->isExhaust() || MONGO_unlikely(simulateOldStandbyHeartbeat.shouldFail())) {
-            // Non-exhaust path: standard request/response heartbeat (or simulated old standby).
+        if (!opCtx->isExhaust()) {
+            // Non-exhaust path: standard request/response heartbeat.
             return BasicCommand::runWithReplyBuilder(opCtx, dbName, cmdObj, replyBuilder);
         }
 
