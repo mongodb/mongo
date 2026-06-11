@@ -57,6 +57,11 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
         return "";
     }
 
+    // TODO(SERVER-128108): consult provider here.
+    bool mustUseContainerWrites() const override {
+        return false;
+    }
+
     bool shouldUseReplicatedCatalogIdentifiers() const override {
         return false;
     }

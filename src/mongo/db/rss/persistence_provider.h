@@ -91,6 +91,11 @@ public:
     virtual bool mustUsePrimaryDrivenIndexBuilds() const = 0;
 
     /**
+     * If true, the provider requires that table-level operations are replicated through the oplog.
+     */
+    virtual bool mustUseContainerWrites() const = 0;
+
+    /**
      * If true, the provider expects that all catalog identifiers will be replicated and identical
      * between nodes.
      */

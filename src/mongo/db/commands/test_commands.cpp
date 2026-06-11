@@ -467,6 +467,7 @@ public:
 
 #define BUILD_DESCRIPTOR_FOR_BOOL_CAPABILITIES(BOOL_FIELD_BUILDER_FN)        \
     BOOL_FIELD_BUILDER_FN(mustUsePrimaryDrivenIndexBuilds)                   \
+    BOOL_FIELD_BUILDER_FN(mustUseContainerWrites)                            \
     BOOL_FIELD_BUILDER_FN(shouldAvoidDuplicateCheckpoints)                   \
     BOOL_FIELD_BUILDER_FN(shouldDelayDataAccessDuringStartup)                \
     BOOL_FIELD_BUILDER_FN(shouldDisableTransactionUpdateCoalescing)          \

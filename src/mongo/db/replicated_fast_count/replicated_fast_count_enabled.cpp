@@ -87,10 +87,12 @@ bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceS
 }
 
 bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx) {
-    // TODO SERVER-125446: Also consult persistence provider for container writes enablement.
-    return feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    return rss::ReplicatedStorageService::get(opCtx)
+               .getPersistenceProvider()
+               .mustUseContainerWrites() ||
+        feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
@@ -99,6 +101,8 @@ bool isReplicatedFastCountListCollectionsEnabled(OperationContext* opCtx) {
     }
     const auto vCtx = VersionContext::getDecoration(opCtx);
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    // We don't consult the mustUseContainerWrites or shouldUseReplicatedFastCount persistence
+    // provider fields since this is test only functionality.
     return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(vCtx,
                                                                                   fcvSnapshot) &&
         feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);

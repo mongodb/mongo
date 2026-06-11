@@ -79,6 +79,11 @@ public:
             "StubPersistenceProvider::mustUsePrimaryDrivenIndexBuilds() method not implemented");
     }
 
+    bool mustUseContainerWrites() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::mustUseContainerWrites() method not implemented");
+    }
+
     bool shouldUseReplicatedRecordIds() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::shouldUseReplicatedRecordIds() method not implemented");

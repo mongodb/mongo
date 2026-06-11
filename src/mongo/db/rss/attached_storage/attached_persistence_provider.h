@@ -71,6 +71,11 @@ public:
     bool mustUsePrimaryDrivenIndexBuilds() const override;
 
     /**
+     * Attached storage does not replicate table-level operations through the oplog.
+     */
+    bool mustUseContainerWrites() const override;
+
+    /**
      * Attached storage does not require replicated RecordIds to function correctly.
      */
     bool shouldUseReplicatedRecordIds() const override;

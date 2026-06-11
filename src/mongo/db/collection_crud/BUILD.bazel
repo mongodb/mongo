@@ -41,6 +41,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/op_observer",
+        "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/storage:container",
     ],
 )

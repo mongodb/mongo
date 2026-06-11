@@ -31,7 +31,9 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/version_context.h"
 
 namespace mongo::container_write {
 namespace {
@@ -39,8 +41,10 @@ void assertCanAcceptContainerWrites(OperationContext* opCtx) {
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     uassert(ErrorCodes::InvalidOptions,
             "Container write support is not enabled",
-            fcv.isVersionInitialized() &&
-                ::mongo::feature_flags::gContainerWrites.isEnabled(
+            rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+                    .getPersistenceProvider()
+                    .mustUseContainerWrites() ||
+                ::mongo::feature_flags::gContainerWrites.isEnabledUseLastLTSFCVWhenUninitialized(
                     VersionContext::getDecoration(opCtx), fcv));
 
     uassert(ErrorCodes::NotWritablePrimary,

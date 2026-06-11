@@ -87,6 +87,10 @@ bool AttachedPersistenceProvider::mustUsePrimaryDrivenIndexBuilds() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::mustUseContainerWrites() const {
+    return false;
+}
+
 bool AttachedPersistenceProvider::shouldUseReplicatedCatalogIdentifiers() const {
     return false;
 }
