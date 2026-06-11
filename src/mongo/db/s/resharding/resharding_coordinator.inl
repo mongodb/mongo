@@ -611,9 +611,11 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                                kReshardingCoordinatorAwaitAllRecipientsInStrictConsistency);
                        return _awaitAllRecipientsInStrictConsistency(executor);
                    })
-                   .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
-                       return _verifyFinalCollection(std::move(coordinatorDocChangedOnDisk));
-                   });
+                   .then(
+                       [this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+                           return _verifyFinalCollection(executor,
+                                                         std::move(coordinatorDocChangedOnDisk));
+                       });
            })
         .onTransientError([](const Status& status) {
             LOGV2(5093704,
@@ -1830,6 +1832,7 @@ ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency(
 }
 
 ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
     if (!_metadata.getPerformVerification()) {
         return coordinatorDocChangedOnDisk;
@@ -1841,31 +1844,64 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
         return coordinatorDocChangedOnDisk;
     }
 
+    // All recipients have just reached strict consistency, so 'reachedStrictConsistencyTime' is
+    // when the donor/recipient delta wait can begin. The deadline is a share of the
+    // critical-section time still remaining.
+    auto reachedStrictConsistencyTime = (*executor)->now();
     auto opCtx = _makeOperationContext();
+
+    opCtx->setDeadlineByDate(
+        resharding::computeVerificationDeadline(_coordinatorDoc, reachedStrictConsistencyTime),
+        ErrorCodes::ExceededTimeLimit);
 
     auto verifyPreCommitStart = resharding::getCurrentTime();
     _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit,
                           verifyPreCommitStart);
 
-    _persistDonorDocumentsDelta(opCtx.get(), _donorDeltaFuture->get(opCtx.get()));
-    _persistRecipientDocumentsDelta(opCtx.get(), _recipientDeltaFuture->get(opCtx.get()));
-
-    // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk'
-    // above came from the OpObserver and may not reflect the latest version
-    // coordinator doc because the write to populate donor 'documentsFinal' metrics
-    // (to be used for verification) may occur after all recipients have reached
-    // strict consistency and updated the coordinator doc.
-    coordinatorDocChangedOnDisk =
-        resharding::getCoordinatorDoc(opCtx.get(), coordinatorDocChangedOnDisk.getReshardingUUID());
-
+    // Phase 1: Fetch deltas. If this fails for any reason (including deadline expiry), skip
+    // validation entirely.
+    bool deltasFetched = false;
     try {
-        _reshardingCoordinatorExternalState->verifyFinalCollection(opCtx.get(),
-                                                                   coordinatorDocChangedOnDisk);
-    } catch (const ExceptionFor<ErrorCodes::ReshardingValidationIncompleteData>& ex) {
-        LOGV2_WARNING(1091841,
-                      "Failed to verify the temporary resharding collection after reaching "
-                      "strict consistency",
-                      "error"_attr = redact(ex.toString()));
+        _persistDonorDocumentsDelta(opCtx.get(), _donorDeltaFuture->get(opCtx.get()));
+        _persistRecipientDocumentsDelta(opCtx.get(), _recipientDeltaFuture->get(opCtx.get()));
+
+        // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk'
+        // above came from the OpObserver and may not reflect the latest version
+        // coordinator doc because the write to populate donor 'documentsFinal' metrics
+        // (to be used for verification) may occur after all recipients have reached
+        // strict consistency and updated the coordinator doc.
+        coordinatorDocChangedOnDisk = resharding::getCoordinatorDoc(
+            opCtx.get(), coordinatorDocChangedOnDisk.getReshardingUUID());
+        deltasFetched = true;
+    } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::ExceededTimeLimit) {
+            LOGV2_WARNING(
+                12178802,
+                "Skipping resharding verification because a participant's change-streams monitor "
+                "did not complete before the deadline",
+                "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                "error"_attr = redact(ex.toString()));
+        } else {
+            LOGV2_WARNING(
+                12178803,
+                "Unexpected error when fetching deltas from participant change-streams monitors, "
+                "skipping resharding verification",
+                "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                "error"_attr = redact(ex.toString()));
+        }
+    }
+
+    // Phase 2: Validate the deltas we successfully fetched.
+    if (deltasFetched) {
+        try {
+            _reshardingCoordinatorExternalState->verifyFinalCollection(opCtx.get(),
+                                                                       coordinatorDocChangedOnDisk);
+        } catch (const ExceptionFor<ErrorCodes::ReshardingValidationIncompleteData>& ex) {
+            LOGV2_WARNING(1091841,
+                          "Failed to verify the temporary resharding collection after reaching "
+                          "strict consistency",
+                          "error"_attr = redact(ex.toString()));
+        }
     }
 
     auto verifyPreCommitEnd = resharding::getCurrentTime();

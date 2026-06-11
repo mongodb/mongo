@@ -1476,30 +1476,6 @@ TEST_F(ReshardingDonorServiceTest, RetryableErrorDuringChangeStreamsMonitorTrigg
     checkStateDocumentRemoved(opCtx.get());
 }
 
-// TODO SERVER-121788: Remove death test once validation no longer runs in critical section.
-DEATH_TEST_REGEX_F(ReshardingDonorServiceTestDeathTest,
-                   UnrecoverableCSMErrorAfterBlockingWritesFatals,
-                   "10903204") {
-    // _awaitChangeStreamsMonitorCompleted runs after kBlockingWrites is persisted.
-    // Any unrecoverable CSM error at this point triggers a fatal assertion.
-    TestOptions testOptions{.isAlsoRecipient = false, .performVerification = true};
-
-    auto doc = makeStateDocument(testOptions);
-    auto opCtx = makeOperationContext();
-    createSourceCollection(opCtx.get(), doc);
-    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
-    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-
-    FailPointEnableBlock failpoint("reshardingDonorFailsUpdatingChangeStreamsMonitorProgress",
-                                   BSON("errorCode" << ErrorCodes::InternalError));
-
-    notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
-    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
-
-    donor->getCompletionFuture().getNoThrow().ignore();
-}
-
 TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToBlockWrites) {
     externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kPreparingToBlockWrites,
                                                kAbortUnpreparedTransactionIfNecessary);

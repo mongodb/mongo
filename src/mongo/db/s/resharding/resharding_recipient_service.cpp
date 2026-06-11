@@ -1168,13 +1168,6 @@ ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCom
                             return _awaitChangeStreamsMonitorCompleted(executor, factory);
                         });
                 } else {
-                    if (_recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency) {
-                        LOGV2_FATAL(
-                            10903201,
-                            "Change streams monitor failed with unrecoverable error past the "
-                            "point recipient was prepared to complete the resharding operation",
-                            "error"_attr = status);
-                    }
                     LOGV2_WARNING(10903202,
                                   "Change streams monitor failed with unrecoverable error",
                                   "reshardingUUID"_attr = _metadata.getReshardingUUID(),

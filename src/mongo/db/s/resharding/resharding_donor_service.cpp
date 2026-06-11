@@ -1239,13 +1239,6 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStre
                             return _awaitChangeStreamsMonitorCompleted(executor, factory);
                         });
                 } else {
-                    if (_donorCtx.getState() >= DonorStateEnum::kBlockingWrites) {
-                        LOGV2_FATAL(
-                            10903204,
-                            "Change streams monitor failed with unrecoverable error past the "
-                            "point donor was prepared to complete the resharding operation",
-                            "error"_attr = status);
-                    }
                     LOGV2_WARNING(10903205,
                                   "Change streams monitor failed with unrecoverable error",
                                   "reshardingUUID"_attr = _metadata.getReshardingUUID(),

@@ -149,11 +149,6 @@ const criticalSectionDonorBlock = (() => {
 const cmdsToBlock = [
     criticalSectionDonorBlock,
     {
-        cmdName: "_shardsvrReshardingDonorFetchFinalCollectionStats",
-        // No skipping.
-        numSkips: 0,
-    },
-    {
         cmdName: "_shardsvrReshardRecipientCriticalSectionStarted",
         // No skipping.
         numSkips: 0,

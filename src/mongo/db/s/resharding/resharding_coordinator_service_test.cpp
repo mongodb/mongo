@@ -1745,15 +1745,18 @@ TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringBlockingWrites)
                                         kTellAllDonorsToRefresh);
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorInDeltaCollectorDuringBlockingWrites) {
+TEST_F(ReshardingCoordinatorServiceTest, DeltaCollectorErrorDuringBlockingWritesSkipsVerification) {
     // The delta collector runs asynchronously after the coordinator enters kBlockingWrites. Its
     // error is only surfaced when _verifyFinalCollection awaits the delta future, which happens
     // after all recipients reach strict consistency. Unlike kTellAllDonorsToRefresh (which fails
     // synchronously before the recipients wait), we must drive recipients to strict consistency
     // so the coordinator calls _verifyFinalCollection and observes the error. This means
     // runReshardingWithUnrecoverableError cannot be used here.
+    //
+    // An error from a participant's change-streams monitor must not abort the resharding operation
+    // as verfication is best effort.
     PauseDuringStateTransitions stateTransitionsGuard{
-        controller(), {CoordinatorStateEnum::kBlockingWrites, CoordinatorStateEnum::kAborting}};
+        controller(), {CoordinatorStateEnum::kBlockingWrites, CoordinatorStateEnum::kCommitting}};
 
     externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kBlockingWrites,
                                                kGetDocumentsDeltaFromDonors);
@@ -1775,11 +1778,14 @@ TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorInDeltaCollectorDurin
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
     makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
 
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
 
-    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::InternalError);
-    checkCoordinatorDocumentRemoved(opCtx);
+    makeDonorsProceedToDoneWithAssert(opCtx);
+    makeRecipientsProceedToDoneWithAssert(opCtx);
+
+    ASSERT_OK(coordinator->getCompletionFuture().getNoThrow());
 }
 
 class ReshardingCoordinatorServiceFailGetDocumentsToCopy
@@ -1911,12 +1917,14 @@ protected:
     const ErrorCodes::Error getDocumentsDeltaErrorCode{9858608};
 };
 
-TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta, AbortIfPerformVerification) {
+TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta, ContinuesIfPerformVerification) {
+    // A failure to fetch the document count delta from a participant's change streams monitor must
+    // not abort the resharding operation as verfication is best effort.
     const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
                                                       CoordinatorStateEnum::kCloning,
                                                       CoordinatorStateEnum::kApplying,
                                                       CoordinatorStateEnum::kBlockingWrites,
-                                                      CoordinatorStateEnum::kAborting};
+                                                      CoordinatorStateEnum::kCommitting};
 
     PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
 
@@ -1955,11 +1963,14 @@ TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta, AbortIfPerformVerifica
 
     makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
 
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
 
-    ASSERT_THROWS_CODE(
-        coordinator->getCompletionFuture().get(opCtx), DBException, getDocumentsDeltaErrorCode);
+    makeDonorsProceedToDoneWithAssert(opCtx);
+    makeRecipientsProceedToDoneWithAssert(opCtx);
+
+    ASSERT_OK(coordinator->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta,

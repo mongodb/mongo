@@ -302,6 +302,22 @@ server_parameters:
             gte: 0
         redact: false
 
+    reshardingVerificationDeltaWaitRemainingCriticalSectionPercent:
+        description: >-
+            Maximum percentage of the critical-section time still remaining when all recipients
+            reach strict consistency that waiting to get deltas from donors and recipients to
+            perform final collection verification may consume. If waiting does not finish within
+            this share, final collection validation is skipped and resharding proceeds to commit.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationDeltaWaitRemainingCriticalSectionPercent
+        default:
+            expr: 80
+        validator:
+            gte: 0
+            lte: 100
+        redact: false
+
     remainingReshardingOperationTimeThresholdMillis:
         description: >-
             Controls the threshold for engaging the critical section of resharding operations.

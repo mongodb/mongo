@@ -434,6 +434,7 @@ private:
      * collection verification check. Returns the (possibly refreshed) coordinator document.
      */
     ReshardingCoordinatorDocument _verifyFinalCollection(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         ReshardingCoordinatorDocument coordinatorDocChangedOnDisk);
 
     /**

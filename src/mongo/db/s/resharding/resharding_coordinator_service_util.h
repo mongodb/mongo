@@ -222,6 +222,15 @@ BSONObj createReshardedCollectionEntryUpdate(OperationContext* opCtx,
 boost::optional<UUID> tryRetrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
 
 UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
+
+/**
+ * Returns the deadline the coordinator uses to bound how long it waits for the donor and recipient
+ * deltas during pre-commit verification before giving up and proceeding to commit.
+ * 'reachedStrictConsistencyTime' is the time all recipients reached strict consistency; the
+ * deadline is a configured share of the critical-section time still remaining at that point.
+ */
+Date_t computeVerificationDeadline(const ReshardingCoordinatorDocument& coordinatorDoc,
+                                   Date_t reachedStrictConsistencyTime);
 }  // namespace resharding
 
 }  // namespace mongo

@@ -2907,29 +2907,6 @@ TEST_F(ReshardingRecipientServiceTest,
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
-// TODO SERVER-121788: Remove death test once validation no longer runs in critical section.
-DEATH_TEST_REGEX_F(ReshardingRecipientServiceTestDeathTest,
-                   UnrecoverableCSMErrorAfterStrictConsistencyFatals,
-                   "10903201") {
-    // _awaitChangeStreamsMonitorCompleted runs after kStrictConsistency is persisted.
-    // Any unrecoverable CSM error at this point triggers a fatal assertion.
-    TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
-
-    auto doc = makeRecipientDocument(testOptions);
-    auto opCtx = makeOperationContext();
-    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-
-    FailPointEnableBlock failpoint("reshardingRecipientFailsUpdatingChangeStreamsMonitorProgress",
-                                   BSON("errorCode" << ErrorCodes::InternalError));
-
-    notifyToStartCloning(opCtx.get(), *recipient, doc);
-    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
-    notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
-
-    recipient->getCompletionFuture().getNoThrow().ignore();
-}
-
 TEST_F(ReshardingRecipientServiceTest, AbortWhileWaitingForCriticalSectionStarted) {
     for (auto& testOptions : makeBasicTestOptions()) {
         setupFeatureFlags(testOptions);

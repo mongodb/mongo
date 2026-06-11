@@ -50,6 +50,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failReshardingChangeStreamsMonitorAfterProcessingBatch);
+MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeStarting);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeReceivingNextBatch);
 MONGO_FAIL_POINT_DEFINE(hangReshardingChangeStreamsMonitorBeforeKillingCursors);
 
@@ -142,6 +143,8 @@ SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
 
     return ExecutorFuture<void>(executor)
         .then([this, executor, cancelToken, factory]() {
+            hangReshardingChangeStreamsMonitorBeforeStarting.pauseWhileSet();
+
             if (_startAfterResumeToken) {
                 LOGV2(1006684,
                       "The change streams monitor is resuming",

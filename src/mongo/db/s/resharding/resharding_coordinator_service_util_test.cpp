@@ -550,5 +550,67 @@ TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest, TempCollectionTypeCopiesP
     ASSERT_EQ(collType.getReshardingFields()->getProvenance(), GetParam());
 }
 
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       ComputeVerificationDeadlineAtCriticalSectionStartMatchesShareOfTotalBudget) {
+    RAIIServerParameterControllerForTest percentCtrl{
+        "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 30};
+
+    const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto reachedStrictConsistencyTime = expiresAt - Milliseconds(100'000);
+    ReshardingCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setCommonReshardingMetadata(makeMetadata());
+    coordinatorDoc.setCriticalSectionExpiresAt(expiresAt);
+
+    ASSERT_EQ(computeVerificationDeadline(coordinatorDoc, reachedStrictConsistencyTime),
+              expiresAt - Milliseconds(70'000));
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       ComputeVerificationDeadlineEqualsExpiresAtAt100Percent) {
+    // 100% leaves no reserve: the wait may run right up to critical-section expiry.
+    RAIIServerParameterControllerForTest percentCtrl{
+        "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 100};
+
+    const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto reachedStrictConsistencyTime = expiresAt - Milliseconds(40'000);
+    ReshardingCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setCommonReshardingMetadata(makeMetadata());
+    coordinatorDoc.setCriticalSectionExpiresAt(expiresAt);
+
+    ASSERT_EQ(computeVerificationDeadline(coordinatorDoc, reachedStrictConsistencyTime), expiresAt);
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest, ComputeVerificationDeadlineEqualsReachedAtAt0Percent) {
+    // 0% grants no time: the wait is skipped immediately.
+    RAIIServerParameterControllerForTest percentCtrl{
+        "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 0};
+
+    const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto reachedStrictConsistencyTime = expiresAt - Milliseconds(40'000);
+    ReshardingCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setCommonReshardingMetadata(makeMetadata());
+    coordinatorDoc.setCriticalSectionExpiresAt(expiresAt);
+
+    ASSERT_EQ(computeVerificationDeadline(coordinatorDoc, reachedStrictConsistencyTime),
+              reachedStrictConsistencyTime);
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       ComputeVerificationDeadlineClampsToReachedAtWhenNoBudgetRemains) {
+    // Strict consistency reached after the critical section already expired: remaining < 0.
+    // The deadline must clamp to reachedStrictConsistencyTime (immediate skip).
+    RAIIServerParameterControllerForTest percentCtrl{
+        "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 80};
+
+    const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);
+    const auto reachedStrictConsistencyTime = expiresAt + Milliseconds(5'000);
+    ReshardingCoordinatorDocument coordinatorDoc;
+    coordinatorDoc.setCommonReshardingMetadata(makeMetadata());
+    coordinatorDoc.setCriticalSectionExpiresAt(expiresAt);
+
+    ASSERT_EQ(computeVerificationDeadline(coordinatorDoc, reachedStrictConsistencyTime),
+              reachedStrictConsistencyTime);
+}
+
 }  // namespace resharding
 }  // namespace mongo

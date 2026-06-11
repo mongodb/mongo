@@ -1284,5 +1284,20 @@ UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) 
     return *reshardingUUID;
 }
 
+Date_t computeVerificationDeadline(const ReshardingCoordinatorDocument& coordinatorDoc,
+                                   Date_t reachedStrictConsistencyTime) {
+    auto criticalSectionExpiresAt = coordinatorDoc.getCriticalSectionExpiresAt();
+    tassert(12178801,
+            "Expected criticalSectionExpiresAt to be set when computing the verification deadline; "
+            "the coordinator only launches the delta collectors after engaging the critical "
+            "section",
+            criticalSectionExpiresAt.has_value());
+    const auto percent = gReshardingVerificationDeltaWaitRemainingCriticalSectionPercent.load();
+    const int64_t remainingMs =
+        durationCount<Milliseconds>(*criticalSectionExpiresAt - reachedStrictConsistencyTime);
+    const int64_t timeoutMs = (remainingMs > 0 ? remainingMs : 0) * percent / 100;
+    return reachedStrictConsistencyTime + Milliseconds(timeoutMs);
+}
+
 }  // namespace resharding
 }  // namespace mongo
