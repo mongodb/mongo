@@ -25,5 +25,7 @@
         - class: ValidateCollections
         - class: CheckShardFilteringMetadata
         - class: CheckOrphansDeleted
+        - class: CheckConnectionCount
+          max_connections_per_test: 1000
         - class: CleanEveryN
           n: 20

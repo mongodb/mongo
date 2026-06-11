@@ -66,6 +66,9 @@ filters:
   - "check_idle_cursors.py":
     approvers:
       - 10gen/server-jstest-infra
+  - "check_connection_count.py":
+    approvers:
+      - 10gen/server-networking-and-observability
   - "rotate_execution_control_params.py":
     approvers:
       - 10gen/server-workload-resilience
