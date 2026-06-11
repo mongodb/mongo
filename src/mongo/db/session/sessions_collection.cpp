@@ -172,6 +172,19 @@ SessionsCollection::SessionsCollection() = default;
 
 SessionsCollection::~SessionsCollection() = default;
 
+std::function<Status(BSONObj)> SessionsCollection::withRefreshTimeout(
+    std::function<Status(BSONObj)> fn) {
+    if (!logicalSessionCacheJobTimeoutEnabled) {
+        return fn;
+    }
+    const auto timeoutMs = static_cast<long long>(logicalSessionRefreshMillis) * 9 / 10;
+    return [fn = std::move(fn), timeoutMs](BSONObj batch) {
+        BSONObjBuilder builder(batch);
+        builder.append("maxTimeMS", timeoutMs);
+        return fn(builder.obj());
+    };
+}
+
 SessionsCollection::SendBatchFn SessionsCollection::makeSendFnForBatchWrite(
     const NamespaceString& ns, DBClientBase* client) {
     auto send = [client, ns](BSONObj batch) {

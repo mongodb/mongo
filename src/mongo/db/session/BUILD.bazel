@@ -149,6 +149,7 @@ mongo_cc_library(
         "sessions_collection.cpp",
     ],
     deps = [
+        ":logical_session_cache",
         ":logical_session_id_helpers",
         ":sessions_server_parameters_idl",
         "//src/mongo/client:clientdriver_minimal",

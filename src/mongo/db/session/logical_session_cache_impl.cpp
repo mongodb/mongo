@@ -221,6 +221,18 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
     // starved by admission control during periods of high load.
     admission::execution_control::ScopedTaskTypeNonDeprioritizable nonDeprioritizable(opCtx);
 
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
+    // Only impose a deadline when we own the opCtx (background job).  If the opCtx was
+    // supplied by the caller (e.g. reapLogicalSessionCacheNow / refreshLogicalSessionCacheNow)
+    // we leave their deadline intact.  maxTimeMS in the command BSON cannot be used here
+    // because DBDirectClient rejects it; setting the deadline directly on the opCtx is the
+    // correct mechanism for the loopback path.
+    if (uniqueCtx && logicalSessionCacheJobTimeoutEnabled) {
+        opCtx->setDeadlineAfterNowBy(Milliseconds(logicalSessionRefreshMillis) * 9 / 10,
+                                     ErrorCodes::MaxTimeMSExpired);
+    }
+
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->getSettings().isReplSet() &&
         replCoord->getMemberState().arbiter()) {
@@ -290,6 +302,18 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
     // Mark this operation as non-deprioritizable to prevent session refresh from being
     // starved by admission control during periods of high load.
     admission::execution_control::ScopedTaskTypeNonDeprioritizable nonDeprioritizable(opCtx);
+
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
+    // Only impose a deadline when we own the opCtx (background job).  If the opCtx was
+    // supplied by the caller (e.g. reapLogicalSessionCacheNow / refreshLogicalSessionCacheNow)
+    // we leave their deadline intact.  maxTimeMS in the command BSON cannot be used here
+    // because DBDirectClient rejects it; setting the deadline directly on the opCtx is the
+    // correct mechanism for the loopback path.
+    if (uniqueCtx && logicalSessionCacheJobTimeoutEnabled) {
+        opCtx->setDeadlineAfterNowBy(Milliseconds(logicalSessionRefreshMillis) * 9 / 10,
+                                     ErrorCodes::MaxTimeMSExpired);
+    }
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->getSettings().isReplSet() &&
@@ -385,15 +409,24 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        // Store sessions that failed to update back in _activeSessions to be retried next time.
-        LogicalSessionIdSet failedLsids;
-        for (const auto& record : refreshRes.failedSessions) {
-            failedLsids.insert(record.getId());
-        }
+        // Store sessions that failed to update back in _activeSessions to be retried next time,
+        // unless the failure was specifically MaxTimeMSExpired (our own job deadline firing). In
+        // that case re-storing the backlog would just cause the next cycle to hit the same wall.
+        // For any other failure (network error, write concern timeout, etc.) we do re-store so
+        // those sessions are retried normally, regardless of whether the timeout is enabled.
+        const bool failedDueToJobTimeout = logicalSessionCacheJobTimeoutEnabled &&
+            !refreshRes.errors.empty() &&
+            refreshRes.errors[0].code() == ErrorCodes::MaxTimeMSExpired;
+        if (!failedDueToJobTimeout) {
+            LogicalSessionIdSet failedLsids;
+            for (const auto& record : refreshRes.failedSessions) {
+                failedLsids.insert(record.getId());
+            }
 
-        for (const auto& [lsid, record] : activeSessions) {
-            if (failedLsids.count(lsid) > 0) {
-                _activeSessions.emplace(lsid, record);
+            for (const auto& [lsid, record] : activeSessions) {
+                if (failedLsids.count(lsid) > 0) {
+                    _activeSessions.emplace(lsid, record);
+                }
             }
         }
 

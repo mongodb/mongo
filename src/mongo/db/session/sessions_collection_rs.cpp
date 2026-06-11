@@ -201,10 +201,10 @@ SessionsCollection::RefreshSessionsResult SessionsCollectionRS::refreshSessions(
                 makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
         },
         [&](DBClientBase* client) {
-            return _doRefresh(
-                NamespaceString::kLogicalSessionsNamespace,
-                sessionsVector,
-                makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
+            return _doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                              sessionsVector,
+                              withRefreshTimeout(makeSendFnForBatchWrite(
+                                  NamespaceString::kLogicalSessionsNamespace, client)));
         });
 }
 
@@ -224,7 +224,8 @@ void SessionsCollectionRS::removeRecords(OperationContext* opCtx,
         [&](DBClientBase* client) {
             _doRemove(NamespaceString::kLogicalSessionsNamespace,
                       sessionsVector,
-                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, client));
+                      withRefreshTimeout(makeSendFnForBatchWrite(
+                          NamespaceString::kLogicalSessionsNamespace, client)));
         });
 }
 

@@ -503,6 +503,14 @@ public:
             if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
                 systemCriticalTaskType.emplace(opCtx);
             }
+            // Session collection upserts from internal clients (refreshSessions) must make forward
+            // progress to prevent TooManyLogicalSessions errors under heavy write load. Since this
+            // is for internal clients it does not include loopback requests through DBDirectClient.
+            boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
+            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+                systemCriticalTaskType.reset();
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+            }
 
             write_ops::UpdateCommandReply updateReply;
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
@@ -761,6 +769,14 @@ public:
                 systemCriticalTaskType;
             if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
                 systemCriticalTaskType.emplace(opCtx);
+            }
+            // Session collection deletes from internal clients (removeRecords) must make forward
+            // progress to prevent TooManyLogicalSessions errors under heavy write load. Since this
+            // is for internal clients it does not include loopback requests through DBDirectClient.
+            boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
+            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+                systemCriticalTaskType.reset();
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
 
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
