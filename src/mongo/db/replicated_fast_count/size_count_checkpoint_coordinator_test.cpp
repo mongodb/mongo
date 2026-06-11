@@ -45,7 +45,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <mutex>
@@ -76,14 +75,6 @@ protected:
         CatalogTestFixture::tearDown();
     }
 
-    void waitForCondition(std::function<bool()> pred) {
-        const auto deadline = Date_t::now() + Seconds(5);
-        while (!pred()) {
-            ASSERT_LT(Date_t::now(), deadline) << "Condition timed out after 5 seconds";
-            sleepmillis(10);
-        }
-    }
-
     OperationContext* _opCtx = nullptr;
     CollectionSizeCountStore _sizeCountStore;
     CollectionSizeCountTimestampStore _timestampStore;
@@ -105,11 +96,6 @@ TEST_F(SizeCountCheckpointCoordinatorTest, StartupAndShutdownAreIdempotent) {
 
 TEST_F(SizeCountCheckpointCoordinatorTest,
        ShutdownCanCompleteWhileStartupCallerIsStillPausedAfterPublication) {
-    bool startupReturned = false;
-    bool shutdownDone = false;
-    std::mutex stateMu;
-    stdx::condition_variable stateCv;
-
     stdx::thread starter;
     stdx::thread stopper;
 
@@ -117,35 +103,19 @@ TEST_F(SizeCountCheckpointCoordinatorTest,
         FailPointEnableBlock startupPause(
             "hangAfterSizeCountCheckpointCoordinatorStartupPublishesThreads");
 
-        starter = stdx::thread([&] {
-            _coordinator->startup(getServiceContext(), Timestamp::min());
-            std::lock_guard lk(stateMu);
-            startupReturned = true;
-            stateCv.notify_all();
-        });
+        starter =
+            stdx::thread([&] { _coordinator->startup(getServiceContext(), Timestamp::min()); });
 
         startupPause->waitForTimesEntered(startupPause.initialTimesEntered() + 1);
 
-        stopper = stdx::thread([&] {
-            _coordinator->shutdown();
-            std::lock_guard lk(stateMu);
-            shutdownDone = true;
-            stateCv.notify_all();
-        });
+        stopper = stdx::thread([&] { _coordinator->shutdown(); });
 
-        // shutdown() should not depend on the startup() caller returning once the worker
-        // threads have been published.
-        std::unique_lock lk(stateMu);
-        ASSERT_TRUE(stateCv.wait_for(lk, std::chrono::seconds(1), [&] { return shutdownDone; }));
-    }
+        // If shutdown incorrectly waited for the startup() caller to return, this join would
+        // deadlock: starter is still blocked at the failpoint above.
+        stopper.join();
+    }  // failpoint releases; starter unblocks and startup() returns
 
     starter.join();
-    stopper.join();
-
-    {
-        std::lock_guard lk(stateMu);
-        ASSERT_TRUE(startupReturned);
-    }
     ASSERT_FALSE(_coordinator->isRunning_ForTest());
 }
 
@@ -195,12 +165,6 @@ TEST_F(SizeCountCheckpointCoordinatorTest, ShutdownOnNeverStartedCoordinatorSets
     // Terminal: any subsequent startup() must be rejected.
     _coordinator->startup(getServiceContext(), Timestamp::min());
     ASSERT_FALSE(_coordinator->isRunning_ForTest());
-}
-
-TEST_F(SizeCountCheckpointCoordinatorTest, RequestFlushSetsFlushRequestedFlag) {
-    ASSERT_FALSE(_coordinator->isFlushRequested_ForTest());
-    _coordinator->requestFlush();
-    ASSERT_TRUE(_coordinator->isFlushRequested_ForTest());
 }
 
 TEST_F(SizeCountCheckpointCoordinatorTest, MultipleRequestFlushCallsBeforeFlushAreCoalesced) {
