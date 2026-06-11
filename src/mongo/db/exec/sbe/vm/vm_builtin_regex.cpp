@@ -100,8 +100,7 @@ value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
         "idx", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(codePointPos));
     auto [arrTag, arrVal] = arr.releaseToRaw();
     resObjectView->push_back_raw("captures", arrTag, arrVal);
-    auto [resTag, resVal] = res.releaseToRaw();
-    return {true, resTag, resVal};
+    return std::move(res);
 }
 
 /**

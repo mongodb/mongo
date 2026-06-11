@@ -1898,10 +1898,8 @@ value::TagValueMaybeOwned ByteCode::blockRoundTrunc(std::string funcName,
     }
 
     const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
-        [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
-            auto [_, resTag, resVal] =
-                genericRoundTrunc(funcName, roundingMode, place, tag, val).releaseToRaw();
-            return {resTag, resVal};
+        [&](value::TypeTags tag, value::Value val) -> value::TagValueOwned {
+            return genericRoundTrunc(funcName, roundingMode, place, tag, val).moveToOwned();
         });
 
     auto res = valueBlockIn->map(cmpOp);
@@ -2319,17 +2317,15 @@ value::TagValueOwned ByteCode::builtinValueBlockNewFill(ArityType arity) {
     tassert(11079907, "Unexpected arity value", arity == 2);
 
     auto right = viewFromStack(1);
-    auto [countOwned, countTag, countVal] =
-        value::genericNumConvert(right.tag, right.value, value::TypeTags::NumberInt32)
-            .releaseToRaw();
+    auto count = value::genericNumConvert(right.tag, right.value, value::TypeTags::NumberInt32);
     tassert(8141602,
             "valueBlockNewFill expects an integer in the size argument",
-            countTag == value::TypeTags::NumberInt32);
+            count.tag() == value::TypeTags::NumberInt32);
 
     // Take ownership of the value, we are transferring it to the block.
     auto [leftTag, leftVal] = moveRawOwnedFromStack(0);
-    auto blockOut =
-        std::make_unique<value::MonoBlock>(value::bitcastTo<int32_t>(countVal), leftTag, leftVal);
+    auto blockOut = std::make_unique<value::MonoBlock>(
+        value::bitcastTo<int32_t>(count.value()), leftTag, leftVal);
     return value::TagValueOwned(value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(blockOut.release()));
 }

@@ -313,11 +313,9 @@ void ArithmeticAverageHashAggAccumulatorTerminal::finalizePartialAggregate(
         return;
     }
 
-    auto [ownedFinalSum, tagFinalSum, valFinalSum] =
-        vm::ByteCode::aggDoubleDoubleSumFinalizeImpl(partialSum).releaseToRaw();
-    value::ValueGuard finalSumGuard(ownedFinalSum, tagFinalSum, valFinalSum);
+    auto finalSum = vm::ByteCode::aggDoubleDoubleSumFinalizeImpl(partialSum);
 
-    result.reset(vm::ByteCode::genericDiv(tagFinalSum, valFinalSum, tagCount, valCount));
+    result.reset(vm::ByteCode::genericDiv(finalSum.tag(), finalSum.value(), tagCount, valCount));
 }
 
 void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(

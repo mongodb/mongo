@@ -313,7 +313,7 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
                 intermediateResView->push_back_raw(value::TypeTags::Null, 0);
             }
         }
-        resView->push_back_raw(intermediateRes.releaseToRaw());
+        resView->push_back(std::move(intermediateRes));
     }
 
     return result;
