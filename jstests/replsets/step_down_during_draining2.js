@@ -15,7 +15,18 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-let replSet = new ReplSetTest({name: "testSet", nodes: 3});
+let replSet = new ReplSetTest({
+    name: "testSet",
+    nodes: 3,
+    nodeOptions: {
+        setParameter: {
+            // On in-memory variants, restarting a node triggers initial sync. Waiting for the
+            // sync source's lastStableRecoveryTimestamp to advance during initial sync can hang
+            // this test, so we disable that wait. See SERVER-128221 for more information.
+            "initialSyncWaitForSyncSourceLastStableRecoveryTs": false,
+        },
+    },
+});
 replSet.startSet();
 let conf = replSet.getReplSetConfig();
 conf.members[2].priority = 0;

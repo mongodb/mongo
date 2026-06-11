@@ -40,6 +40,10 @@ const addNode = (id, {newlyAdded, force, shouldSucceed, failureCode} = {}) => {
     const newNode = rst.add({
         rsConfig: {priority: 0},
         setParameter: {
+            // On in-memory variants, restarting a node triggers initial sync. Waiting for the
+            // sync source's lastStableRecoveryTimestamp to advance during initial sync can hang
+            // this test, so we disable that wait. See SERVER-128221 for more information.
+            "initialSyncWaitForSyncSourceLastStableRecoveryTs": false,
             "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": primary.host}}),
             "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
             "numInitialSyncAttempts": 1,

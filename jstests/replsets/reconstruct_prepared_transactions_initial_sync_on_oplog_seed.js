@@ -58,6 +58,10 @@ secondary = replTest.start(
     {
         startClean: true,
         setParameter: {
+            // On in-memory variants, the sync source's lastStableRecoveryTimestamp may not
+            // advance during initial sync, so waiting for it can hang this test. We disable that
+            // wait. See SERVER-128221 for more information.
+            "initialSyncWaitForSyncSourceLastStableRecoveryTs": false,
             "numInitialSyncAttempts": 2,
             // Fail point to force the first attempt to fail and hang before starting the second
             // attempt.

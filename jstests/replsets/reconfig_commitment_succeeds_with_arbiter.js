@@ -5,7 +5,17 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Make the secondary unelectable.
-let rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {arbiterOnly: true}}]});
+let rst = new ReplSetTest({
+    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {arbiterOnly: true}}],
+    nodeOptions: {
+        setParameter: {
+            // On in-memory variants, restarting a node triggers initial sync. Waiting for the
+            // sync source's lastStableRecoveryTimestamp to advance during initial sync can hang
+            // this test, so we disable that wait. See SERVER-128221 for more information.
+            "initialSyncWaitForSyncSourceLastStableRecoveryTs": false,
+        },
+    },
+});
 rst.startSet();
 rst.initiate();
 

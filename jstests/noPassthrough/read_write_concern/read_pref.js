@@ -22,7 +22,17 @@ let SEC_TAGS = [
 let NODES = SEC_TAGS.length + 1;
 
 let doTest = function () {
-    let st = new ShardingTest({shards: {rs0: {nodes: NODES, oplogSize: 10, useHostName: true}}});
+    let st = new ShardingTest({
+        shards: {rs0: {nodes: NODES, oplogSize: 10, useHostName: true}},
+        rsOptions: {
+            setParameter: {
+                // On in-memory variants, restarting a node triggers initial sync. Waiting for the
+                // sync source's lastStableRecoveryTimestamp to advance during initial sync can
+                // hang this test, so we disable that wait. See SERVER-128221 for more information.
+                "initialSyncWaitForSyncSourceLastStableRecoveryTs": false,
+            },
+        },
+    });
     let replTest = st.rs0;
     let primaryNode = replTest.getPrimary();
 
