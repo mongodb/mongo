@@ -320,4 +320,12 @@ const char* jsSkipWhiteSpace(const char* raw);
 MONGO_MOD_PUB ScriptEngine* getGlobalScriptEngine();
 MONGO_MOD_PUB void setGlobalScriptEngine(ScriptEngine* impl);
 
+/**
+ * Registers a stable kill-op proxy with the given ServiceContext. The proxy delegates interrupt
+ * calls to whatever getGlobalScriptEngine() returns at call time, avoiding dangling pointer issues
+ * when the global engine is swapped via setGlobalScriptEngine. The proxy outlives the
+ * ServiceContext, as required by registerKillOpListener (which has no unregister).
+ */
+void registerScriptEngineKillOpProxy(ServiceContext* svcCtx);
+
 }  // namespace mongo

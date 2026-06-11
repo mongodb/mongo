@@ -43,19 +43,8 @@
 
 namespace mongo {
 
-bool isExternalScriptingEnabled() {
-    return gEnableExternalScripting;
-}
-
 void ScriptEngine::setup(ExecutionEnvironment environment) {
     if (getGlobalScriptEngine()) {
-        return;
-    }
-
-    if (isExternalScriptingEnabled()) {
-        if (!serverGlobalParams.quiet.load()) {
-            LOGV2_INFO(11542361, "External scripting is enabled. Not setting up Wasmtime engine.");
-        }
         return;
     }
 
@@ -66,7 +55,7 @@ void ScriptEngine::setup(ExecutionEnvironment environment) {
     setGlobalScriptEngine(new mozjs::WasmtimeScriptEngine());
 
     if (hasGlobalServiceContext()) {
-        getGlobalServiceContext()->registerKillOpListener(getGlobalScriptEngine());
+        registerScriptEngineKillOpProxy(getGlobalServiceContext());
     }
 }
 

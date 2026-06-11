@@ -55,6 +55,7 @@
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <deque>
@@ -88,9 +89,23 @@ MONGO_FAIL_POINT_DEFINE(mr_killop_test_fp);
 // 2 GB is the largest support Javascript file size.
 const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
 
-const ServiceContext::Decoration<std::unique_ptr<ScriptEngine>> forService =
-    ServiceContext::declareDecoration<std::unique_ptr<ScriptEngine>>();
-static std::unique_ptr<ScriptEngine> globalScriptEngine;
+const ServiceContext::Decoration<std::shared_ptr<ScriptEngine>> forService =
+    ServiceContext::declareDecoration<std::shared_ptr<ScriptEngine>>();
+static std::shared_ptr<ScriptEngine> globalScriptEngine;
+
+// Tracks whether the kill-op proxy has already been registered on a given ServiceContext.
+// registerKillOpListener has no unregister and does not dedup, so this guards against registering
+// the proxy more than once if setup() is re-entered after the global engine is cleared.
+const ServiceContext::Decoration<std::atomic<bool>> killOpProxyRegistered =
+    ServiceContext::declareDecoration<std::atomic<bool>>();
+
+// Guards access to the global ScriptEngine pointer above. setGlobalScriptEngine() may replace (and
+// destroy) the previously installed engine, e.g. when streams swap MozJS/Wasmtime for ExternalJS at
+// runtime. The pointer is stored as a shared_ptr so the kill-op proxy can snapshot a refcounted
+// handle under this mutex and then release it before delegating; this keeps the engine alive across
+// the delegated call without holding the mutex across it (which would invert lock order with the
+// Client lock).
+std::mutex globalScriptEngineMutex;
 
 // Cache the parsed MONGO_PATH to avoid re-parsing the environment variable on every load() call
 const std::vector<std::string> cachedMongoPath = parseMongoPath();
@@ -692,6 +707,7 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
 void (*ScriptEngine::_connectCallback)(DBClientBase&, StringData) = nullptr;
 
 ScriptEngine* getGlobalScriptEngine() {
+    std::lock_guard<std::mutex> lk(globalScriptEngineMutex);
     if (hasGlobalServiceContext())
         return forService(getGlobalServiceContext()).get();
     else
@@ -699,10 +715,65 @@ ScriptEngine* getGlobalScriptEngine() {
 }
 
 void setGlobalScriptEngine(ScriptEngine* impl) {
+    // Swap the new engine in under the mutex, then let any previously installed engine be destroyed
+    // after the lock is released. Destroying it outside the mutex avoids running the engine's
+    // destructor (which may take Client locks) while holding globalScriptEngineMutex.
+    std::shared_ptr<ScriptEngine> previous;
+    {
+        std::lock_guard<std::mutex> lk(globalScriptEngineMutex);
+        auto& slot =
+            hasGlobalServiceContext() ? forService(getGlobalServiceContext()) : globalScriptEngine;
+        previous = std::move(slot);
+        slot = std::shared_ptr<ScriptEngine>(impl);
+    }
+}
+
+namespace {
+// Returns a refcounted handle to the current global ScriptEngine. Holding the returned shared_ptr
+// keeps the engine alive even if setGlobalScriptEngine() concurrently swaps (and would otherwise
+// destroy) it, without keeping globalScriptEngineMutex held past this call.
+std::shared_ptr<ScriptEngine> getGlobalScriptEngineShared() {
+    std::lock_guard<std::mutex> lk(globalScriptEngineMutex);
     if (hasGlobalServiceContext())
-        forService(getGlobalServiceContext()).reset(impl);
+        return forService(getGlobalServiceContext());
     else
-        globalScriptEngine.reset(impl);
+        return globalScriptEngine;
+}
+
+/**
+ * A stable proxy that delegates kill-op notifications to whatever the current global script engine
+ * is. This avoids dangling pointer issues when the global engine is swapped (e.g., from MozJS to
+ * ExternalJS) since registerKillOpListener has no corresponding unregister and the listener pointer
+ * must remain valid for the lifetime of the ServiceContext.
+ */
+class ScriptEngineKillOpProxy : public KillOpListenerInterface {
+public:
+    // Snapshot a refcounted handle to the engine and release globalScriptEngineMutex before
+    // delegating. The engine takes Client locks internally and killOperation already holds a Client
+    // lock when it calls interrupt(), so holding globalScriptEngineMutex across the delegated call
+    // would invert lock order with the Client lock (potential deadlock). The shared_ptr keeps the
+    // engine alive for the duration of the call even if it is swapped out concurrently.
+    void interrupt(ClientLock& lk, OperationContext* opCtx) override {
+        if (auto engine = getGlobalScriptEngineShared()) {
+            engine->interrupt(lk, opCtx);
+        }
+    }
+    void interruptAll(ServiceContextLock& svcCtxLock) override {
+        if (auto engine = getGlobalScriptEngineShared()) {
+            engine->interruptAll(svcCtxLock);
+        }
+    }
+};
+
+ScriptEngineKillOpProxy killOpProxy;
+}  // namespace
+
+void registerScriptEngineKillOpProxy(ServiceContext* svcCtx) {
+    // Register at most once per ServiceContext. setup() guards on engine presence, not proxy
+    // registration, so a clear-then-re-setup would otherwise push the same proxy twice.
+    if (!killOpProxyRegistered(svcCtx).exchange(true)) {
+        svcCtx->registerKillOpListener(&killOpProxy);
+    }
 }
 
 bool hasJSReturn(const string& code) {

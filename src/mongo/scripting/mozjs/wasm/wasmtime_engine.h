@@ -33,6 +33,7 @@
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 
 namespace mongo {
+
 namespace mozjs {
 
 class WasmtimeImplScope;
@@ -91,4 +92,5 @@ public:
 };
 
 }  // namespace mozjs
+
 }  // namespace mongo
