@@ -58,7 +58,8 @@ void write(OperationContext* opCtx,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch) {
-    if (request.hasEncryptionInformation()) {
+    if (prepareForFLERewrite(opCtx,
+                             request.getWriteCommandRequestBase().getEncryptionInformation())) {
         FLEBatchResult result = processFLEBatch(opCtx, request, stats, response, targetEpoch);
         if (result == FLEBatchResult::kProcessed) {
             return;
@@ -111,7 +112,7 @@ bulk_write_exec::BulkWriteReplyInfo bulkWrite(
                     "BulkWrite with Queryable Encryption supports only a single namespace.",
                     !nsInfo.getEncryptionInformation().has_value());
         }
-    } else if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
+    } else if (prepareForFLERewrite(opCtx, request.getNsInfo()[0].getEncryptionInformation())) {
         auto [result, replies] = bulk_write_exec::attemptExecuteFLE(opCtx, request);
         if (result == FLEBatchResult::kProcessed) {
             return replies;

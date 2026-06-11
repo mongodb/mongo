@@ -123,6 +123,7 @@ MONGO_FAIL_POINT_DEFINE(fleCrudPauseNonTxnGetTags);
 
 namespace mongo {
 namespace {
+
 std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
     std::vector<write_ops::WriteError> errors;
 
@@ -321,6 +322,19 @@ std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesFo
         executor,
         TransactionRouterResourceYielder::makeForLocalHandoff(),
         fleInlineCrudExecutor);
+}
+
+void assertFLECrudNotYetProcessed(const EncryptionInformation& ei) {
+    tassert(12783101,
+            "FLE2 CRUD processing entered but command is already processed.",
+            !ei.getCrudProcessed().value_or(false));
+}
+
+void assertFLECrudNotYetProcessed(const boost::optional<EncryptionInformation>& ei) {
+    tassert(12783102,
+            "FLE2 CRUD processing entered without encryptionInformation in the command.",
+            ei.has_value());
+    assertFLECrudNotYetProcessed(*ei);
 }
 
 namespace {
@@ -1354,15 +1368,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                BatchWriteExecStats* stats,
                                BatchedCommandResponse* response,
                                boost::optional<OID> targetEpoch) {
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
-
-    if (request.getWriteCommandRequestBase().getEncryptionInformation()->getCrudProcessed()) {
-        return FLEBatchResult::kNotProcessed;
-    }
+    assertFLECrudNotYetProcessed(request.getWriteCommandRequestBase().getEncryptionInformation());
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
         auto insertRequest = request.getInsertRequest();
@@ -1417,7 +1423,8 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
 std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
     OperationContext* opCtx, const BatchedCommandRequest& request) {
-    invariant(request.hasEncryptionInformation());
+    assertFLECrudNotYetProcessed(request.getWriteCommandRequestBase().getEncryptionInformation());
+
     auto getExpCtx = [&](const auto& op) {
         auto expCtx =
             ExpressionContextBuilder{}
@@ -1430,11 +1437,6 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
         expCtx->stopExpressionCounters();
         return expCtx;
     };
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
         auto deleteRequest = request.getDeleteRequest();
@@ -1660,28 +1662,9 @@ write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
 }
 
 FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                       const BSONObj& cmdObj,
+                                       const write_ops::FindAndModifyCommandRequest& request,
                                        BSONObjBuilder& result) {
-    // There is no findAndModify parsing in mongos so we need to first parse to decide if it is for
-    // FLE2
-    auto request =
-        write_ops::FindAndModifyCommandRequest::parse(IDLParserContext("findAndModify"), cmdObj);
-
-    if (!request.getEncryptionInformation().has_value()) {
-        return FLEBatchResult::kNotProcessed;
-    }
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-    }
-
-    // FLE2 Mongos CRUD operations loopback through MongoS with EncryptionInformation as
-    // findAndModify so query can do any necessary transformations. But on the nested call, CRUD
-    // does not need to do any more work.
-    if (request.getEncryptionInformation()->getCrudProcessed()) {
-        return FLEBatchResult::kNotProcessed;
-    }
+    assertFLECrudNotYetProcessed(request.getEncryptionInformation());
 
     // This callback ensures that any write concern errors are set in the reply in the event
     // that processFindAndModifyRequest returned a non-OK status, which is then thrown.
@@ -1704,9 +1687,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
 processFLEFindAndModifyExplainMongos(OperationContext* opCtx,
                                      const write_ops::FindAndModifyCommandRequest& request) {
-    tassert(6513400,
-            "Missing encryptionInformation for findAndModify",
-            request.getEncryptionInformation().has_value());
+    assertFLECrudNotYetProcessed(request.getEncryptionInformation());
 
     return uassertStatusOK(processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
         opCtx, request, &getTransactionWithRetriesForMongoS, processFindAndModifyExplain));
@@ -1995,12 +1976,14 @@ std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString&
 void processFLEFindS(OperationContext* opCtx,
                      const NamespaceString& nss,
                      FindCommandRequest* findCommand) {
+    assertFLECrudNotYetProcessed(findCommand->getEncryptionInformation());
     fle::processFindCommand(opCtx, nss, findCommand, &getTransactionWithRetriesForMongoS);
 }
 
 void processFLECountS(OperationContext* opCtx,
                       const NamespaceString& nss,
                       CountCommandRequest& countCommand) {
+    assertFLECrudNotYetProcessed(countCommand.getEncryptionInformation());
     fle::processCountCommand(opCtx, nss, &countCommand, &getTransactionWithRetriesForMongoS);
 }
 
@@ -2009,6 +1992,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(
     NamespaceString nss,
     const EncryptionInformation& encryptInfo,
     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite) {
+    assertFLECrudNotYetProcessed(encryptInfo);
     return fle::processPipeline(
         opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoS);
 }

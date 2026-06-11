@@ -731,8 +731,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                            BSONObjBuilder& result) {
     NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj));
 
-    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
-        return true;
+    if (auto request = write_ops::FindAndModifyCommandRequest::parse(
+            IDLParserContext("ClusterFindAndModify"), originalCmdObj);
+        prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
+        if (processFLEFindAndModify(opCtx, request, result) == FLEBatchResult::kProcessed) {
+            return true;
+        }
+        // fall through
     }
 
     auto cmdObj = [&] {
