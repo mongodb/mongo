@@ -570,8 +570,8 @@ public:
         grow(endIt);
     }
 
-    boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage(const DocumentSource* ds,
-                                                                  PathRef path) const {
+    boost::intrusive_ptr<mongo::DocumentSource> getPrevModifyingStage(const DocumentSource* ds,
+                                                                      PathRef path) const {
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.
@@ -589,8 +589,8 @@ public:
         return nullptr;
     }
 
-    DeclaringStageResult getDeclaringStageIncludingSubpipelines(const DocumentSource* ds,
-                                                                PathRef path) const {
+    DeclaringStageResult getPrevModifyingStageIncludingSubpipelines(const DocumentSource* ds,
+                                                                    PathRef path) const {
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.
@@ -610,7 +610,7 @@ public:
             if (auto* subGraph = _stages[declaringStageId].subpipelineGraph) {
                 auto suffixPath = skipPathComponents(path, prefix.size() + 1);
                 if (!suffixPath.empty()) {
-                    auto result = subGraph->getDeclaringStageIncludingSubpipelines_forTest(
+                    auto result = subGraph->getPrevModifyingStageIncludingSubpipelines_forTest(
                         nullptr, suffixPath);
                     result.srcStages.insert(result.srcStages.begin(),
                                             _stages[declaringStageId].documentSource);
@@ -620,7 +620,7 @@ public:
             }
         }
 
-        return {{getDeclaringStage(ds, path)}};
+        return {{getPrevModifyingStage(ds, path)}};
     }
 
     bool canPathBeArray(const DocumentSource* ds, PathRef path) const {
@@ -1945,14 +1945,14 @@ DependencyGraph::~DependencyGraph() = default;
 DependencyGraph::DependencyGraph(DependencyGraph&&) noexcept = default;
 DependencyGraph& DependencyGraph::operator=(DependencyGraph&&) noexcept = default;
 
-boost::intrusive_ptr<mongo::DocumentSource> DependencyGraph::getDeclaringStage_forTest(
+boost::intrusive_ptr<mongo::DocumentSource> DependencyGraph::getPrevModifyingStage(
     const DocumentSource* ds, PathRef path) const {
-    return _impl->getDeclaringStage(ds, path);
+    return _impl->getPrevModifyingStage(ds, path);
 }
 
-DeclaringStageResult DependencyGraph::getDeclaringStageIncludingSubpipelines_forTest(
+DeclaringStageResult DependencyGraph::getPrevModifyingStageIncludingSubpipelines_forTest(
     const DocumentSource* ds, PathRef path) const {
-    return _impl->getDeclaringStageIncludingSubpipelines(ds, path);
+    return _impl->getPrevModifyingStageIncludingSubpipelines(ds, path);
 }
 
 bool DependencyGraph::canPathBeArray(const DocumentSource* ds, PathRef path) const {

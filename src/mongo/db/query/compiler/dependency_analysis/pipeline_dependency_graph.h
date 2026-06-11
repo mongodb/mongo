@@ -108,31 +108,38 @@ public:
     DependencyGraph& operator=(DependencyGraph&&) noexcept;
 
     /**
-     * Returns the stage which last declared, modified or removed the path as seen at the input of
-     * 'stage'. If 'stage' is nullptr, returns the stage which last touched the path at the end of
-     * the pipeline. Returns nullptr when the path passes through unchanged from the pipeline input
-     * (the base collection or sub-pipeline input). Only used for testing.
+     * Returns the stage within the pipeline represented by this DependencyGraph instance which last
+     * declared, modified or removed the path as seen at the input of 'stage'. If 'stage' is
+     * nullptr, returns the stage which last touched the path at the end of the pipeline. Returns
+     * nullptr when the path passes through unchanged from the pipeline input.
      *
      * For example, the following stages all modify the path 'a':
      * - {$set: {a: 1}}
      * - {$set: {a.b: 1}}
      * - {$project: {a: 0}}
      * - {$group: {_id: ...}}
+     *
+     * Note: if this field was last modified by a stage with a sub-pipeline (e.g. $lookup), this
+     * does NOT recurse into subpipelines to report which specific subpipeline stage modified this
+     * field (if any). If we have a stage like:
+     *   {$lookup: {... as: "b", pipeline: [{$set: {x: 12}}]}}
+     * querying for field "b.x" after this stage will return the $lookup, NOT the $set.
      */
-    boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage_forTest(
-        const DocumentSource* stage, PathRef path) const;
+    boost::intrusive_ptr<mongo::DocumentSource> getPrevModifyingStage(const DocumentSource* stage,
+                                                                      PathRef path) const;
 
     /**
-     * Like getDeclaringStage_forTest, but additionally records the chain of intermediate
-     * sub-pipeline containing stages that the path crosses through.
+     * Like getPrevModifyingStage, but additionally records the chain of intermediate sub-pipeline
+     * containing stages that the path crosses through (i.e. in the example above, will return a
+     * pointer to $set).
      *
      * When the path crosses into a sub-pipeline (e.g. "docs.x" through a $lookup), the result has
      * 'fromSubpipeline' set to true and 'srcStages' populated with the chain of intermediate
      * sub-pipeline containing stages followed by the final declaring stage (or nullptr if the path
      * comes from the sub-pipeline's input).
      */
-    DeclaringStageResult getDeclaringStageIncludingSubpipelines_forTest(const DocumentSource* stage,
-                                                                        PathRef path) const;
+    DeclaringStageResult getPrevModifyingStageIncludingSubpipelines_forTest(
+        const DocumentSource* stage, PathRef path) const;
 
     /**
      * Returns false if the path as seen at the input of 'stage' can be proven to not be an array.
