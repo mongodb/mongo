@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/record_id.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
@@ -78,6 +79,15 @@ public:
 
     bool isEmpty() const;
 
+    /**
+     * Compares a RecordId against this range.
+     * Returns -1 if rid is before the start of this range (only possible when min is bounded;
+     *           an absent min is treated as -∞ so rid is never before the start).
+     * Returns  0 if rid is within this range.
+     * Returns +1 if rid is past the end of this range (only possible when max is bounded;
+     *           an absent max is treated as +∞ so rid is never past the end).
+     */
+    int compare(const RecordId& rid) const;
 
     const auto& getMin() const {
         return _min;

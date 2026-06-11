@@ -88,6 +88,41 @@ void RecordIdRange::maybeNarrowMax(const RecordIdBound& newMax, bool inclusive) 
     _maxInclusive = inclusive;
 }
 
+bool RecordIdRange::isEmpty() const {
+    if (!_min || !_max) {
+        return false;  // at least one side is unbounded → the range is not empty
+    }
+    auto cmp = *_min <=> *_max;
+    if (std::is_gt(cmp)) {
+        return true;  // min > max → no records can satisfy the range
+    }
+    if (std::is_eq(cmp)) {
+        // Same bound value: empty unless both sides are inclusive ([x,x] contains x)
+        return !_minInclusive || !_maxInclusive;
+    }
+    return false;
+}
+
+int RecordIdRange::compare(const RecordId& rid) const {
+    if (_min) {
+        int cmp = _min->recordId().compare(rid);
+        // cmp > 0: _min > rid → rid is before the range start
+        // cmp == 0 with exclusive bound: rid is at an excluded start → also before range
+        if (cmp > 0 || (cmp == 0 && !_minInclusive)) {
+            return -1;
+        }
+    }
+    if (_max) {
+        int cmp = _max->recordId().compare(rid);
+        // cmp < 0: _max < rid → rid is past the range end
+        // cmp == 0 with exclusive bound: rid is at an excluded end → also past range
+        if (cmp < 0 || (cmp == 0 && !_maxInclusive)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void RecordIdRange::intersectRange(const RecordIdRange& other) {
     intersectRange(other._min, other._max, other._minInclusive, other._maxInclusive);
 }
