@@ -157,6 +157,10 @@ const internalCommandsMap = {
         testname: "_configsvrCommitMergeAllChunksOnShard",
         command: {_configsvrCommitMergeAllChunksOnShard: "test.x", shard: shard0name},
     },
+    _configsvrCommitMergeAllPrecomputedChunksOnShard: {
+        testname: "_configsvrCommitMergeAllPrecomputedChunksOnShard",
+        command: {_configsvrCommitMergeAllPrecomputedChunksOnShard: "test.x", shard: shard0name, newChunks: []},
+    },
     _configsvrCommitReshardCollection: {
         testname: "_configsvrCommitReshardCollection",
         command: {_configsvrCommitReshardCollection: "test.x"},

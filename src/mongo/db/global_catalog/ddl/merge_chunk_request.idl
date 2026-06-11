@@ -94,7 +94,7 @@ structs:
                 description: "Latest data placement of the shard."
 
     MergeAllChunksOnShardResponse:
-        description: "Response of the _configsvrCommitMergeAllChunksOnShard and _shardsvrMergeAllChunksOnShard commands"
+        description: "Response of the _configsvrCommitMergeAllChunksOnShard and _shardsvrMergeAllChunksOnShard commands."
         strict: false
         is_command_reply: true
         fields:
@@ -104,6 +104,16 @@ structs:
             numMergedChunks:
                 type: int
                 description: "Number of chunks that were merged"
+
+    ConfigsvrMergeAllPrecomputedChunksOnShardResponse:
+        description: "Response of the _configsvrCommitMergeAllPrecomputedChunksOnShard command."
+        strict: false
+        is_command_reply: true
+        fields:
+            shardVersion:
+                type: ChunkVersion
+                description: "Latest data placement of the shard."
+                optional: false
 
 commands:
     _configsvrCommitChunksMerge:
@@ -204,7 +214,7 @@ commands:
         type: namespacestring
         api_version: ""
         strict: false
-        reply_type: ConfigSvrMergeResponse
+        reply_type: MergeAllChunksOnShardResponse
         fields:
             shard:
                 description: "The id of the shard."
@@ -220,3 +230,22 @@ commands:
                     "The maximum time in milliseconds spent looking for mergeable chunks."
                 type: int
                 default: 2147483647 # INT_MAX
+
+    _configsvrCommitMergeAllPrecomputedChunksOnShard:
+        command_name: _configsvrCommitMergeAllPrecomputedChunksOnShard
+        cpp_name: ConfigSvrCommitMergeAllPrecomputedChunksOnShard
+        description: "Definition of the mergeAllChunksOnShardV2 command called on the config server."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        reply_type: ConfigsvrMergeAllPrecomputedChunksOnShardResponse
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"
+            newChunks:
+                description: "A precomputed list with the new chunks to commit."
+                type: array<object_owned>
