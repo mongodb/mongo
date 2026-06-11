@@ -430,6 +430,13 @@ public:
                     str::stream() << "Not authorized to call analyze on collection "
                                   << ns.toStringForErrorMsg(),
                     authzSession->isAuthorizedForActionsOnNamespace(ns, ActionType::analyze));
+
+            // Require find privilege to prevent analyze from being used as a proxy to read
+            // documents from collections the caller cannot directly access.
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to read collection "
+                                  << ns.toStringForErrorMsg(),
+                    authzSession->isAuthorizedForActionsOnNamespace(ns, ActionType::find));
         }
     };
 };

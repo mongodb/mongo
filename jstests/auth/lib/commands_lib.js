@@ -656,25 +656,60 @@ export const authCommandsLib = {
             testcases: [
                 {
                     runOnDb: firstDbName,
-                    roles: roles_dbAdmin,
+                    // analyze requires both the 'analyze' and 'find' privileges.
+                    roles: {dbOwner: 1, root: 1, __system: 1},
                     privileges: [
                         {
                             resource: {db: firstDbName, collection: "x"},
-                            actions: ["analyze"],
+                            actions: ["analyze", "find"],
                         },
                     ],
                     expectFail: true,
                 },
                 {
                     runOnDb: secondDbName,
-                    roles: roles_dbAdminAny,
+                    roles: {root: 1, __system: 1},
                     privileges: [
                         {
                             resource: {db: secondDbName, collection: "x"},
-                            actions: ["analyze"],
+                            actions: ["analyze", "find"],
                         },
                     ],
                     expectFail: true,
+                },
+            ],
+        },
+        {
+            // Sample mode of analyze enforces the same authorization as histograms mode: both the
+            // 'analyze' and 'find' privileges are required on the target collection.
+            testname: "analyze_sample",
+            command: {analyze: "x", mode: "sample", samplingMethod: "random", sampleSize: 10},
+            setup: function (db) {
+                assert.commandWorked(db.x.insert({}));
+            },
+            teardown: function (db) {
+                db.x.drop();
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {dbOwner: 1, root: 1, __system: 1},
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: "x"},
+                            actions: ["analyze", "find"],
+                        },
+                    ],
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: {root: 1, __system: 1},
+                    privileges: [
+                        {
+                            resource: {db: secondDbName, collection: "x"},
+                            actions: ["analyze", "find"],
+                        },
+                    ],
                 },
             ],
         },
