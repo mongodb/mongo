@@ -24,6 +24,7 @@
 #include "gc/Scheduling.h"
 #include "gc/Statistics.h"
 #include "gc/StoreBuffer.h"
+#include "js/friend/CycleCollector.h"
 #include "js/friend/PerformanceHint.h"
 #include "js/GCAnnotations.h"
 #include "js/UniquePtr.h"
@@ -108,13 +109,15 @@ class ChunkPool {
 
   void sort();
 
+  // Linear time, use with caution.
+  bool contains(ArenaChunk* chunk) const;
+
  private:
   ArenaChunk* mergeSort(ArenaChunk* list, size_t count);
   bool isSorted() const;
 
 #ifdef DEBUG
  public:
-  bool contains(ArenaChunk* chunk) const;
   bool verify() const;
   void verifyChunks() const;
 #endif
@@ -685,6 +688,9 @@ class GCRuntime {
   // WeakRefs
   bool registerWeakRef(HandleObject target, HandleObject weakRef);
   void traceKeptObjects(JSTracer* trc);
+
+  void maybeClearWeakRefTargets(JS::ShouldClearWeakRefTargetCallback callback,
+                                void* data);
 
   JS::GCReason lastStartReason() const { return initialReason; }
 

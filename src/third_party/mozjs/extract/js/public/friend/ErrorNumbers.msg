@@ -804,6 +804,7 @@ MSG_DEF(JSMSG_ITERATOR_NO_THROW,       0, JSEXN_TYPEERR, "iterator does not have
 
 // Async Function
 MSG_DEF(JSMSG_UNHANDLABLE_PROMISE_REJECTION_WARNING, 0, JSEXN_WARN, "unhandlable error after resolving async function's promise")
+MSG_DEF(JSMSG_UNHANDLABLE_PROMISE_RESOLUTION_WARNING, 0, JSEXN_WARN, "unhandlable resolve after resolving async function's promise")
 
 // Async Iteration
 MSG_DEF(JSMSG_FOR_AWAIT_NOT_OF,        0, JSEXN_SYNTAXERR, "'for await' loop should be used with 'of'")

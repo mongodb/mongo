@@ -72,7 +72,10 @@ class MatchPairs {
   friend class RegExpShared;
   friend class RegExpStatics;
 
-  void forgetArray() { pairs_ = nullptr; }
+  void forgetArray() {
+    pairs_ = nullptr;
+    pairCount_ = 0;
+  }
 
  public:
   void checkAgainst(size_t inputLength) {

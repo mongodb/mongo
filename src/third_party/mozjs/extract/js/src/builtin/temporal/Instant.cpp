@@ -235,10 +235,10 @@ static BigInt* CreateBigInt(JSContext* cx,
     if (!result) {
       return nullptr;
     }
-    if (y) {
+    if (length > 1) {
       result->setDigit(1, y);
     }
-    if (x) {
+    if (length > 0) {
       result->setDigit(0, x);
     }
     return result;

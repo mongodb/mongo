@@ -17748,6 +17748,9 @@ void CodeGenerator::visitLoadSlotByIteratorIndex(
   masm.bind(&indexOkay);
 
   masm.loadValue(BaseObjectElementIndex(temp2, temp), result);
+  masm.branchTestMagicValue(Assembler::NotEqual, result, JS_ELEMENTS_HOLE,
+                            &done);
+  masm.assumeUnreachable("Dense element is a hole");
   masm.bind(&done);
 }
 

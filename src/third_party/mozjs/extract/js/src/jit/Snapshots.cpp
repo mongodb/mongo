@@ -51,7 +51,7 @@ using namespace js::jit;
 //
 // Snapshot header:
 //
-//   [vwu] bits ((n+1)-31]: recover instruction offset
+//   [vwu] bits ((n+1),63]: recover instruction offset
 //         bits [0,n): bailout kind (n = SNAPSHOT_BAILOUTKIND_BITS)
 //
 // Snapshot body, repeated "frame count" times, from oldest frame to newest
@@ -506,12 +506,12 @@ SnapshotReader::SnapshotReader(const uint8_t* snapshots, uint32_t offset,
 }
 
 #define COMPUTE_SHIFT_AFTER_(name) (name##_BITS + name##_SHIFT)
-#define COMPUTE_MASK_(name) ((uint32_t(1 << name##_BITS) - 1) << name##_SHIFT)
+#define COMPUTE_MASK_(name) (((uint64_t(1) << name##_BITS) - 1) << name##_SHIFT)
 
 // Details of snapshot header packing.
 static const uint32_t SNAPSHOT_BAILOUTKIND_SHIFT = 0;
 static const uint32_t SNAPSHOT_BAILOUTKIND_BITS = 6;
-static const uint32_t SNAPSHOT_BAILOUTKIND_MASK =
+static const uint64_t SNAPSHOT_BAILOUTKIND_MASK =
     COMPUTE_MASK_(SNAPSHOT_BAILOUTKIND);
 
 static_assert((1 << SNAPSHOT_BAILOUTKIND_BITS) - 1 >=
@@ -520,14 +520,14 @@ static_assert((1 << SNAPSHOT_BAILOUTKIND_BITS) - 1 >=
 
 static const uint32_t SNAPSHOT_ROFFSET_SHIFT =
     COMPUTE_SHIFT_AFTER_(SNAPSHOT_BAILOUTKIND);
-static const uint32_t SNAPSHOT_ROFFSET_BITS = 32 - SNAPSHOT_ROFFSET_SHIFT;
-static const uint32_t SNAPSHOT_ROFFSET_MASK = COMPUTE_MASK_(SNAPSHOT_ROFFSET);
+static const uint32_t SNAPSHOT_ROFFSET_BITS = 64 - SNAPSHOT_ROFFSET_SHIFT;
+static const uint64_t SNAPSHOT_ROFFSET_MASK = COMPUTE_MASK_(SNAPSHOT_ROFFSET);
 
 #undef COMPUTE_MASK_
 #undef COMPUTE_SHIFT_AFTER_
 
 void SnapshotReader::readSnapshotHeader() {
-  uint32_t bits = reader_.readUnsigned();
+  uint64_t bits = reader_.readUnsigned64();
 
   bailoutKind_ = BailoutKind((bits & SNAPSHOT_BAILOUTKIND_MASK) >>
                              SNAPSHOT_BAILOUTKIND_SHIFT);
@@ -635,15 +635,15 @@ SnapshotOffset SnapshotWriter::startSnapshot(RecoverOffset recoverOffset,
   allocWritten_ = 0;
 
   JitSpew(JitSpew_IonSnapshots,
-          "starting snapshot with recover offset %u, bailout kind %u",
+          "starting snapshot with recover offset %" PRIu64 ", bailout kind %u",
           recoverOffset, uint32_t(kind));
 
-  MOZ_ASSERT(uint32_t(kind) < (1 << SNAPSHOT_BAILOUTKIND_BITS));
-  MOZ_ASSERT(recoverOffset < (1 << SNAPSHOT_ROFFSET_BITS));
-  uint32_t bits = (uint32_t(kind) << SNAPSHOT_BAILOUTKIND_SHIFT) |
+  MOZ_ASSERT(uint64_t(kind) < (uint64_t(1) << SNAPSHOT_BAILOUTKIND_BITS));
+  MOZ_ASSERT(recoverOffset < (RecoverOffset(1) << SNAPSHOT_ROFFSET_BITS));
+  uint64_t bits = (uint64_t(kind) << SNAPSHOT_BAILOUTKIND_SHIFT) |
                   (recoverOffset << SNAPSHOT_ROFFSET_SHIFT);
 
-  writer_.writeUnsigned(bits);
+  writer_.writeUnsigned64(bits);
   return lastStart_;
 }
 

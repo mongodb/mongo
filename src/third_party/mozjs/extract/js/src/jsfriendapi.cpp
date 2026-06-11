@@ -479,6 +479,10 @@ void JS::detail::SetReservedSlotWithBarrier(JSObject* obj, size_t slot,
   }
 }
 
+bool JS::NativeObjectHasOwnProperties(const JSObject* obj) {
+  return !obj->as<NativeObject>().empty();
+}
+
 void js::SetPreserveWrapperCallbacks(
     JSContext* cx, PreserveWrapperCallback preserveWrapper,
     HasReleasedWrapperCallback hasReleasedWrapper) {

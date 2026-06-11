@@ -696,10 +696,11 @@ bool ChunkPool::isSorted() const {
   return true;
 }
 
-#ifdef DEBUG
-
 bool ChunkPool::contains(ArenaChunk* chunk) const {
+#ifdef DEBUG
   verify();
+#endif
+
   for (ArenaChunk* cursor = head_; cursor; cursor = cursor->info.next) {
     if (cursor == chunk) {
       return true;
@@ -707,6 +708,8 @@ bool ChunkPool::contains(ArenaChunk* chunk) const {
   }
   return false;
 }
+
+#ifdef DEBUG
 
 bool ChunkPool::verify() const {
   MOZ_ASSERT(bool(head_) == bool(count_));

@@ -393,18 +393,18 @@ static int32_t PerformWait(Instance* instance, uint32_t memoryIndex,
                            PtrT byteOffset, ValT value, int64_t timeout_ns) {
   JSContext* cx = instance->cx();
 
-  if (!instance->memory(memoryIndex)->isShared()) {
-    ReportTrapError(cx, JSMSG_WASM_NONSHARED_WAIT);
-    return -1;
-  }
-
   if (byteOffset & (sizeof(ValT) - 1)) {
     ReportTrapError(cx, JSMSG_WASM_UNALIGNED_ACCESS);
     return -1;
   }
 
-  if (byteOffset + sizeof(ValT) >
-      instance->memory(memoryIndex)->volatileMemoryLength()) {
+  if (!instance->memory(memoryIndex)->isShared()) {
+    ReportTrapError(cx, JSMSG_WASM_NONSHARED_WAIT);
+    return -1;
+  }
+
+  size_t memSizeBytes = instance->memory(memoryIndex)->volatileMemoryLength();
+  if (memSizeBytes < sizeof(ValT) || byteOffset > memSizeBytes - sizeof(ValT)) {
     ReportTrapError(cx, JSMSG_WASM_OUT_OF_BOUNDS);
     return -1;
   }
@@ -468,16 +468,14 @@ static int32_t PerformWake(Instance* instance, PtrT byteOffset, int32_t count,
                            uint32_t memoryIndex) {
   JSContext* cx = instance->cx();
 
-  // The alignment guard is not in the wasm spec as of 2017-11-02, but is
-  // considered likely to appear, as 4-byte alignment is required for WAKE by
-  // the spec's validation algorithm.
-
   if (byteOffset & 3) {
     ReportTrapError(cx, JSMSG_WASM_UNALIGNED_ACCESS);
     return -1;
   }
 
-  if (byteOffset >= instance->memory(memoryIndex)->volatileMemoryLength()) {
+  size_t memSizeBytes = instance->memory(memoryIndex)->volatileMemoryLength();
+  if (memSizeBytes < sizeof(int32_t) ||
+      byteOffset > memSizeBytes - sizeof(int32_t)) {
     ReportTrapError(cx, JSMSG_WASM_OUT_OF_BOUNDS);
     return -1;
   }
