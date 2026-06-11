@@ -93,23 +93,28 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
     if (replanningData && !rankerResult.solutions.empty()) {
         const auto qsn = rankerResult.solutions.at(0).get();
         const bool isSameAsCachedPlan = qsn && replanningData->oldPlanHash == qsn->hash();
-        tassert(12870801, "Expected execState to exist after replanning.", rankerResult.execState);
-        const auto classicExecStats = rankerResult.execState->peekExecState<ClassicExecState>();
-        tassert(
-            12870802, "Expected classic execState to exist after replanning.", classicExecStats);
-        LOGV2_DEBUG(
-            12870800,
-            1,
-            "Query plan after replanning and its cache status",
-            "query"_attr = redact(canonicalQuery->toStringShort()),
-            "planSummary"_attr =
-                plan_explainer_factory::make(classicExecStats->root.get())->getPlanSummary(),
-            "shouldCache"_attr =
-                replanningData->shouldCache == plan_cache_util::CacheMode::AlwaysCache ? "yes"
-                                                                                       : "no",
-            "isSameAsCachedPlan"_attr = isSameAsCachedPlan);
         if (isSameAsCachedPlan) {
             planCacheCounters.incrementClassicReplannedPlanIsCachedPlanCounter();
+        }
+        // On the inside of a $lookup, a single solution may be cached. This means when the inner
+        // query is replanned, there won't be any exec state because execution was not needed to
+        // determine the winning plan.
+        if (rankerResult.execState) {
+            const auto classicExecStats = rankerResult.execState->peekExecState<ClassicExecState>();
+            tassert(12870802,
+                    "Expected classic execState to exist after replanning.",
+                    classicExecStats);
+            LOGV2_DEBUG(
+                12870800,
+                1,
+                "Query plan after replanning and its cache status",
+                "query"_attr = redact(canonicalQuery->toStringShort()),
+                "planSummary"_attr =
+                    plan_explainer_factory::make(classicExecStats->root.get())->getPlanSummary(),
+                "shouldCache"_attr =
+                    replanningData->shouldCache == plan_cache_util::CacheMode::AlwaysCache ? "yes"
+                                                                                           : "no",
+                "isSameAsCachedPlan"_attr = isSameAsCachedPlan);
         }
     }
     return lowerPlanRankingResult(std::move(canonicalQuery),
