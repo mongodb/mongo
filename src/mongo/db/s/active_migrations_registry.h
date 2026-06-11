@@ -43,7 +43,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/notification.h"
+#include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -221,7 +221,7 @@ private:
         ActiveMoveChunkState(NamespaceString inNss, ShardsvrMoveRangeRequest inRequest)
             : nss(std::move(inNss)),
               request(std::move(inRequest)),
-              notification(std::make_shared<Notification<Status>>()) {}
+              promise(std::make_shared<SharedPromise<void>>()) {}
 
         /**
          * Constructs an error status to return in the case of conflicting operations.
@@ -234,8 +234,8 @@ private:
         // Move-range request fields of the currently active operation.
         ShardsvrMoveRangeRequest request;
 
-        // Notification event that will be signaled when the currently active operation completes
-        std::shared_ptr<Notification<Status>> notification;
+        // Promise that will be resolved when the currently active operation completes.
+        std::shared_ptr<SharedPromise<void>> promise;
     };
 
     // Describes the state of a currently active receive chunk operation
@@ -349,7 +349,7 @@ class ScopedDonateChunk {
 public:
     ScopedDonateChunk(ActiveMigrationsRegistry* registry,
                       bool shouldExecute,
-                      std::shared_ptr<Notification<Status>> completionNotification);
+                      std::shared_ptr<SharedPromise<void>> promise);
     ~ScopedDonateChunk();
 
     ScopedDonateChunk(ScopedDonateChunk&&);
@@ -388,12 +388,7 @@ private:
      */
     bool _shouldExecute;
 
-    // This is the future, which will be set at the end of a migration.
-    std::shared_ptr<Notification<Status>> _completionNotification;
-
-    // This is the outcome of the migration execution, stored when signalComplete() is called and
-    // set on the future of the executing ScopedDonateChunk object when this gets destroyed.
-    boost::optional<Status> _completionOutcome;
+    std::shared_ptr<SharedPromise<void>> _promise;
 };
 
 /**

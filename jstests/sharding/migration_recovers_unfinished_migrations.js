@@ -15,6 +15,7 @@
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {startParallelOps} from "jstests/libs/test_background_ops.js";
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh their sharding metadata. That
@@ -89,15 +90,23 @@ skipShardFilteringMetadataRefreshFailpoint.off();
 // document.
 let moveChunkHangAtStep3Failpoint = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep3");
 
-let joinMoveChunk2 = moveChunkParallel(
-    staticMongod,
+// When the MoveRangeCoordinator path is active, the recovered coordinator for the first migration
+// holds the ActiveMigrationsRegistry slot while it determines the outcome of that migration. The
+// second migration must wait for that operation to complete before it can proceed. Retry on
+// ConflictingOperationInProgress until the slot is free.
+function runMoveChunkWithRetryOnConflict(mongosURL, ns, toShardId) {
+    const admin = new Mongo(mongosURL).getDB("admin");
+    assert.soonRetryOnAcceptableErrors(() => {
+        assert.commandWorked(admin.runCommand({moveChunk: ns, find: {_id: 0}, to: toShardId, _waitForDelete: true}));
+        return true;
+    }, ErrorCodes.ConflictingOperationInProgress);
+}
+
+let joinMoveChunk2 = startParallelOps(staticMongod, runMoveChunkWithRetryOnConflict, [
     st.s0.host,
-    {_id: 0},
-    null,
     nsB,
     st.shard1.shardName,
-    true /* expectSuccess */,
-);
+]);
 
 // Check that second migration won't be able to persist its coordinator document until the shard has
 // been able to recover the first migration.

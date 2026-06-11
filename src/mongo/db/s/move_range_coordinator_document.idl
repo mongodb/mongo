@@ -48,6 +48,7 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kMigrate: "migrate"
 
 structs:
     MoveRangeCoordinatorDocument:
@@ -70,6 +71,9 @@ structs:
             # deliberately stored alongside the chained request rather than inside it so that
             # `checkIfOptionsConflict` (which compares the chained request) ignores write concern
             # differences when joining identical concurrent requests.
+            migrationId:
+                type: uuid
+                description: "Stable identifier for the MigrationCoordinator document associated with this migration."
             writeConcern:
                 type: WriteConcern
                 optional: true

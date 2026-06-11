@@ -31,8 +31,13 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -93,151 +98,277 @@ bool MoveRangeCoordinator::isInCriticalSection(Phase phase) const {
     return false;
 }
 
+ExecutorFuture<void> MoveRangeCoordinator::_acquireLocksAsync(
+    OperationContext*,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken&) {
+    return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this()] {
+        auto opCtx = makeOperationContext(/*deprioritizable=*/false);
+        // registerDonateChunk has a legacy invariant requiring this flag. The cancellation
+        // token already ensures this opCtx is interrupted on stepdown, but the invariant
+        // checks for the flag specifically.
+        opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+        // Bypass the registry's waitForRecovery() when called from the coordinator recovery
+        // path (_recoveredFromDisk == true): _acquireLocksAsync runs before
+        // _constructionCompletionPromise is set, so waiting for recovery would deadlock against
+        // the ShardingCoordinatorService waiting for this coordinator to finish construction.
+        auto bypass = _recoveredFromDisk
+            ? boost::optional<ActiveMigrationsRegistry::BypassRecoveryWait>(
+                  makeRegistryRecoveryBypass())
+            : boost::none;
+        _scopedDonateChunk =
+            uassertStatusOK(ActiveMigrationsRegistry::get(opCtx.get())
+                                .registerDonateChunk(opCtx.get(), nss(), _request, bypass));
+    });
+}
+
+void MoveRangeCoordinator::_releaseLocks(OperationContext*) {
+    _scopedDonateChunk.reset();
+}
+
 ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
+    if (!_recoveredFromDisk) {
+        return _initialExecutionFlow(executor, token);
+    }
+    return _recoveryFlow(
+        executor,
+        token,
+        Status{ErrorCodes::InterruptedDueToReplStateChange, "Migration aborted during recovery"});
+}
+
+ExecutorFuture<void> MoveRangeCoordinator::_joinExistingExecution(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    // A join token (mustExecute == false) means a legacy ScopedDonateChunk migration is still
+    // in-flight for this namespace with identical parameters. Wait for it and propagate its result.
+    return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this()] {
+        auto opCtx = makeOperationContext(/*deprioritizable=*/false);
+        _completeOnError = true;
+        uassertStatusOK(_scopedDonateChunk->waitForCompletion(opCtx.get()));
+    });
+}
+
+ExecutorFuture<void> MoveRangeCoordinator::_initialExecutionFlow(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    if (!_scopedDonateChunk->mustExecute()) {
+        return _joinExistingExecution(executor);
+    }
+    return ExecutorFuture<void>(**executor)
+        .then(_buildPhaseHandler(
+            Phase::kMigrate,
+            [this, anchor = shared_from_this(), executor](OperationContext* opCtx) {
+                Status migrationStatus{ErrorCodes::InternalError,
+                                       "MoveRangeCoordinator did not complete"};
+                try {
+                    const auto writeConcern =
+                        _doc.getWriteConcern().value_or(WriteConcernOptions{});
+
+                    // Resolve donor and recipient at execution time, not at coordinator-
+                    // construction time: the recipient primary may change between command
+                    // submission and the coordinator running on the fixed executor.
+                    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+                    const auto donorConnStr =
+                        uassertStatusOK(shardRegistry->getShard(opCtx, _request.getFromShard()))
+                            ->getConnString();
+                    const auto recipientHost = uassertStatusOK([&] {
+                        auto recipientShard =
+                            uassertStatusOK(shardRegistry->getShard(opCtx, _request.getToShard()));
+
+                        return recipientShard->getTargeter()->findHost(
+                            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
+                    }());
+
+                    long long totalDocsCloned =
+                        ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load();
+                    long long totalBytesCloned =
+                        ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load();
+                    long long totalCloneTime =
+                        ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load();
+
+                    auto&& migrationSourceManager =
+                        MigrationSourceManager::createMigrationSourceManager(
+                            opCtx,
+                            buildShardsvrMoveRange(nss(), _request),
+                            WriteConcernOptions{writeConcern},
+                            donorConnStr,
+                            recipientHost,
+                            ManagementModeEnum::kMoveRangeCoordinator,
+                            _doc.getMigrationId());
+
+                    migrationSourceManager.startClone();
+                    migrationSourceManager.awaitToCatchUp();
+                    migrationSourceManager.enterCriticalSection();
+                    migrationSourceManager.commitChunkOnRecipient();
+                    // Any failure after this point may have committed on the config server, so
+                    // the recovery flow is required to determine the outcome.
+                    _commitAttempted = true;
+                    migrationSourceManager.commitChunkMetadataOnConfig();
+
+                    long long docsCloned =
+                        ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load() -
+                        totalDocsCloned;
+                    long long bytesCloned =
+                        ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load() -
+                        totalBytesCloned;
+                    long long cloneTime =
+                        ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load() -
+                        totalCloneTime;
+                    auto migrationId = migrationSourceManager.getMigrationId();
+
+                    LOGV2(12697302,
+                          "Migration finished",
+                          "migrationId"_attr = migrationId ? migrationId->toString() : "",
+                          "totalTimeMillis"_attr = migrationSourceManager.getOpTimeMillis(),
+                          "docsCloned"_attr = docsCloned,
+                          "bytesCloned"_attr = bytesCloned,
+                          "cloneTime"_attr = cloneTime);
+
+                    migrationStatus = Status::OK();
+                } catch (const DBException& ex) {
+                    migrationStatus = ex.toStatus();
+                    LOGV2_WARNING(12697303,
+                                  "Error while doing moveChunk",
+                                  logAttrs(nss()),
+                                  "error"_attr = redact(migrationStatus),
+                                  "errorCode"_attr = migrationStatus.codeString());
+                    if (migrationStatus.code() == ErrorCodes::LockTimeout) {
+                        ShardingStatistics::get(opCtx).countDonorMoveChunkLockTimeout.addAndFetch(
+                            1);
+                    }
+                }
+
+                uassertStatusOK(migrationStatus);
+                return _completeMigration(opCtx, executor, Status::OK());
+            }))
+        .onError([this, anchor = shared_from_this(), executor, token](Status status) {
+            auto opCtx = makeOperationContext(/*deprioritizable=*/false);
+            if (!_mustInitiateRecovery(opCtx.get())) {
+                // The commit was never attempted and the MSM's cleanup path successfully removed
+                // the MigrationCoordinator document.
+                return _completeMigration(opCtx.get(), executor, status);
+            }
+            // Either the commit was attempted, or the MigrationCoordinator document is still on
+            // disk (or we couldn't confirm it's gone). Enter the recovery flow to determine the
+            // outcome.
+            return _recoveryFlow(executor, token, status);
+        });
+}
+
+ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    Status incomingStatus) {
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
-            auto opCtxHolder = makeOperationContext(/*deprioritizable=*/true);
-            auto* opCtx = opCtxHolder.get();
+            tassert(12723001,
+                    "Recovered MoveRangeCoordinator must be the migration executor, not a joiner",
+                    _scopedDonateChunk->mustExecute());
+            auto opCtx = makeOperationContext(/*deprioritizable=*/true);
 
-            // Preserve the interruption semantics of the legacy command handler: MSM's blocking
-            // phases (notably enterCriticalSection, which can wait up to 6h) must be interrupted
-            // on primary stepdown via the opCtx so the critical section is released promptly.
-            // makeOperationContext() does NOT set this; we must opt in explicitly.
-            // TODO: Plumb the coordinator's CancellationToken into MSM so non-stepdown
-            // cancellations (e.g. coordinator service shutdown) also interrupt the migration.
-            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-
-            // Short-circuit a same-shard move before any I/O. Matches the legacy command's
-            // behavior; no ActiveMigrationsRegistry slot is needed for a same-shard move.
-            if (_request.getFromShard() == _request.getToShard()) {
-                return;
-            }
-
-            // TODO (SERVER-127230): Move acquisition and release of the
-            // ActiveMigrationsRegistry into _acquireLocksAsync() and _releaseLocks() once
-            // failover recovery is handled by the ShardingCoordinatorService.
-            //
-            // Until then, releasing the ActiveMigrationsRegistry from _releaseLocks() can
-            // deadlock during step-up with resumeMigrationCoordinationsOnStepUp(). This is
-            // because stepdown does not call _releaseLocks(); instead, the locks are
-            // released during step-up, after resumeMigrationCoordinationsOnStepUp() has
-            // already been invoked.
-            auto scopedDonateChunk = uassertStatusOK(
-                ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(opCtx, nss(), _request));
-
-            // The coordinator service guarantees at most one MoveRangeCoordinator instance
-            // per namespace. A join path (mustExecute == false) on this code path could only
-            // mean a legacy ScopedDonateChunk migration is still running for the same
-            // namespace — assert so the framework's outer AsyncTry retries with exponential
-            // backoff until the legacy migration releases the registry.
-            uassert(12697301,
-                    "Joined an existing ScopedDonateChunk while running as a "
-                    "MoveRangeCoordinator; retrying lock acquisition",
-                    scopedDonateChunk.mustExecute());
-
-            Status migrationStatus{ErrorCodes::InternalError,
-                                   "MoveRangeCoordinator did not complete"};
-            try {
-                const auto writeConcern = _doc.getWriteConcern().value_or(WriteConcernOptions{});
-
-                // Resolve donor and recipient at execution time, not at coordinator-
-                // construction time: the recipient primary may change between command
-                // submission and the coordinator running on the fixed executor.
-                auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-                const auto donorConnStr =
-                    uassertStatusOK(shardRegistry->getShard(opCtx, _request.getFromShard()))
-                        ->getConnString();
-                const auto recipientHost = uassertStatusOK([&] {
-                    auto recipientShard =
-                        uassertStatusOK(shardRegistry->getShard(opCtx, _request.getToShard()));
-
-                    return recipientShard->getTargeter()->findHost(
-                        opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
-                }());
-
-                long long totalDocsCloned =
-                    ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load();
-                long long totalBytesCloned =
-                    ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load();
-                long long totalCloneTime =
-                    ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load();
-
-                auto&& migrationSourceManager =
-                    MigrationSourceManager::createMigrationSourceManager(
-                        opCtx,
-                        buildShardsvrMoveRange(nss(), _request),
-                        WriteConcernOptions{writeConcern},
-                        donorConnStr,
-                        recipientHost);
-
-                migrationSourceManager.startClone();
-                migrationSourceManager.awaitToCatchUp();
-                migrationSourceManager.enterCriticalSection();
-                migrationSourceManager.commitChunkOnRecipient();
-                migrationSourceManager.commitChunkMetadataOnConfig();
-
-                long long docsCloned =
-                    ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load() - totalDocsCloned;
-                long long bytesCloned =
-                    ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load() -
-                    totalBytesCloned;
-                long long cloneTime =
-                    ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load() -
-                    totalCloneTime;
-                auto migrationId = migrationSourceManager.getMigrationId();
-
-                LOGV2(12697302,
-                      "Migration finished",
-                      "migrationId"_attr = migrationId ? migrationId->toString() : "",
-                      "totalTimeMillis"_attr = migrationSourceManager.getOpTimeMillis(),
-                      "docsCloned"_attr = docsCloned,
-                      "bytesCloned"_attr = bytesCloned,
-                      "cloneTime"_attr = cloneTime);
-
-                migrationStatus = Status::OK();
-            } catch (const DBException& ex) {
-                migrationStatus = ex.toStatus();
-                LOGV2_WARNING(12697303,
-                              "Error while doing moveChunk",
-                              logAttrs(nss()),
-                              "error"_attr = redact(migrationStatus),
-                              "errorCode"_attr = migrationStatus.codeString());
-                if (migrationStatus.code() == ErrorCodes::LockTimeout) {
-                    ShardingStatistics::get(opCtx).countDonorMoveChunkLockTimeout.addAndFetch(1);
-                }
-            }
-
-            // signalComplete() satisfies ScopedDonateChunk's destructor invariant; the
-            // destructor (running on stack unwind below) is what actually clears the
-            // registry slot via _clearDonateChunk().
-            scopedDonateChunk.signalComplete(migrationStatus);
-
-            // Re-throw on error so the outer .onError/.onCompletion observe the failure
-            // status. On stepdown the framework wrappers will short-circuit those user
-            // bodies (executor is shut down), but that's fine — the slot is already being
-            // released by the local going out of scope right after this throw.
-            uassertStatusOK(migrationStatus);
+            // Clearing the metadata forces _recoverMigrationCoordinations to run during the
+            // refresh below (via the non-authoritative CSR state), which drives completeMigration
+            // on the migrationCoordinators document and installs fresh filtering metadata.
+            CollectionShardingRuntime::acquireExclusive(opCtx.get(), nss())
+                ->clearFilteringMetadata_nonAuthoritative(opCtx.get());
         })
-        .onError([this, anchor = shared_from_this()](Status status) {
-            // Mimic the legacy _shardsvrMoveRange command: every error surfaced by
-            // MigrationSourceManager is terminal for this migration attempt; the policy about
-            // whether to re-issue belongs to the caller (the balancer or a user-issued
-            // sh.moveRange), not to the coordinator instance.
+        .then([this, anchor = shared_from_this(), executor, token] {
+            // migrationutil::refreshFilteringMetadataUntilSuccess doesn't play nicely with
+            // stepdowns when invoked from a PrimaryOnlyService, so implement the loop directly.
+            // This code is expected to go away after we enable authoritative commit anyway.
+            return AsyncTry([this, anchor = shared_from_this()] {
+                       auto opCtx = makeOperationContext(/*deprioritizable=*/true);
+                       try {
+                           uassertStatusOK(FilteringMetadataCache::get(opCtx.get())
+                                               ->onCollectionPlacementVersionMismatch(
+                                                   opCtx.get(), nss(), boost::none));
+                       } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                           // Can throw NamespaceNotFound if the collection/database was dropped.
+                       }
+                   })
+                .until([](Status status) { return status.isOK(); })
+                .withBackoffBetweenIterations(Backoff(Seconds(1), Milliseconds::max()))
+                .on(**executor, token);
+        })
+        .then([this, anchor = shared_from_this()] {
+            // Verify that _recoverMigrationCoordinations cleaned up the document as expected.
+            // If it didn't (e.g. document deletion failed silently), throw so the outer
+            // ShardingCoordinator retries the entire recovery flow from the beginning.
+            auto opCtx = makeOperationContext(/*deprioritizable=*/true);
+            uassert(12723003,
+                    "MigrationCoordinator document still on disk after filtering metadata "
+                    "refresh; retrying recovery",
+                    !_migrationCoordinatorDocumentMayExist(opCtx.get()));
+        })
+        .then([this,
+               anchor = shared_from_this(),
+               executor,
+               incomingStatus = std::move(incomingStatus)] {
+            auto opCtx = makeOperationContext(/*deprioritizable=*/true);
+
+            // Determine whether the migration committed or aborted by checking if the migrated
+            // range's min key still belongs to this shard. If it does, the chunk never moved
+            // (migration was aborted). This mirrors the decision logic in
+            // _recoverMigrationCoordinations.
             //
-            // The framework's until-predicate consults _completeOnError ahead of
-            // _isRetriableErrorForDDLCoordinator, so setting the flag here short-circuits the retry
-            // loop on every kind of MSM failure — including categories the base classifier treats
-            // as retriable (Interruption from index / collMod / killOp / LockTimeout,
-            // WriteConcernError from unsatisfiable WC, CursorInvalidatedError that
-            // MigrationChunkClonerSource::commitToConfig uses as the wire-format catch-all for
-            // recipient-side data-transfer failures).
-            _completeOnError = true;
-            return status;
+            // getMin() is always set by the time the coordinator runs: the moveChunk/moveRange
+            // command resolves any find-key to an explicit min/max before sending
+            // _shardsvrMoveRange to the shard.
+            const auto& min = _request.getMoveRangeRequestBase().getMin().value();
+            const bool migrationAborted = [&] {
+                auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx.get(), nss());
+                const auto optMeta = scopedCsr->getCurrentMetadataIfKnown();
+                return optMeta && optMeta->isSharded() && optMeta->keyBelongsToMe(min);
+            }();
+
+            // These are meaningful only when recovering after a failover: the stat tracks
+            // unfinished migrations from the previous term, and the range deleter needs to know
+            // its recovery job for this migration is complete.
+            if (_recoveredFromDisk) {
+                ShardingStatistics::get(opCtx.get())
+                    .unfinishedMigrationFromPreviousPrimary.fetchAndAdd(1);
+                const auto term = repl::ReplicationCoordinator::get(opCtx.get())->getTerm();
+                RangeDeleterService::get(opCtx.get())->notifyRecoveryJobComplete(term);
+            }
+
+            return _completeMigration(
+                opCtx.get(), executor, migrationAborted ? incomingStatus : Status::OK());
         });
+}
+
+bool MoveRangeCoordinator::_migrationCoordinatorDocumentMayExist(OperationContext* opCtx) {
+    // Treat any read failure as "document may exist": if we can't confirm it's gone, assume the
+    // worst so that callers can trigger the recovery path.
+    try {
+        PersistentTaskStore<MigrationCoordinatorDocument> store(
+            NamespaceString::kMigrationCoordinatorsNamespace);
+        return store.count(
+                   opCtx,
+                   BSON(MigrationCoordinatorDocument::kIdFieldName << _doc.getMigrationId())) > 0;
+    } catch (const DBException&) {
+        return true;
+    }
+}
+
+bool MoveRangeCoordinator::_mustInitiateRecovery(OperationContext* opCtx) {
+    return _commitAttempted || _migrationCoordinatorDocumentMayExist(opCtx);
+}
+
+ExecutorFuture<void> MoveRangeCoordinator::_completeMigration(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    Status completionStatus) {
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    tassert(12723002,
+            "Expected no MigrationCoordinator document on disk before completing migration",
+            store.count(
+                opCtx, BSON(MigrationCoordinatorDocument::kIdFieldName << _doc.getMigrationId())) ==
+                0);
+    _scopedDonateChunk->signalComplete(completionStatus);
+    _completeOnError = true;
+    return ExecutorFuture<void>(**executor, completionStatus);
 }
 
 }  // namespace mongo

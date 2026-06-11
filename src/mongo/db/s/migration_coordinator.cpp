@@ -88,7 +88,8 @@ TxnNumber getNextTxnNumber() {
 
 namespace migrationutil {
 
-MigrationCoordinator::MigrationCoordinator(MigrationSessionId sessionId,
+MigrationCoordinator::MigrationCoordinator(UUID migrationId,
+                                           MigrationSessionId sessionId,
                                            ShardId donorShard,
                                            ShardId recipientShard,
                                            NamespaceString collectionNamespace,
@@ -97,8 +98,9 @@ MigrationCoordinator::MigrationCoordinator(MigrationSessionId sessionId,
                                            ChunkVersion preMigrationChunkVersion,
                                            const KeyPattern& shardKeyPattern,
                                            ChunkVersion currentCollectionVersion,
-                                           bool waitForDelete)
-    : _migrationInfo(UUID::gen(),
+                                           bool waitForDelete,
+                                           ManagementModeEnum mode)
+    : _migrationInfo(std::move(migrationId),
                      std::move(sessionId),
                      getSystemLogicalSessionId(),
                      getNextTxnNumber(),
@@ -110,7 +112,11 @@ MigrationCoordinator::MigrationCoordinator(MigrationSessionId sessionId,
                      std::move(preMigrationChunkVersion)),
       _shardKeyPattern(shardKeyPattern),
       _shardVersionPriorToTheMigration(currentCollectionVersion),
-      _waitForDelete(waitForDelete) {}
+      _waitForDelete(waitForDelete) {
+    if (mode != ManagementModeEnum::kStandalone) {
+        _migrationInfo.setManagementMode(mode);
+    }
+}
 
 MigrationCoordinator::MigrationCoordinator(const MigrationCoordinatorDocument& doc)
     : _migrationInfo(doc) {}
@@ -142,7 +148,6 @@ void MigrationCoordinator::setTransfersFirstCollectionChunkToRecipient(Operation
 bool MigrationCoordinator::getTransfersFirstCollectionChunkToRecipient() {
     return _migrationInfo.getTransfersFirstCollectionChunkToRecipient().value_or(false);
 }
-
 
 void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     LOGV2_DEBUG(

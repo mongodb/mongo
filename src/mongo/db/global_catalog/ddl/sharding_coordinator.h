@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/primary_only_service_helpers/cancel_state.h"
 #include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -56,6 +58,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/modules.h"
@@ -63,6 +66,7 @@
 
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <stack>
 #include <string>
@@ -227,7 +231,7 @@ protected:
      * This version will automatically mark the `OperationContext` as non-deprioritizable if the
      * current phase is in the critical section.
      */
-    ServiceContext::UniqueOperationContext makeOperationContext() {
+    CancelableOperationContext makeOperationContext() {
         const auto currentPhase = getDoc().getGenericPhase();
         const auto deprioritizable = !_isInCriticalSectionGeneric(currentPhase);
         return makeOperationContext(deprioritizable);
@@ -236,9 +240,12 @@ protected:
     /**
      * Create an `OperationContext` with the `ForwardableOperationMetadata` from the coordinator
      * document set on it. Use this instead of `cc().makeOperationContext()`.
-     * If deprioritizable is false, then the `OperationContext` wil be marked as non-deprioritizable
+     * If deprioritizable is false, then the `OperationContext` wil be marked as
+     * non-deprioritizable. When `_shouldUseCancelableOpCtx()` returns true, the returned context is
+     * backed by the coordinator's abort-or-stepdown token; otherwise it uses an uncancelable token
+     * so behaviour is identical to a plain opCtx for coordinators that have not opted in.
      */
-    ServiceContext::UniqueOperationContext makeOperationContext(bool deprioritizable) {
+    CancelableOperationContext makeOperationContext(bool deprioritizable) {
         auto opCtxHolder = cc().makeOperationContext();
         getForwardableOpMetadata().setOn(opCtxHolder.get());
         if (!deprioritizable) {
@@ -246,7 +253,13 @@ protected:
                 .setTaskType(opCtxHolder.get(),
                              ExecutionAdmissionContext::TaskType::NonDeprioritizable);
         }
-        return opCtxHolder;
+        auto token = _shouldUseCancelableOpCtx() ? _cancelState.getAbortOrStepdownToken()
+                                                 : CancellationToken::uncancelable();
+        return CancelableOperationContext(std::move(opCtxHolder), token, _markKilledExecutor);
+    }
+
+    virtual bool _shouldUseCancelableOpCtx() const {
+        return false;
     }
 
     /**
@@ -277,6 +290,9 @@ protected:
 
     const std::string _coordinatorName;
     mutable std::mutex _docMutex;
+
+    primary_only_service_helpers::CancelState _cancelState;
+    const std::shared_ptr<ThreadPool> _markKilledExecutor;
 
     ShardingCoordinatorService* _service;
     const ShardingCoordinatorId _coordId;

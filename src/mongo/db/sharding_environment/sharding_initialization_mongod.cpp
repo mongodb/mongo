@@ -689,12 +689,7 @@ void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long l
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
         ShardingState::get(opCtx)->enabled()) {
-        // Register a recovery job with the RangeDeleterService if we will later call
-        // migrationutil::resumeMigrationCoordinationsOnStepUp() in onStepUpComplete().
-        // MigrationCoordinators may register range deletion tasks, and it's important that all
-        // tasks are recovered before any tasks are processed to avoid the issue seen in
-        // SERVER-110796.
-        RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
+        migrationutil::registerMigrationRecoveryJobs(opCtx, term);
     }
 }
 

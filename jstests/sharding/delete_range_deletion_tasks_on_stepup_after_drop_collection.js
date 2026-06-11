@@ -10,6 +10,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -40,6 +41,17 @@ const collName = "foo";
 const ns = dbName + "." + collName;
 
 let st = new ShardingTest({shards: 2, configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}});
+
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL")) {
+    jsTestLog(
+        "Skipping test: on the authoritative DDL path, stopMigrations() drains all " +
+            "active MoveRange coordinators before the drop proceeds, so the scenario " +
+            "this test targets — dropping a collection while migration coordination " +
+            "recovery is suspended — cannot occur.",
+    );
+    st.stop();
+    quit();
+}
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 let testColl = st.s.getDB(dbName).getCollection(collName);

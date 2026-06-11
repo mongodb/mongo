@@ -57,7 +57,8 @@ namespace migrationutil {
  */
 class MONGO_MOD_NEEDS_REPLACEMENT MigrationCoordinator {
 public:
-    MigrationCoordinator(MigrationSessionId sessionId,
+    MigrationCoordinator(UUID migrationId,
+                         MigrationSessionId sessionId,
                          ShardId donorShard,
                          ShardId recipientShard,
                          NamespaceString collectionNamespace,
@@ -66,7 +67,8 @@ public:
                          ChunkVersion preMigrationChunkVersion,
                          const KeyPattern& shardKeyPattern,
                          ChunkVersion currentShardVersion,
-                         bool waitForDelete);
+                         bool waitForDelete,
+                         ManagementModeEnum mode = ManagementModeEnum::kStandalone);
 
     MigrationCoordinator(const MigrationCoordinatorDocument& doc);
     MigrationCoordinator(const MigrationCoordinator&) = delete;

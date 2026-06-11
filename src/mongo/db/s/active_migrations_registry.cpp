@@ -160,7 +160,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
                   "min"_attr = request.getMin(),
                   "max"_attr = request.getMax(),
                   "toShardId"_attr = request.getToShard());
-            return {ScopedDonateChunk(nullptr, false, _activeMoveChunkState->notification)};
+            return {ScopedDonateChunk(nullptr, false, _activeMoveChunkState->promise)};
         }
 
         LOGV2(6386801,
@@ -181,7 +181,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
 
     _activeMoveChunkState.emplace(nss, request);
 
-    return {ScopedDonateChunk(this, true, _activeMoveChunkState->notification)};
+    return {ScopedDonateChunk(this, true, _activeMoveChunkState->promise)};
 }
 
 StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
@@ -338,17 +338,12 @@ Status ActiveMigrationsRegistry::ActiveReceiveChunkState::constructErrorStatus()
 
 ScopedDonateChunk::ScopedDonateChunk(ActiveMigrationsRegistry* registry,
                                      bool shouldExecute,
-                                     std::shared_ptr<Notification<Status>> completionNotification)
-    : _registry(registry),
-      _shouldExecute(shouldExecute),
-      _completionNotification(std::move(completionNotification)) {}
+                                     std::shared_ptr<SharedPromise<void>> promise)
+    : _registry(registry), _shouldExecute(shouldExecute), _promise(std::move(promise)) {}
 
 ScopedDonateChunk::~ScopedDonateChunk() {
     if (_registry && _shouldExecute) {
-        // If this is a newly started migration the outcome must have been set by the holder
-        invariant(_completionOutcome);
         _registry->_clearDonateChunk();
-        _completionNotification->set(*_completionOutcome);
     }
 }
 
@@ -361,7 +356,7 @@ ScopedDonateChunk& ScopedDonateChunk::operator=(ScopedDonateChunk&& other) {
         _registry = other._registry;
         other._registry = nullptr;
         _shouldExecute = other._shouldExecute;
-        _completionNotification = std::move(other._completionNotification);
+        _promise = std::move(other._promise);
     }
 
     return *this;
@@ -369,13 +364,12 @@ ScopedDonateChunk& ScopedDonateChunk::operator=(ScopedDonateChunk&& other) {
 
 void ScopedDonateChunk::signalComplete(Status status) {
     invariant(_shouldExecute);
-    invariant(!_completionOutcome.has_value());
-    _completionOutcome = status;
+    _promise->setFrom(std::move(status));
 }
 
 Status ScopedDonateChunk::waitForCompletion(OperationContext* opCtx) {
     invariant(!_shouldExecute);
-    return _completionNotification->get(opCtx);
+    return _promise->getFuture().getNoThrow(opCtx);
 }
 
 ScopedReceiveChunk::ScopedReceiveChunk(ActiveMigrationsRegistry* registry) : _registry(registry) {}

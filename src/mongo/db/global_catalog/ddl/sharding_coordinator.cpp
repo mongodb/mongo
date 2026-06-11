@@ -80,6 +80,13 @@ ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
                                          std::string name,
                                          const BSONObj& coorDoc)
     : _coordinatorName(std::move(name)),
+      _markKilledExecutor([] {
+          ThreadPool::Options opts;
+          opts.poolName = "ShardingCoordinatorCancelableOpCtxPool";
+          opts.minThreads = 0;
+          opts.maxThreads = 1;
+          return std::make_shared<ThreadPool>(std::move(opts));
+      }()),
       _service(service),
       _coordId(extractShardingCoordinatorMetadata(coorDoc).getId()),
       _recoveredFromDisk(extractShardingCoordinatorMetadata(coorDoc).getRecoveredFromDisk()),
@@ -89,7 +96,9 @@ ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
                   return f.withVersionContextPropagation_UNSAFE();
               })),
       _firstExecution(!_recoveredFromDisk),
-      _externalState(_service->createExternalState()) {}
+      _externalState(_service->createExternalState()) {
+    _markKilledExecutor->startup();
+}
 
 ShardingCoordinator::~ShardingCoordinator() {
     tassert(10644519,
@@ -225,6 +234,7 @@ logv2::DynamicAttributes ShardingCoordinator::getBasicCoordinatorAttrs() const {
 
 SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept {
+    _cancelState.attachStepdownToken(token);
     return ExecutorFuture<void>(**executor)
         .then([this, executor, token, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
@@ -538,17 +548,19 @@ void RecoverableShardingCoordinator::_enterPhaseGeneric(CoordinatorGenericPhase 
                 "newPhase"_attr = serializeGenericPhase(newDoc->getGenericPhase()),
                 "oldPhase"_attr = serializeGenericPhase(currentDoc.getGenericPhase()));
 
-    ServiceContext::UniqueOperationContext uniqueOpCtx;
-    auto opCtx = cc().getOperationContext();
-    if (!opCtx) {
-        uniqueOpCtx = this->makeOperationContext(/*deprioritizable=*/false);
-        opCtx = uniqueOpCtx.get();
-    }
+    auto doInsertOrUpdate = [&](OperationContext* opCtx) {
+        if (currentDoc.getGenericPhase() == CoordinatorGenericPhase::kUnset) {
+            _insertStateDocumentGeneric(opCtx, std::move(newDoc));
+        } else {
+            _updateStateDocumentGeneric(opCtx, std::move(newDoc));
+        }
+    };
 
-    if (currentDoc.getGenericPhase() == CoordinatorGenericPhase::kUnset) {
-        _insertStateDocumentGeneric(opCtx, std::move(newDoc));
+    if (auto existingOpCtx = cc().getOperationContext()) {
+        doInsertOrUpdate(existingOpCtx);
     } else {
-        _updateStateDocumentGeneric(opCtx, std::move(newDoc));
+        auto newOpCtx = this->makeOperationContext(/*deprioritizable=*/false);
+        doInsertOrUpdate(newOpCtx.get());
     }
 }
 

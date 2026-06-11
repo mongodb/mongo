@@ -51,6 +51,15 @@ enums:
             kCommitted: "committed"
             kAborted: "aborted"
 
+    ManagementMode:
+        description:
+            "Whether the migration is driven by the legacy moveChunk command path or is
+            subordinate to a MoveRangeCoordinator whose coordinator service handles recovery."
+        type: string
+        values:
+            kStandalone: "standalone"
+            kMoveRangeCoordinator: "moveRangeCoordinator"
+
 types:
     MigrationSessionId:
         bson_serialization_type: string
@@ -115,4 +124,12 @@ structs:
                     start owning data for the parent collection once committed.
                     This field (marked as optional for backwards compatibility) is used to compose
                     the legacy 'migrateChunkToNewShard' op entry when the operation is successful."
+                optional: true
+            managementMode:
+                type: ManagementMode
+                description:
+                    "When present and set to kMoveRangeCoordinator, the migration is
+                    driven by a MoveRangeCoordinator and recovery should be handled by the
+                    coordinator service rather than the legacy step-up path in
+                    resumeMigrationCoordinationsOnStepUp. Absence implies kStandalone."
                 optional: true

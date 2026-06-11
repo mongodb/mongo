@@ -183,6 +183,24 @@ MONGO_MOD_PUBLIC void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx)
 void drainMigrationsPendingRecovery(OperationContext* opCtx);
 
 /**
+ * Refreshes the filtering metadata for the given namespace from the config server, retrying until
+ * success or stepdown. Drives any pending migration coordinator recovery as a side effect.
+ */
+void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Registers RangeDeleterService recovery jobs for all migration coordinator recovery work that
+ * will run in onStepUpComplete. Must be called during onStepUpBegin so that all jobs are
+ * registered before the RangeDeleterService scan can complete and unblock range deletions.
+ *
+ * Registers one job for the legacy standalone migration recovery path
+ * (resumeMigrationCoordinationsOnStepUp), which recovers all standalone coordinators as a single
+ * batch. Registers one additional job per unfinished MoveRangeCoordinator, each of which notifies
+ * completion individually at the end of its _recoveryFlow.
+ */
+MONGO_MOD_PUBLIC void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term);
+
+/**
  * Submits an asynchronous task to recover the migration until it succeeds or the node steps down.
  */
 SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,

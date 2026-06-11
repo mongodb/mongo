@@ -231,6 +231,7 @@ protected:
         metadata.setForwardableOpMetadata(forwardableOpMetadata);
         doc.setShardingCoordinatorMetadata(std::move(metadata));
         doc.setShardsvrMoveRangeRequest(req);
+        doc.setMigrationId(UUID::gen());
         return doc;
     }
 

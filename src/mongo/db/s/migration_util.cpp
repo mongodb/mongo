@@ -61,6 +61,7 @@
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -132,6 +133,8 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout);
 
+}  // namespace
+
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
     hangBeforeFilteringMetadataRefresh.pauseWhileSet();
 
@@ -155,6 +158,26 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
                           "simulate an error response for onCollectionPlacementVersionMismatch");
             }
         });
+}
+
+void registerMigrationRecoveryJobs(OperationContext* opCtx, long long term) {
+    // Reset the stat before either recovery path (standalone batch or per-coordinator) contributes
+    // its count via fetchAndAdd on onStepUpComplete.
+    ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(0);
+
+    // Register a recovery job for migrationutil::resumeMigrationCoordinationsOnStepUp(), which
+    // recovers all standalone MigrationCoordinators as a single batch and calls
+    // notifyRecoveryJobComplete once when the entire batch finishes.
+    RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
+
+    // Register one recovery job per unfinished MoveRangeCoordinator. Each coordinator calls
+    // notifyRecoveryJobComplete individually at the end of its _recoveryFlow.
+    DBDirectClient client(opCtx);
+    const auto count = client.count(NamespaceString::kShardingDDLCoordinatorsNamespace,
+                                    BSON("_id.operationType" << "moveRange"));
+    for (long long i = 0; i < count; ++i) {
+        RangeDeleterService::get(opCtx)->registerRecoveryJob(term);
+    }
 }
 
 BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
@@ -184,9 +207,6 @@ BSONObj serializeAndRedactCoordinatorDocument(OperationContext* opCtx,
     redactedCoordinatorDoc.setTransfersFirstCollectionChunkToRecipient(boost::none);
     return redactedCoordinatorDoc.toBSON();
 }
-
-
-}  // namespace
 
 BSONObjBuilder _makeMigrationStatusDocumentCommon(const NamespaceString& nss,
                                                   const ShardId& fromShard,
@@ -356,10 +376,6 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
 }
 
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long term) {
-    // TODO (SERVER-127230): When the donor-side migration recovery is owned by MoveRangeCoordinator
-    // and its persisted state in config.system.sharding_ddl_coordinators, note that the legacy
-    // recovery driven from config.migrationCoordinators below races with the coordinator's own
-    // recovery and should be skipped
     LOGV2_DEBUG(4798510, 2, "Starting migration coordinator step-up recovery", "term"_attr = term);
 
     const auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
@@ -371,6 +387,16 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long ter
         opCtx,
         BSONObj{},
         [opCtx, term, &executor, &recoveryFutures](const MigrationCoordinatorDocument& doc) {
+            if (doc.getManagementMode().value_or(ManagementModeEnum::kStandalone) !=
+                ManagementModeEnum::kStandalone) {
+                LOGV2_DEBUG(12723000,
+                            3,
+                            "Skipping legacy recovery for non-standalone migration",
+                            "migrationId"_attr = doc.getId(),
+                            logAttrs(doc.getNss()));
+                return true;
+            }
+
             LOGV2_DEBUG(4798511,
                         3,
                         "Found unfinished migration on step-up",
@@ -391,7 +417,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long ter
             return true;
         });
 
-    ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.store(
+    ShardingStatistics::get(opCtx).unfinishedMigrationFromPreviousPrimary.fetchAndAdd(
         recoveryFutures.size());
 
     LOGV2_DEBUG(4798513,

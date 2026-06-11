@@ -21,6 +21,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getNewNs(dbName) {
@@ -56,15 +57,32 @@ function testShutDownAfterFailPoint(failPointName) {
     // recover the commit decision.
     configureFailPoint(donorShard.rs.getPrimary(), "migrationCommitNetworkError");
 
+    const isAuthoritativeDDLEnabled = FeatureFlagUtil.isPresentAndEnabled(
+        st.s.getDB("admin"),
+        "AuthoritativeShardsDDL",
+    );
+
     // Set the requested failpoint and launch the moveChunk asynchronously.
     let failPoint = configureFailPoint(donorShard.rs.getPrimary(), failPointName);
     const awaitResult = startParallelShell(
         funWithArgs(
-            function (ns, toShardName) {
-                assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+            function (ns, toShardName, isAuthoritativeDDLEnabled) {
+                // When authoritative shards DDL is enabled, processManualMigrationOutcome
+                // faithfully returns the error from _shardsvrMoveRange rather than
+                // reconstructing the commit decision by reading the routing table. Reading
+                // the routing table is not legal when shards own authoritative metadata, as
+                // the config server may be in a partial-commit state. Depending on how far
+                // recovery has progressed when the donor is shut down, moveChunk may succeed
+                // or fail, so we do not assert on its outcome.
+                if (isAuthoritativeDDLEnabled) {
+                    db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName});
+                } else {
+                    assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+                }
             },
             ns,
             recipientShard.shardName,
+            isAuthoritativeDDLEnabled,
         ),
         st.s.port,
     );
@@ -77,9 +95,16 @@ function testShutDownAfterFailPoint(failPointName) {
 
     // Ensure we are able to shut down the donor primary by asserting that its exit code is 0.
     assert.eq(0, donorShard.rs.stop(primary_id, null, {}, {forRestart: true, waitPid: true}));
-    awaitResult();
 
+    // Restart the donor before waiting for the moveChunk result. When AuthoritativeShardsDDL is
+    // enabled, processManualMigrationOutcome returns the error from _shardsvrMoveRange faithfully
+    // rather than reconstructing the commit decision from the config server's routing table. The
+    // moveChunk retry loop can only make progress once the donor's MoveRangeCoordinator completes
+    // its recovery, which requires the donor to be running. Awaiting the result before restarting
+    // would deadlock: awaitResult() blocks until moveChunk returns, but moveChunk cannot return
+    // until the donor is up. Restarting first is safe for the legacy path as well.
     donorShard.rs.start(primary_id, {}, true /* restart */, true /* waitForHealth */);
+    awaitResult();
 }
 
 testShutDownAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible");

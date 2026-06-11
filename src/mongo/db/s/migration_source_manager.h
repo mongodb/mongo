@@ -112,11 +112,14 @@ public:
      *  - InvalidOptions if the operation context is missing shard version
      *  - StaleConfig if the expected placement version does not match the one known by this shard.
      */
-    static MigrationSourceManager createMigrationSourceManager(OperationContext* opCtx,
-                                                               ShardsvrMoveRange&& request,
-                                                               WriteConcernOptions&& writeConcern,
-                                                               ConnectionString donorConnStr,
-                                                               HostAndPort recipientHost);
+    static MigrationSourceManager createMigrationSourceManager(
+        OperationContext* opCtx,
+        ShardsvrMoveRange&& request,
+        WriteConcernOptions&& writeConcern,
+        ConnectionString donorConnStr,
+        HostAndPort recipientHost,
+        ManagementModeEnum managementMode = ManagementModeEnum::kStandalone,
+        UUID migrationId = UUID::gen());
     ~MigrationSourceManager();
 
     /**
@@ -202,12 +205,14 @@ public:
     }
 
 private:
-    // Private constructor, use the buildMigrationSourceManager() factory method instead.
+    // Private constructor, use the createMigrationSourceManager() factory method instead.
     MigrationSourceManager(OperationContext* opCtx,
                            ShardsvrMoveRange&& request,
                            WriteConcernOptions&& writeConcern,
                            ConnectionString donorConnStr,
-                           HostAndPort recipientHost);
+                           HostAndPort recipientHost,
+                           ManagementModeEnum managementMode,
+                           UUID migrationId);
 
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
@@ -227,7 +232,7 @@ private:
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
      */
-    void _cleanup(bool completeMigration);
+    Status _cleanup(bool completeMigration);
 
     /**
      * May be called at any time. Unregisters the migration source manager from the collection,
@@ -267,6 +272,9 @@ private:
 
     // Stores a reference to the process sharding statistics object which needs to be updated
     ShardingStatistics& _stats;
+
+    const ManagementModeEnum _managementMode;
+    const UUID _migrationId;
 
     // Information about the moveChunk to be used in the critical section.
     const BSONObj _critSecReason;

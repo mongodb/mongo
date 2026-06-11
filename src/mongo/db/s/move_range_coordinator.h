@@ -30,8 +30,11 @@
 #pragma once
 
 #include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/move_range_coordinator_document_gen.h"
 #include "mongo/util/modules.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 
@@ -50,18 +53,44 @@ protected:
     bool isInCriticalSection(Phase phase) const override;
 
 private:
+    bool _mustAlwaysMakeProgress() override {
+        return _recoveredFromDisk;
+    }
+
+    bool _shouldUseCancelableOpCtx() const override {
+        return true;
+    }
+
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                            const CancellationToken& token) override {
-        return ExecutorFuture<void>{**executor};
-    };
+                                            const CancellationToken& token) override;
 
-    void _releaseLocks(OperationContext* opCtx) override {};
+    void _releaseLocks(OperationContext* opCtx) override;
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    ExecutorFuture<void> _initialExecutionFlow(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
+
+    ExecutorFuture<void> _joinExistingExecution(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+    ExecutorFuture<void> _recoveryFlow(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                       const CancellationToken& token,
+                                       Status incomingStatus);
+
+    [[nodiscard]] ExecutorFuture<void> _completeMigration(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        Status completionStatus);
+
+    bool _migrationCoordinatorDocumentMayExist(OperationContext* opCtx);
+    bool _mustInitiateRecovery(OperationContext* opCtx);
+
     const ShardsvrMoveRangeRequest _request;
+    bool _commitAttempted{false};
+    boost::optional<ScopedDonateChunk> _scopedDonateChunk;
 };
 
 }  // namespace mongo

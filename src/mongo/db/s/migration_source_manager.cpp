@@ -190,7 +190,9 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
     ShardsvrMoveRange&& request,
     WriteConcernOptions&& writeConcern,
     ConnectionString donorConnStr,
-    HostAndPort recipientHost) {
+    HostAndPort recipientHost,
+    ManagementModeEnum managementMode,
+    UUID migrationId) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     auto&& args = std::move(request);
@@ -266,21 +268,30 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
             args.getMoveRangeRequestBase().setMin(min);
         }
     }
-    return MigrationSourceManager(
-        opCtx, std::move(args), std::move(writeConcern), donorConnStr, recipientHost);
+    return MigrationSourceManager(opCtx,
+                                  std::move(args),
+                                  std::move(writeConcern),
+                                  donorConnStr,
+                                  recipientHost,
+                                  managementMode,
+                                  std::move(migrationId));
 }
 
 MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                ShardsvrMoveRange&& request,
                                                WriteConcernOptions&& writeConcern,
                                                ConnectionString donorConnStr,
-                                               HostAndPort recipientHost)
+                                               HostAndPort recipientHost,
+                                               ManagementModeEnum managementMode,
+                                               UUID migrationId)
     : _opCtx(opCtx),
       _args(request),
       _writeConcern(writeConcern),
       _donorConnStr(std::move(donorConnStr)),
       _recipientHost(std::move(recipientHost)),
       _stats(ShardingStatistics::get(_opCtx)),
+      _managementMode(managementMode),
+      _migrationId(std::move(migrationId)),
       _critSecReason(BSON("command" << "moveChunk"
                                     << "fromShard" << _args.getFromShard() << "toShard"
                                     << _args.getToShard())),
@@ -481,7 +492,8 @@ void MigrationSourceManager::startClone() {
         _cloneDriver = std::make_shared<MigrationChunkClonerSource>(
             _opCtx, _args, _writeConcern, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
 
-        _coordinator.emplace(_cloneDriver->getSessionId(),
+        _coordinator.emplace(_migrationId,
+                             _cloneDriver->getSessionId(),
                              _args.getFromShard(),
                              _args.getToShard(),
                              nss(),
@@ -490,7 +502,8 @@ void MigrationSourceManager::startClone() {
                              *_chunkVersion,
                              KeyPattern(metadata.getKeyPattern()),
                              metadata.getShardPlacementVersion(),
-                             _args.getWaitForDelete());
+                             _args.getWaitForDelete(),
+                             _managementMode);
 
         _state = kCloning;
     }
@@ -681,7 +694,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     if (MONGO_unlikely(migrationCommitNetworkError.shouldFail())) {
         commitChunkMigrationResponse = Status(
-            ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
+            ErrorCodes::HostUnreachable, "Failpoint 'migrationCommitNetworkError' generated error");
     }
 
     Status migrationCommitStatus =
@@ -695,7 +708,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
             });
         }
         scopedGuard.dismiss();
-        _cleanup(false);
+        auto ignored = _cleanup(false);
         migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, nss())
             .thenRunOn(Grid::get(_opCtx)->getExecutorPool()->getFixedExecutor())
             .getAsync([](auto) {});
@@ -739,7 +752,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
             });
         }
         scopedGuard.dismiss();
-        _cleanup(false);
+        auto ignored = _cleanup(false);
         throw;
     }
 
@@ -790,7 +803,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     // Exit the critical section and ensure that all the necessary state is fully persisted
     // before scheduling orphan cleanup.
-    _cleanup(true);
+    uassertStatusOK(_cleanup(true));
 
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
@@ -849,7 +862,7 @@ void MigrationSourceManager::_cleanupOnError() {
                                             logDetails.obj(),
                                             defaultMajorityWriteConcernDoNotUse());
 
-    _cleanup(true);
+    auto ignored = _cleanup(true);
 }
 
 template <typename F>
@@ -899,7 +912,7 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckForConflic
     return metadata;
 }
 
-void MigrationSourceManager::_cleanup(bool completeMigration) {
+Status MigrationSourceManager::_cleanup(bool completeMigration) {
     invariant(_state != kDone);
 
     auto cloneDriver = [&]() {
@@ -967,11 +980,15 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
                       "error"_attr = redact(ex),
                       logAttrs(nss()),
                       "migrationId"_attr = _coordinator->getMigrationId());
-        // Something went really wrong when completing the migration just unset the metadata and
-        // let the next op to recover.
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
+        if (_managementMode == ManagementModeEnum::kStandalone) {
+            // Something went really wrong when completing the migration just unset the metadata and
+            // let the next op to recover.
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
+            scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
+        }
+        return ex.toStatus();
     }
+    return Status::OK();
 }
 
 BSONObj MigrationSourceManager::getMigrationStatusReport(
