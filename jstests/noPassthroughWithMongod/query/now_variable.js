@@ -167,7 +167,7 @@ runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
-// TODO SERVER-119773 Handle SBE plan cache in new get executor
+// The deferred get_executor path does not support the SBE plan cache.
 if (sbePlanCacheEnabled(db) && !FeatureFlagUtil.isPresentAndEnabled(db, "GetExecutorDeferredEngineChoice")) {
     function verifyPlanCacheSize(query) {
         coll.getPlanCache().clear();

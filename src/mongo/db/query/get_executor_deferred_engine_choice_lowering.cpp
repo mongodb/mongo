@@ -176,7 +176,7 @@ private:
             sbePlanAndData.second.replanReason =
                 _rankingResult.plannerParams->replanningData->replanReason;
         }
-        // SERVER-119773 integrate with SBE plan cache.
+        // The deferred get_executor path does not support the SBE plan cache.
         static const bool preparingFromSbeCache = false;
         stage_builder::prepareSlotBasedExecutableTree(_opCtx,
                                                       sbePlanAndData.first.get(),

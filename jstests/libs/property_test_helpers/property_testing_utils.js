@@ -95,8 +95,6 @@ export function createIndexesForPBT(collection, indexSpecs) {
  *      getQuery(0, 0)
  *      getQuery(0, 1)
  *      ...
- * TODO SERVER-98132 redesign getQuery to be more opaque about how many query shapes and constants
- * there are.
  */
 function runProperty(propertyFn, namespaces, workload, sortArrays) {
     let {collSpec, foreignCollSpec, queries, extraParams} = workload;
