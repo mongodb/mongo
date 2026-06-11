@@ -23,6 +23,44 @@ export const kSlowestRefreshRateSecs = 5e-6;
 export const kRateLimiterExemptAppName = "testRateLimiter";
 
 /**
+ * AppName prefixes for all MongoDB-internal connections that must be exempt from the ingress
+ * request rate limiter in a sharded cluster test. Covers general cluster infrastructure
+ * (replication, DDL coordination, sharding executors, initial sync, rollback, cloning, oplog
+ * fetching) as well as resharding-specific connections.
+ *
+ * The server uses prefix (starts_with) matching, so "NetworkInterfaceTL-Repl" covers
+ * ReplNetwork, ReplCoordExternNetwork, and ReplNodeDbWorkerNetwork;
+ * "NetworkInterfaceTL-ReplicaSetMonitor" covers ReplicaSetMonitor-TaskExecutor;
+ * "OplogFetcher" covers "OplogFetcher-{UUID}-{shard}"; and "NetworkInterfaceTL-Resharding"
+ * covers all resharding NetworkInterfaceTL names.
+ *
+ * Sourced from:
+ *   https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs
+ */
+export const kInternalConnectionAppNameExemptions = [
+    "MongoDB Internal Client",
+    "NetworkInterfaceTL-AddShardCoordinator-TaskExecutor",
+    "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
+    "NetworkInterfaceTL-HelloMe-TaskExecutor",
+    "NetworkInterfaceTL-Repl",
+    "NetworkInterfaceTL-StandaloneNetwork",
+    "NetworkInterfaceTL-Sharding-Fixed",
+    "NetworkInterfaceTL-ShardingDDLCoordinatorNetwork",
+    "ReplCoordExtern",
+    "InitialSyncer",
+    "Rollback",
+    "Cloner",
+    "OplogFetcher",
+];
+
+/**
+ * All appName prefixes to configure as rate-limiter exemptions in sharded cluster tests.
+ * Combines the test-specific exempt name with all internal MongoDB connection prefixes so that
+ * replication, DDL coordination, and transaction commit RPCs are not blocked during tests.
+ */
+export const kExemptions = [kRateLimiterExemptAppName, ...kInternalConnectionAppNameExemptions];
+
+/**
  * Common configuration for rate limiting tests.
  * It enables the feature flags and enables fail points.
  */
