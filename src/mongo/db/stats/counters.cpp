@@ -47,9 +47,11 @@
 
 namespace mongo {
 
+using ::mongo::otel::metrics::CounterOptions;
 using ::mongo::otel::metrics::MetricNames;
 using ::mongo::otel::metrics::MetricsService;
 using ::mongo::otel::metrics::MetricUnit;
+using ::mongo::otel::metrics::ServerStatusOptions;
 
 NetworkCounter::NetworkCounter()
     : _ingressLogicalBytesIn(MetricsService::instance().createInt64Counter(
@@ -365,6 +367,122 @@ void AuthCounter::append(BSONObjBuilder* b) {
 AuthCounter authCounter;
 AggStageCounters aggStageCounters{"aggStageCounters."};
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
+
+namespace {
+otel::metrics::Counter<int64_t>& makeOperationsCounter(otel::metrics::MetricName name,
+                                                       StringData description,
+                                                       StringData dottedPath,
+                                                       bool skipPathValidation = false) {
+    return MetricsService::instance().createInt64Counter(
+        name,
+        std::string(description),
+        MetricUnit::kOperations,
+        CounterOptions{.serverStatusOptions =
+                           ServerStatusOptions{.dottedPath = std::string(dottedPath),
+                                               .skipPathValidation = skipPathValidation}});
+}
+}  // namespace
+
+PlanCacheCounters::PlanCacheCounters()
+    : classicHits(
+          makeOperationsCounter(MetricNames::kPlanCacheClassicHits,
+                                "Number of times a plan was found in the classic plan cache.",
+                                "query.planCache.classic.hits")),
+      classicMisses(makeOperationsCounter(
+          MetricNames::kPlanCacheClassicMisses,
+          "Number of times no matching plan was found in the classic plan cache.",
+          "query.planCache.classic.misses")),
+      classicSkipped(makeOperationsCounter(
+          MetricNames::kPlanCacheClassicSkipped,
+          "Number of times the classic plan cache was not consulted for a query.",
+          "query.planCache.classic.skipped")),
+      classicReplanned(makeOperationsCounter(
+          MetricNames::kPlanCacheClassicReplanned,
+          "Number of times a cached classic plan was replanned after failing its trial run.",
+          "query.planCache.classic.replanned")),
+      classicReplannedPlanIsCachedPlan(
+          makeOperationsCounter(MetricNames::kPlanCacheClassicReplannedPlanIsCachedPlan,
+                                "Number of times replanning a cached classic plan produced the "
+                                "same plan as the cached one.",
+                                "query.planCache.classic.replanned_plan_is_cached_plan",
+                                true)),
+      classicCachedPlansEvicted(
+          makeOperationsCounter(MetricNames::kPlanCacheClassicCachedPlansEvicted,
+                                "Number of plans evicted from the classic plan cache.",
+                                "query.planCache.classic.cached_plans_evicted",
+                                true)),
+      classicInactiveCachedPlansReplaced(
+          makeOperationsCounter(MetricNames::kPlanCacheClassicInactiveCachedPlansReplaced,
+                                "Number of times an inactive classic cached plan was replaced.",
+                                "query.planCache.classic.inactive_cached_plans_replaced",
+                                true)),
+      sbeHits(makeOperationsCounter(MetricNames::kPlanCacheSbeHits,
+                                    "Number of times a plan was found in the SBE plan cache.",
+                                    "query.planCache.sbe.hits")),
+      sbeMisses(
+          makeOperationsCounter(MetricNames::kPlanCacheSbeMisses,
+                                "Number of times no matching plan was found in the SBE plan cache.",
+                                "query.planCache.sbe.misses")),
+      sbeSkipped(
+          makeOperationsCounter(MetricNames::kPlanCacheSbeSkipped,
+                                "Number of times the SBE plan cache was not consulted for a query.",
+                                "query.planCache.sbe.skipped")),
+      sbeReplanned(makeOperationsCounter(
+          MetricNames::kPlanCacheSbeReplanned,
+          "Number of times a cached SBE plan was replanned after failing its trial run.",
+          "query.planCache.sbe.replanned")),
+      sbeReplannedPlanIsCachedPlan(makeOperationsCounter(
+          MetricNames::kPlanCacheSbeReplannedPlanIsCachedPlan,
+          "Number of times replanning the SBE engine produced the same plan as the cached one.",
+          "query.planCache.sbe.replanned_plan_is_cached_plan",
+          true)),
+      sbeCachedPlansEvicted(
+          makeOperationsCounter(MetricNames::kPlanCacheSbeCachedPlansEvicted,
+                                "Number of plans evicted from the SBE plan cache.",
+                                "query.planCache.sbe.cached_plans_evicted",
+                                true)),
+      sbeInactiveCachedPlansReplaced(
+          makeOperationsCounter(MetricNames::kPlanCacheSbeInactiveCachedPlansReplaced,
+                                "Number of times an inactive SBE cached plan was replaced.",
+                                "query.planCache.sbe.inactive_cached_plans_replaced",
+                                true)) {}
+
+QueryFrameworkCounters::QueryFrameworkCounters()
+    : sbeFindQueryCounter(makeOperationsCounter(MetricNames::kQueryFrameworkFindSbe,
+                                                "Number of find queries executed fully using the "
+                                                "SBE engine.",
+                                                "query.queryFramework.find.sbe")),
+      classicFindQueryCounter(makeOperationsCounter(MetricNames::kQueryFrameworkFindClassic,
+                                                    "Number of find queries executed fully using "
+                                                    "the classic engine.",
+                                                    "query.queryFramework.find.classic")),
+      sbeOnlyAggregationCounter(
+          makeOperationsCounter(MetricNames::kQueryFrameworkAggregateSbeOnly,
+                                "Number of aggregations fully pushed down to the SBE layer.",
+                                "query.queryFramework.aggregate.sbeOnly")),
+      classicOnlyAggregationCounter(
+          makeOperationsCounter(MetricNames::kQueryFrameworkAggregateClassicOnly,
+                                "Number of aggregations fully pushed down to the classic layer.",
+                                "query.queryFramework.aggregate.classicOnly")),
+      sbeHybridAggregationCounter(
+          makeOperationsCounter(MetricNames::kQueryFrameworkAggregateSbeHybrid,
+                                "Number of aggregations executed as SBE/DocumentSource hybrids.",
+                                "query.queryFramework.aggregate.sbeHybrid")),
+      classicHybridAggregationCounter(makeOperationsCounter(
+          MetricNames::kQueryFrameworkAggregateClassicHybrid,
+          "Number of aggregations executed as classic/DocumentSource hybrids.",
+          "query.queryFramework.aggregate.classicHybrid")) {}
+
+FastPathQueryCounters::FastPathQueryCounters()
+    : idHackQueryCounter(makeOperationsCounter(MetricNames::kFastPathIdHack,
+                                               "Number of queries planned using idHack fast "
+                                               "planning.",
+                                               "query.planning.fastPath.idHack")),
+      expressQueryCounter(makeOperationsCounter(MetricNames::kFastPathExpress,
+                                                "Number of queries planned using express fast "
+                                                "planning.",
+                                                "query.planning.fastPath.express")) {}
+
 QueryFrameworkCounters queryFrameworkCounters;
 LookupPushdownCounters lookupPushdownCounters;
 ValidatorCounters validatorCounters;

@@ -290,6 +290,59 @@ public:
     static constexpr MetricName kAggregateOpCount =
         MetricNameMaker::make("serverStatus.opcounters.aggregates");
 
+    // Plan cache counters — classic engine
+    static constexpr MetricName kPlanCacheClassicHits =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.hits");
+    static constexpr MetricName kPlanCacheClassicMisses =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.misses");
+    static constexpr MetricName kPlanCacheClassicSkipped =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.skipped");
+    static constexpr MetricName kPlanCacheClassicReplanned =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.replanned");
+    static constexpr MetricName kPlanCacheClassicReplannedPlanIsCachedPlan = MetricNameMaker::make(
+        "serverStatus.metrics.query.planCache.classic.replanned_plan_is_cached_plan");
+    static constexpr MetricName kPlanCacheClassicCachedPlansEvicted =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.cached_plans_evicted");
+    static constexpr MetricName kPlanCacheClassicInactiveCachedPlansReplaced =
+        MetricNameMaker::make(
+            "serverStatus.metrics.query.planCache.classic.inactive_cached_plans_replaced");
+
+    // Plan cache counters — SBE engine
+    static constexpr MetricName kPlanCacheSbeHits =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.hits");
+    static constexpr MetricName kPlanCacheSbeMisses =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.misses");
+    static constexpr MetricName kPlanCacheSbeSkipped =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.skipped");
+    static constexpr MetricName kPlanCacheSbeReplanned =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.replanned");
+    static constexpr MetricName kPlanCacheSbeReplannedPlanIsCachedPlan = MetricNameMaker::make(
+        "serverStatus.metrics.query.planCache.sbe.replanned_plan_is_cached_plan");
+    static constexpr MetricName kPlanCacheSbeCachedPlansEvicted =
+        MetricNameMaker::make("serverStatus.metrics.query.planCache.sbe.cached_plans_evicted");
+    static constexpr MetricName kPlanCacheSbeInactiveCachedPlansReplaced = MetricNameMaker::make(
+        "serverStatus.metrics.query.planCache.sbe.inactive_cached_plans_replaced");
+
+    // Query framework engine-mix counters
+    static constexpr MetricName kQueryFrameworkFindSbe =
+        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.find.sbe");
+    static constexpr MetricName kQueryFrameworkFindClassic =
+        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.find.classic");
+    static constexpr MetricName kQueryFrameworkAggregateSbeOnly =
+        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.sbeOnly");
+    static constexpr MetricName kQueryFrameworkAggregateClassicOnly =
+        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.classicOnly");
+    static constexpr MetricName kQueryFrameworkAggregateSbeHybrid =
+        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.sbeHybrid");
+    static constexpr MetricName kQueryFrameworkAggregateClassicHybrid =
+        MetricNameMaker::make("serverStatus.metrics.query.queryFramework.aggregate.classicHybrid");
+
+    // Fast-path planning counters
+    static constexpr MetricName kFastPathIdHack =
+        MetricNameMaker::make("serverStatus.metrics.query.planning.fastPath.idHack");
+    static constexpr MetricName kFastPathExpress =
+        MetricNameMaker::make("serverStatus.metrics.query.planning.fastPath.express");
+
     // Test-only
     static constexpr MetricName kTest1 = MetricNameMaker::make("test_only.metric1");
     static constexpr MetricName kTest2 = MetricNameMaker::make("test_only.metric2");

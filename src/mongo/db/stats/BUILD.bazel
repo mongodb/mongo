@@ -278,6 +278,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":counters",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )

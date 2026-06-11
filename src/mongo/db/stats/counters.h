@@ -263,7 +263,7 @@ extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 
 class QueryFrameworkCounters {
 public:
-    QueryFrameworkCounters() = default;
+    QueryFrameworkCounters();
     QueryFrameworkCounters(QueryFrameworkCounters&) = delete;
     QueryFrameworkCounters& operator=(const QueryFrameworkCounters&) = delete;
 
@@ -275,10 +275,10 @@ public:
         if (cmdName == "find") {
             switch (debug.queryFramework) {
                 case PlanExecutor::QueryFramework::kClassicOnly:
-                    classicFindQueryCounter.incrementRelaxed();
+                    incrementFindClassicCounter();
                     break;
                 case PlanExecutor::QueryFramework::kSBEOnly:
-                    sbeFindQueryCounter.incrementRelaxed();
+                    incrementFindSbeCounter();
                     break;
                 default:
                     break;
@@ -286,16 +286,16 @@ public:
         } else if (cmdName == "aggregate") {
             switch (debug.queryFramework) {
                 case PlanExecutor::QueryFramework::kClassicOnly:
-                    classicOnlyAggregationCounter.incrementRelaxed();
+                    incrementAggregateClassicOnlyCounter();
                     break;
                 case PlanExecutor::QueryFramework::kClassicHybrid:
-                    classicHybridAggregationCounter.incrementRelaxed();
+                    incrementAggregateClassicHybridCounter();
                     break;
                 case PlanExecutor::QueryFramework::kSBEOnly:
-                    sbeOnlyAggregationCounter.incrementRelaxed();
+                    incrementAggregateSbeOnlyCounter();
                     break;
                 case PlanExecutor::QueryFramework::kSBEHybrid:
-                    sbeHybridAggregationCounter.incrementRelaxed();
+                    incrementAggregateSbeHybridCounter();
                     break;
                 case PlanExecutor::QueryFramework::kUnknown:
                     break;
@@ -303,41 +303,61 @@ public:
         }
     }
 
+    void incrementFindSbeCounter() {
+        sbeFindQueryCounter.add(1);
+    }
+    void incrementFindClassicCounter() {
+        classicFindQueryCounter.add(1);
+    }
+    void incrementAggregateSbeOnlyCounter() {
+        sbeOnlyAggregationCounter.add(1);
+    }
+    void incrementAggregateClassicOnlyCounter() {
+        classicOnlyAggregationCounter.add(1);
+    }
+    void incrementAggregateSbeHybridCounter() {
+        sbeHybridAggregationCounter.add(1);
+    }
+    void incrementAggregateClassicHybridCounter() {
+        classicHybridAggregationCounter.add(1);
+    }
+
+private:
     // Query counters that record whether a find query was fully or partially executed in SBE, or
     // fully executed using the classic engine. One of these will always be incremented during a
     // query.
-    Counter64& sbeFindQueryCounter = *MetricBuilder<Counter64>{"query.queryFramework.find.sbe"};
-    Counter64& classicFindQueryCounter =
-        *MetricBuilder<Counter64>{"query.queryFramework.find.classic"};
+    otel::metrics::Counter<int64_t>& sbeFindQueryCounter;
+    otel::metrics::Counter<int64_t>& classicFindQueryCounter;
 
     // Aggregation query counters that record whether an aggregation was fully or partially executed
     // in DocumentSource (an sbe/classic hybrid plan), or fully pushed down to the sbe/classic
     // layer. These are only incremented during aggregations.
-    Counter64& sbeOnlyAggregationCounter =
-        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.sbeOnly"};
-    Counter64& classicOnlyAggregationCounter =
-        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.classicOnly"};
-    Counter64& sbeHybridAggregationCounter =
-        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.sbeHybrid"};
-    Counter64& classicHybridAggregationCounter =
-        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.classicHybrid"};
+    otel::metrics::Counter<int64_t>& sbeOnlyAggregationCounter;
+    otel::metrics::Counter<int64_t>& classicOnlyAggregationCounter;
+    otel::metrics::Counter<int64_t>& sbeHybridAggregationCounter;
+    otel::metrics::Counter<int64_t>& classicHybridAggregationCounter;
 };
 extern QueryFrameworkCounters queryFrameworkCounters;
 
 class FastPathQueryCounters {
 public:
+    FastPathQueryCounters();
+    FastPathQueryCounters(FastPathQueryCounters&) = delete;
+    FastPathQueryCounters& operator=(const FastPathQueryCounters&) = delete;
+
     void incrementIdHackQueryCounter() {
-        idHackQueryCounter.increment();
+        idHackQueryCounter.add(1);
     }
 
     void incrementExpressQueryCounter() {
-        expressQueryCounter.increment();
+        expressQueryCounter.add(1);
     }
 
+private:
     // Counter for the number of queries planned using idHack fast planning.
-    Counter64& idHackQueryCounter = *MetricBuilder<Counter64>{"query.planning.fastPath.idHack"};
+    otel::metrics::Counter<int64_t>& idHackQueryCounter;
     // Counter for the number of queries planned using express fast planning.
-    Counter64& expressQueryCounter = *MetricBuilder<Counter64>{"query.planning.fastPath.express"};
+    otel::metrics::Counter<int64_t>& expressQueryCounter;
 };
 extern FastPathQueryCounters fastPathQueryCounters;
 
@@ -563,71 +583,67 @@ extern UpdateCounters updateCounters;
  */
 class PlanCacheCounters {
 public:
-    PlanCacheCounters() = default;
+    PlanCacheCounters();
     PlanCacheCounters(PlanCacheCounters&) = delete;
     PlanCacheCounters& operator=(const PlanCacheCounters&) = delete;
 
     void incrementClassicHitsCounter() {
-        classicHits.incrementRelaxed();
+        classicHits.add(1);
     }
 
     void incrementClassicMissesCounter() {
-        classicMisses.incrementRelaxed();
+        classicMisses.add(1);
     }
 
     void incrementClassicSkippedCounter() {
-        classicSkipped.incrementRelaxed();
+        classicSkipped.add(1);
     }
 
     void incrementClassicReplannedCounter() {
-        classicReplanned.incrementRelaxed();
+        classicReplanned.add(1);
     }
 
     void incrementClassicReplannedPlanIsCachedPlanCounter() {
-        classicReplannedPlanIsCachedPlan.incrementRelaxed();
+        classicReplannedPlanIsCachedPlan.add(1);
     }
 
     void incrementClassicCachedPlansEvictedCounter(size_t increment) {
-        classicCachedPlansEvicted.incrementRelaxed(increment);
+        classicCachedPlansEvicted.add(static_cast<int64_t>(increment));
     }
 
     void incrementClassicInactiveCachedPlansReplacedCounter() {
-        classicInactiveCachedPlansReplaced.incrementRelaxed();
+        classicInactiveCachedPlansReplaced.add(1);
     }
 
     void incrementSbeHitsCounter() {
-        sbeHits.incrementRelaxed();
+        sbeHits.add(1);
     }
 
     void incrementSbeMissesCounter() {
-        sbeMisses.incrementRelaxed();
+        sbeMisses.add(1);
     }
 
     void incrementSbeSkippedCounter() {
-        sbeSkipped.incrementRelaxed();
+        sbeSkipped.add(1);
     }
 
     void incrementSbeReplannedCounter() {
-        sbeReplanned.incrementRelaxed();
+        sbeReplanned.add(1);
     }
 
     void incrementSbeReplannedPlanIsCachedPlanCounter() {
-        sbeReplannedPlanIsCachedPlan.incrementRelaxed();
+        sbeReplannedPlanIsCachedPlan.add(1);
     }
 
     void incrementSbeCachedPlansEvictedCounter(size_t increment) {
-        sbeCachedPlansEvicted.incrementRelaxed(increment);
+        sbeCachedPlansEvicted.add(static_cast<int64_t>(increment));
     }
 
     void incrementSbeInactiveCachedPlansReplacedCounter() {
-        sbeInactiveCachedPlansReplaced.incrementRelaxed();
+        sbeInactiveCachedPlansReplaced.add(1);
     }
 
 private:
-    static Counter64& _makeMetric(std::string name) {
-        return *MetricBuilder<Counter64>("query.planCache." + std::move(name));
-    }
-
     // Counters that track the number of times a query plan is:
     // a) found in the cache (hits),
     // b) not found in cache (misses), or
@@ -635,22 +651,20 @@ private:
     // d) failed to finish trial run within budget, so we decided to replan it (replanned);
     // e) replanned only to produce the same plan as what's in the plan cache.
     // Split into classic and SBE, depending on which execution engine is used.
-    Counter64& classicHits = _makeMetric("classic.hits");
-    Counter64& classicMisses = _makeMetric("classic.misses");
-    Counter64& classicSkipped = _makeMetric("classic.skipped");
-    Counter64& classicReplanned = _makeMetric("classic.replanned");
-    Counter64& classicReplannedPlanIsCachedPlan =
-        _makeMetric("classic.replanned_plan_is_cached_plan");
-    Counter64& classicCachedPlansEvicted = _makeMetric("classic.cached_plans_evicted");
-    Counter64& classicInactiveCachedPlansReplaced =
-        _makeMetric("classic.inactive_cached_plans_replaced");
-    Counter64& sbeHits = _makeMetric("sbe.hits");
-    Counter64& sbeMisses = _makeMetric("sbe.misses");
-    Counter64& sbeSkipped = _makeMetric("sbe.skipped");
-    Counter64& sbeReplanned = _makeMetric("sbe.replanned");
-    Counter64& sbeReplannedPlanIsCachedPlan = _makeMetric("sbe.replanned_plan_is_cached_plan");
-    Counter64& sbeCachedPlansEvicted = _makeMetric("sbe.cached_plans_evicted");
-    Counter64& sbeInactiveCachedPlansReplaced = _makeMetric("sbe.inactive_cached_plans_replaced");
+    otel::metrics::Counter<int64_t>& classicHits;
+    otel::metrics::Counter<int64_t>& classicMisses;
+    otel::metrics::Counter<int64_t>& classicSkipped;
+    otel::metrics::Counter<int64_t>& classicReplanned;
+    otel::metrics::Counter<int64_t>& classicReplannedPlanIsCachedPlan;
+    otel::metrics::Counter<int64_t>& classicCachedPlansEvicted;
+    otel::metrics::Counter<int64_t>& classicInactiveCachedPlansReplaced;
+    otel::metrics::Counter<int64_t>& sbeHits;
+    otel::metrics::Counter<int64_t>& sbeMisses;
+    otel::metrics::Counter<int64_t>& sbeSkipped;
+    otel::metrics::Counter<int64_t>& sbeReplanned;
+    otel::metrics::Counter<int64_t>& sbeReplannedPlanIsCachedPlan;
+    otel::metrics::Counter<int64_t>& sbeCachedPlansEvicted;
+    otel::metrics::Counter<int64_t>& sbeInactiveCachedPlansReplaced;
 };
 extern PlanCacheCounters planCacheCounters;
 
