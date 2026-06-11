@@ -201,11 +201,11 @@ protected:
 };
 
 TEST_F(ReplicatedFastCountManagerLegacyMetricsTest,
-       MetadataMutexRegisteredWithObservableMutexRegistry) {
+       LifecycleMutexRegisteredWithObservableMutexRegistry) {
     _fastCountManager->flushSync_ForTest(operationContext());
 
     const BSONObj report = ObservableMutexRegistry::get().report(false);
-    const StringData name = "ReplicatedFastCountManager::_metadataMutex";
+    const StringData name = "ReplicatedFastCountManager::_lifecycleMutex";
     EXPECT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
     const BSONObj exclusive =
         report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);

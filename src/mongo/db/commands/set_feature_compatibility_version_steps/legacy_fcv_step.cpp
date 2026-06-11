@@ -390,7 +390,8 @@ private:
         // thread when upgrading to an FCV that enables the feature. This handles the case where a
         // shard starts at lastLTS FCV and is upgraded by the config server during addShard.
         if (gFeatureFlagReplicatedFastCount.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
+                requestedVersion, originalVersion) &&
+            repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             setUpReplicatedFastCount(opCtx);
         }
     }
@@ -957,7 +958,8 @@ private:
         // Stop the background metadata checkpoint thread and drop the metadata store collections
         // when downgrading to an FCV that disables the replicated size and count feature.
         if (gFeatureFlagReplicatedFastCount.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
+                requestedVersion, originalVersion) &&
+            repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
                 .shutdown(opCtx);
             DropReply unused;

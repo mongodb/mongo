@@ -97,12 +97,6 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
                 acquireFastCountCollectionForRead(opCtx).has_value());
     }
 
-    // Signals whether to use the new _checkpointer write path.
-    const bool useDurabilityPath =
-        gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
     // Only applies to the new write path, but done outside the lifecycle mutex since it incurs I/O.
     const auto lastPersistedCheckpointTS = _timestampStore->read(opCtx).value_or(Timestamp{});
 
@@ -116,21 +110,12 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
     }
 
     LOGV2(12051100, "Starting up ReplicatedFastCountManager thread");
-    if (useDurabilityPath) {
-        _checkpointer = std::make_unique<SizeCountCheckpointCoordinator>(
-            *_sizeCountStore, *_timestampStore, _metrics);
-        if (!_isUnderTest) {
-            _checkpointer->startup(opCtx->getServiceContext(), lastPersistedCheckpointTS);
-        }
-    } else {
-        ObservableMutexRegistry::get().add("ReplicatedFastCountManager::_metadataMutex",
-                                           _metadataMutex);
-        if (!_isUnderTest) {
-            _isEnabled.store(true);
-            _backgroundThread = stdx::thread(&ReplicatedFastCountManager::_startBackgroundThread,
-                                             this,
-                                             opCtx->getServiceContext());
-        }
+    ObservableMutexRegistry::get().add("ReplicatedFastCountManager::_lifecycleMutex",
+                                       _lifecycleMutex);
+    _checkpointer = std::make_unique<SizeCountCheckpointCoordinator>(
+        *_sizeCountStore, *_timestampStore, _metrics);
+    if (!_isUnderTest) {
+        _checkpointer->startup(opCtx->getServiceContext(), lastPersistedCheckpointTS);
     }
 
     _metrics.setIsRunning(true);
@@ -330,40 +315,35 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         return _timestampStore->read(opCtx);
     }();
 
-    // TODO (SERVER-126366): Remove the feature flag guarding.
-    if (gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        const Date_t oplogScanStartTime = Date_t::now();
+    const Date_t oplogScanStartTime = Date_t::now();
 
-        const Timestamp seekAfterTimestamp = persistedTimestamp.value_or(Timestamp::min());
+    const Timestamp seekAfterTimestamp = persistedTimestamp.value_or(Timestamp::min());
 
-        // Scan the oplog from seekAfterTimestamp and accumulate size and count deltas for every
-        // UUID that has been updated since the last checkpoint.
-        const auto scanResult = [&]() -> OplogScanResult {
-            AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-            const auto& oplogColl = oplogRead.getCollection();
-            massert(12554000, "oplog collection not found", oplogColl);
+    // Scan the oplog from seekAfterTimestamp and accumulate size and count deltas for every
+    // UUID that has been updated since the last checkpoint.
+    const auto scanResult = [&]() -> OplogScanResult {
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+        const auto& oplogColl = oplogRead.getCollection();
+        massert(12554000, "oplog collection not found", oplogColl);
 
-            auto oplogCursor = oplogColl->getRecordStore()->getCursor(
-                opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-            // We pass the oplog UUID here to include the oplog's own size and count in the
-            // aggregation.
-            return aggregateSizeCountDeltasInOplog(
-                *oplogCursor, seekAfterTimestamp, {}, /*isCheckpoint=*/false, oplogColl->uuid());
-        }();
+        auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        // We pass the oplog UUID here to include the oplog's own size and count in the
+        // aggregation.
+        return aggregateSizeCountDeltasInOplog(
+            *oplogCursor, seekAfterTimestamp, {}, /*isCheckpoint=*/false, oplogColl->uuid());
+    }();
 
-        for (const auto& [uuid, delta] : scanResult.deltas) {
-            accumulator[uuid].count += delta.sizeCount.count;
-            accumulator[uuid].size += delta.sizeCount.size;
-        }
-
-        LOGV2(12554001,
-              "ReplicatedFastCountManager oplog scan during initialization complete",
-              "seekAfterTimestamp"_attr = seekAfterTimestamp,
-              "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
-              "duration"_attr = Date_t::now() - oplogScanStartTime);
+    for (const auto& [uuid, delta] : scanResult.deltas) {
+        accumulator[uuid].count += delta.sizeCount.count;
+        accumulator[uuid].size += delta.sizeCount.size;
     }
+
+    LOGV2(12554001,
+          "ReplicatedFastCountManager oplog scan during initialization complete",
+          "seekAfterTimestamp"_attr = seekAfterTimestamp,
+          "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
+          "duration"_attr = Date_t::now() - oplogScanStartTime);
 
     const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
     int numInitialized = 0;

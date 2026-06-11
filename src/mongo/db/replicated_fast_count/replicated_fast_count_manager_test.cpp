@@ -119,8 +119,6 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataNoDat
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest featureFlagDurability(
-        "featureFlagReplicatedFastCountDurability", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -206,8 +204,6 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) 
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest featureFlagDurability(
-        "featureFlagReplicatedFastCountDurability", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -256,8 +252,6 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTracksOplogSizeCount) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest featureFlagDurability(
-        "featureFlagReplicatedFastCountDurability", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -513,8 +507,6 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
 TEST_F(ReplicatedFastCountManagerColdBootTest,
        InitializePopulatesMetadataFromExistingInternalContainer) {
     RAIIServerParameterControllerForTest ffFastCount("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
-                                                      true);
     RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     ASSERT_OK(createInternalFastCountContainers(_opCtx,
@@ -603,8 +595,6 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
        ContainerModeReadsTimestampFromIdentToFilterOplogScan) {
     RAIIServerParameterControllerForTest ffFastCount("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
-                                                      true);
     RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     ASSERT_OK(storageInterface()->createCollection(
