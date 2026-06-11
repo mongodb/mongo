@@ -278,6 +278,11 @@ export var TimeseriesTest = class {
                 .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: coll.getFullName()}}])
                 .toArray();
 
+            // The collection may not yet be visible in $shardedDataDistribution transiently
+            // (e.g. during shard add/remove). Return null to signal assert.soon to retry.
+            if (shardedDataDistribution.length === 0) {
+                return null;
+            }
             assert.eq(shardedDataDistribution.length, 1);
             return shardedDataDistribution[0].shards.map((shard) => shard.shardName);
         };
@@ -285,6 +290,10 @@ export var TimeseriesTest = class {
         assert.soon(() => {
             const allShards = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
             const currentShards = getDataBearingShards();
+
+            if (currentShards === null) {
+                return false;
+            }
 
             if (documentEq(allShards, currentShards)) {
                 return true;
