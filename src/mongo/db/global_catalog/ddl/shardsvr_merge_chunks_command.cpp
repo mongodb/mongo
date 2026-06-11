@@ -200,8 +200,6 @@ public:
             // durable shard catalog and keep the CSR pinned to the pre-merge version.
             // This must be done before starting the operation to ensure the CSR is left as
             // kNonAuthoritative in case of an unexpected failure.
-            // TODO (SERVER-125784) The clearFilteringMetadata_nonAuthoritative should go away once
-            // merge becomes authoritative.
             {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, ns());
                 scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
