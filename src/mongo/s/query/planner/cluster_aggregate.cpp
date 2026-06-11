@@ -837,7 +837,7 @@ Status runAggregateImpl(OperationContext* opCtx,
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
         if (shouldDoFLERewrite) {
-            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+            if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
                 pipeline = processFLEPipelineS(opCtx,
                                                namespaces.executionNss,
                                                request.getEncryptionInformation().value(),

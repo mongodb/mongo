@@ -78,6 +78,15 @@ using GetTxnCallback =
 
 namespace mongo {
 
+// Asserts that encryptionInformation.crudProcessed is not set to true.
+// This is a common precondition to all the processFLE*() functions.
+// If crudProcessed is true, then it signals that the command has already gone through FLE2
+// preprocessing, and so it should just be processed as an ordinary CRUD operation.
+// Some processFLE*() functions internally invoke commands with crudProcessed set to true so
+// as to avoid an infinite recursion.
+void assertFLECrudNotYetProcessed(const EncryptionInformation& ei);
+void assertFLECrudNotYetProcessed(const boost::optional<EncryptionInformation>& ei);
+
 /**
  * FLE Result enum
  */
@@ -180,9 +189,10 @@ processFLEFindAndModify(OperationContext* opCtx,
                         StatusWith<write_ops::FindAndModifyCommandReply>& swReply,
                         boost::optional<WriteConcernErrorDetail>& wceReply);
 
-MONGO_MOD_PUB FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                                     const BSONObj& cmdObj,
-                                                     BSONObjBuilder& result);
+MONGO_MOD_PUB FLEBatchResult
+processFLEFindAndModify(OperationContext* opCtx,
+                        const write_ops::FindAndModifyCommandRequest& request,
+                        BSONObjBuilder& result);
 
 MONGO_MOD_PUB std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
 processFLEFindAndModifyExplainMongos(

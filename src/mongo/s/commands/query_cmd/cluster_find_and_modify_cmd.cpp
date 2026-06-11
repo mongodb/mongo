@@ -876,8 +876,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         return true;
     }
 
-    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
-        return true;
+    if (auto request = write_ops::FindAndModifyCommandRequest::parse(
+            originalCmdObj, IDLParserContext("ClusterFindAndModify"));
+        prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
+        if (processFLEFindAndModify(opCtx, request, result) == FLEBatchResult::kProcessed) {
+            return true;
+        }
+        // fall through
     }
 
     auto findAndModifyBody = [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {

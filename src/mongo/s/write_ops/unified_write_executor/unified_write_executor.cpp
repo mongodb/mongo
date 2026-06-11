@@ -111,7 +111,8 @@ BatchedCommandResponse write(OperationContext* opCtx,
                              const BatchedCommandRequest& request,
                              unified_write_executor::Stats& stats,
                              boost::optional<OID> targetEpoch) {
-    if (request.hasEncryptionInformation()) {
+    if (prepareForFLERewrite(opCtx,
+                             request.getWriteCommandRequestBase().getEncryptionInformation())) {
         BatchedCommandResponse response;
         FLEBatchResult result = processFLEBatch(opCtx, request, &response);
         if (result == FLEBatchResult::kProcessed) {
@@ -129,7 +130,7 @@ bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
                                               const BulkWriteCommandRequest& request,
                                               unified_write_executor::Stats& stats,
                                               BSONObj originalCommand) {
-    if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
+    if (prepareForFLERewrite(opCtx, request.getNsInfo()[0].getEncryptionInformation())) {
         auto [result, replyInfo] = attemptExecuteFLE(opCtx, request);
         if (result == FLEBatchResult::kProcessed) {
             return std::move(replyInfo);
@@ -150,7 +151,7 @@ FindAndModifyCommandResponse findAndModify(
     BSONObj originalCommand) {
     // Make a copy in the event that we need to set runtime constants.
     auto request = originalRequest;
-    if (request.getEncryptionInformation()) {
+    if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
         StatusWith<write_ops::FindAndModifyCommandReply> swReply(
             write_ops::FindAndModifyCommandReply{});
         boost::optional<WriteConcernErrorDetail> wce = boost::none;

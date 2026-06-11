@@ -434,9 +434,8 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
                                                   const write_ops::WriteCommandRequestBase& req,
                                                   const boost::optional<TenantId>& tenantId) {
-    auto& encryptionInfo = req.getEncryptionInformation();
-    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo, tenantId);
-    return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
+    return std::make_tuple(req.getBypassDocumentValidation(),
+                           getFleCrudProcessed(req.getEncryptionInformation()));
 }
 
 inline boost::optional<query_shape::DeferredQueryShape> computeQueryShape(
@@ -609,19 +608,8 @@ bool handleError(OperationContext* opCtx,
     return !ordered;
 }
 
-bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo,
-                         const boost::optional<TenantId>& tenantId) {
-    if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
-        uassert(6666201,
-                "External users cannot have crudProcessed enabled",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(tenantId), ActionType::internal));
-
-        return true;
-    }
-    return false;
+bool getFleCrudProcessed(const boost::optional<EncryptionInformation>& encryptionInfo) {
+    return encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false);
 }
 
 /**

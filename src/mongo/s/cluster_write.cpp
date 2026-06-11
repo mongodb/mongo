@@ -106,7 +106,8 @@ void write(OperationContext* opCtx,
                     ? targeter.getRoutingInfo().getChunkManager().getShardKeyPattern().toBSON()
                     : BSONObj()});
 
-        if (request.hasEncryptionInformation()) {
+        if (prepareForFLERewrite(opCtx,
+                                 request.getWriteCommandRequestBase().getEncryptionInformation())) {
             FLEBatchResult result = processFLEBatch(opCtx, request, response);
             if (result == FLEBatchResult::kProcessed) {
                 return;
@@ -130,7 +131,7 @@ bulk_write_exec::BulkWriteReplyInfo bulkWrite(
         unified_write_executor::Stats uweStats;
         return unified_write_executor::bulkWrite(opCtx, request, uweStats);
     } else {
-        if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
+        if (prepareForFLERewrite(opCtx, request.getNsInfo()[0].getEncryptionInformation())) {
             auto [result, replies] = attemptExecuteFLE(opCtx, request);
             if (result == FLEBatchResult::kProcessed) {
                 return replies;

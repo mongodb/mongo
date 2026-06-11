@@ -380,6 +380,7 @@ void stopFLECrud() {
 FLEBatchResult processFLEInsert(OperationContext* opCtx,
                                 const write_ops::InsertCommandRequest& insertRequest,
                                 write_ops::InsertCommandReply* insertReply) {
+    assertFLECrudNotYetProcessed(insertRequest.getEncryptionInformation());
 
     uassert(
         6371602,
@@ -402,6 +403,7 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
 
 write_ops::DeleteCommandReply processFLEDelete(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteRequest) {
+    assertFLECrudNotYetProcessed(deleteRequest.getEncryptionInformation());
 
     uassert(
         6371701,
@@ -418,6 +420,7 @@ write_ops::DeleteCommandReply processFLEDelete(
 StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>>
 processFLEFindAndModifyHelper(OperationContext* opCtx,
                               const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+    assertFLECrudNotYetProcessed(findAndModifyRequest.getEncryptionInformation());
 
     uassert(
         6371800,
@@ -456,6 +459,7 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
 
 write_ops::UpdateCommandReply processFLEUpdate(
     OperationContext* opCtx, const write_ops::UpdateCommandRequest& updateRequest) {
+    assertFLECrudNotYetProcessed(updateRequest.getEncryptionInformation());
 
     uassert(
         6371905,
@@ -472,12 +476,14 @@ write_ops::UpdateCommandReply processFLEUpdate(
 void processFLEFindD(OperationContext* opCtx,
                      const NamespaceString& nss,
                      FindCommandRequest* findCommand) {
+    assertFLECrudNotYetProcessed(findCommand->getEncryptionInformation());
     fle::processFindCommand(opCtx, nss, findCommand, &getTransactionWithRetriesForMongoD);
 }
 
 void processFLECountD(OperationContext* opCtx,
                       const NamespaceString& nss,
                       CountCommandRequest& countCommand) {
+    assertFLECrudNotYetProcessed(countCommand.getEncryptionInformation());
     fle::processCountCommand(opCtx, nss, &countCommand, &getTransactionWithRetriesForMongoD);
 }
 
@@ -485,6 +491,7 @@ std::unique_ptr<Pipeline> processFLEPipelineD(OperationContext* opCtx,
                                               NamespaceString nss,
                                               const EncryptionInformation& encryptInfo,
                                               std::unique_ptr<Pipeline> toRewrite) {
+    assertFLECrudNotYetProcessed(encryptInfo);
     return fle::processPipeline(
         opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoD);
 }
@@ -496,6 +503,8 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
                                 const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
                                 const boost::optional<BSONObj>& letParameters,
                                 const BSONObj& query) {
+    assertFLECrudNotYetProcessed(info);
+
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, info);
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
@@ -517,9 +526,7 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
 processFLEFindAndModifyExplainMongod(OperationContext* opCtx,
                                      const write_ops::FindAndModifyCommandRequest& request) {
-    tassert(6513401,
-            "Missing encryptionInformation for findAndModify",
-            request.getEncryptionInformation().has_value());
+    assertFLECrudNotYetProcessed(request.getEncryptionInformation());
 
     return uassertStatusOK(processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
         opCtx, request, &getTransactionWithRetriesForMongoD, processFindAndModifyExplain));

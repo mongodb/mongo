@@ -200,8 +200,15 @@ bool prepareForFLERewrite(OperationContext* opCtx,
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
+    const auto processed = encryptionInformation->getCrudProcessed().value_or(false);
+    uassert(12783100,
+            "External users cannot have encryptionInformation.crudProcessed enabled",
+            !processed ||
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(boost::none), ActionType::internal));
     // Prevent duplicate rewriting.
-    return !encryptionInformation->getCrudProcessed().value_or(false);
+    return !processed;
 }
 
 void CommandInvocationHooks::set(ServiceContext* serviceContext,

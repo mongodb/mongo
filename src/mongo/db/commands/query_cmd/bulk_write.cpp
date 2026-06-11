@@ -746,22 +746,13 @@ bool handleGroupedInserts(OperationContext* opCtx,
     invariant(insertDocs.size() == numOps);
 
     // Handle FLE inserts.
-    if (nsEntry.getEncryptionInformation().has_value()) {
-        {
-            // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
+    if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+        auto processed = attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
+        if (processed) {
+            responses.addInsertReplies(opCtx, firstOpIdx, out);
+            return out.canContinue;
         }
-
-        if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
-            auto processed =
-                attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
-            if (processed) {
-                responses.addInsertReplies(opCtx, firstOpIdx, out);
-                return out.canContinue;
-            }
-            // Fallthrough to standard inserts.
-        }
+        // Fallthrough to standard inserts.
     }
 
     // Create nested CurOp for insert.
@@ -1087,15 +1078,8 @@ bool handleDeleteOp(OperationContext* opCtx,
         validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE deletes.
-        if (nsEntry.getEncryptionInformation().has_value()) {
-            {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-            }
-
-            if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
-                return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
-            }
+        if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+            return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
 
         // Non-FLE deletes (including timeseries deletes) will be handled by
@@ -1668,16 +1652,9 @@ bool handleUpdateOp(OperationContext* opCtx,
         validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE updates.
-        if (nsEntry.getEncryptionInformation().has_value()) {
-            {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
-            }
-
-            if (!nsEntry.getEncryptionInformation()->getCrudProcessed()) {
-                // Map to processFLEUpdate.
-                return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
-            }
+        if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+            // Map to processFLEUpdate.
+            return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
 
         const auto [preConditions, isTimeseriesLogicalRequest] =
@@ -1876,20 +1853,16 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         std::any_of(req.getNsInfo().begin(), req.getNsInfo().end(), [](const auto& nsInfo) {
             return nsInfo.getEncryptionInformation().has_value();
         });
-
-    if (hasEncryptionInformation) {
-        uassert(ErrorCodes::BadValue,
-                "BulkWrite with Queryable Encryption supports only a single namespace.",
-                req.getNsInfo().size() == 1);
-    }
+    uassert(ErrorCodes::BadValue,
+            "BulkWrite with Queryable Encryption supports only a single namespace.",
+            !hasEncryptionInformation || req.getNsInfo().size() == 1);
+    const bool fleCrudProcessed = hasEncryptionInformation &&
+        !prepareForFLERewrite(opCtx, req.getNsInfo()[0].getEncryptionInformation());
 
     const auto& bypassDocumentValidation = req.getBypassDocumentValidation();
     DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
         opCtx, bypassDocumentValidation);
 
-    const auto& firstNsInfo = req.getNsInfo()[0];
-    const bool fleCrudProcessed = write_ops_exec::getFleCrudProcessed(
-        opCtx, firstNsInfo.getEncryptionInformation(), firstNsInfo.getNs().dbName().tenantId());
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, bypassDocumentValidation, fleCrudProcessed);
 
