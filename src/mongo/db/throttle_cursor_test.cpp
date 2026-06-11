@@ -55,6 +55,8 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
+#include <vector>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -171,6 +173,41 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
 
     ASSERT_EQ(numRecords, 20);
     ASSERT_LTE(end - start, Milliseconds(1000));
+}
+
+TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorReverse) {
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, kNss, MODE_X);
+    const CollectionPtr& coll = *autoColl;
+
+    // Direction is independent of throttling; leave the throttle off so the test stays fast.
+    FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
+    Date_t start = getTime();
+    setDataThrottle(start);
+    setMaxMbPerSec(0);
+
+    SeekableRecordThrottleCursor cursor = SeekableRecordThrottleCursor(
+        opCtx, coll->getRecordStore(), _dataThrottle.get(), /*forward=*/false);
+
+    // The fixture inserts _id 0..9, which occupy RecordIds 1..10. A reverse cursor's first next()
+    // returns the last record, then walks backwards to the first.
+    std::vector<int64_t> seen;
+    while (auto record = cursor.next(opCtx)) {
+        seen.push_back(record->id.getLong());
+    }
+
+    const std::vector<int64_t> expected = {10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+    ASSERT_EQ(seen.size(), expected.size());  // Fatal: the comparison below indexes both vectors.
+    for (size_t i = 0; i < expected.size(); i++) {
+        EXPECT_EQ(seen[i], expected[i]);
+    }
+
+    // seekToStart() returns the cursor to its starting position so the reverse iteration can be
+    // repeated.
+    cursor.seekToStart(opCtx);
+    auto first = cursor.next(opCtx);
+    ASSERT_TRUE(first);  // Fatal: dereferenced below.
+    EXPECT_EQ(first->id.getLong(), 10);
 }
 
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {

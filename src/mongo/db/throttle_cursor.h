@@ -63,7 +63,15 @@ class SeekableRecordThrottleCursor {
 public:
     SeekableRecordThrottleCursor(OperationContext* opCtx,
                                  const RecordStore* rs,
-                                 DataThrottle* dataThrottle);
+                                 DataThrottle* dataThrottle,
+                                 bool forward = true);
+
+    /**
+     * (Re)creates the underlying cursor in its default starting position -- before the first record
+     * for a forward cursor, or before the last record for a reverse cursor -- so that the next call
+     * to next() returns the first record of the iteration.
+     */
+    void seekToStart(OperationContext* opCtx);
 
     boost::optional<Record> seekExact(OperationContext* opCtx, const RecordId& id);
 
@@ -71,6 +79,10 @@ public:
 
     void save() {
         _cursor->save();
+    }
+
+    [[nodiscard]] bool isForward() const {
+        return _forward;
     }
 
     bool restore(RecoveryUnit& ru) {
@@ -86,6 +98,8 @@ public:
     }
 
 private:
+    const RecordStore& _rs;
+    bool _forward{true};
     std::unique_ptr<SeekableRecordCursor> _cursor;
     DataThrottle* _dataThrottle;
 };

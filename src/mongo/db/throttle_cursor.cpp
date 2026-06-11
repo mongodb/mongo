@@ -55,9 +55,14 @@ MONGO_FAIL_POINT_DEFINE(fixedCursorDataSizeOf2MBForDataThrottle);
 
 SeekableRecordThrottleCursor::SeekableRecordThrottleCursor(OperationContext* opCtx,
                                                            const RecordStore* rs,
-                                                           DataThrottle* dataThrottle) {
-    _cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/true);
-    _dataThrottle = dataThrottle;
+                                                           DataThrottle* dataThrottle,
+                                                           bool forward)
+    : _rs(*rs), _forward(forward), _dataThrottle(dataThrottle) {
+    seekToStart(opCtx);
+}
+
+void SeekableRecordThrottleCursor::seekToStart(OperationContext* opCtx) {
+    _cursor = _rs.getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), _forward);
 }
 
 boost::optional<Record> SeekableRecordThrottleCursor::seekExact(OperationContext* opCtx,
