@@ -54,6 +54,17 @@ class OperationContext;
 template <typename T>
 class StatusWith;
 
+// 'KillCursorAuthzCheckFnInput' carries both the cursor's stored namespace and its authenticated
+// owner — the two fields required by auth::checkAuthForKillCursors.  Using a dedicated input type
+// (rather than the user-only AuthzCheckFn) ensures the auth check is evaluated against the
+// cursor's actual namespace, not the client-supplied request namespace.
+struct KillCursorAuthzCheckFnInput {
+    const NamespaceString& nss;
+    const boost::optional<UserName>& userName;
+};
+using KillCursorAuthzCheckFnInputType = const KillCursorAuthzCheckFnInput&;
+using KillCursorAuthzCheckFn = std::function<Status(KillCursorAuthzCheckFnInputType)>;
+
 /**
  * ClusterCursorManager is a container for ClusterClientCursor objects.  It manages the lifetime of
  * its registered cursors and tracks basic information about them.
@@ -450,7 +461,7 @@ public:
      */
     Status checkAuthForKillCursors(OperationContext* opCtx,
                                    CursorId cursorId,
-                                   AuthzCheckFn authChecker);
+                                   KillCursorAuthzCheckFn authChecker);
 
 
     /**
@@ -473,7 +484,7 @@ public:
      */
     Status killCursorWithAuthCheck(OperationContext* opCtx,
                                    CursorId cursorId,
-                                   AuthzCheckFn authChecker);
+                                   KillCursorAuthzCheckFn authChecker);
 
     /**
      * Kill the cursors satisfying the given predicate. Returns the number of cursors killed.
@@ -585,7 +596,9 @@ private:
      */
     void killOperationUsingCursor(WithLock, CursorEntry* entry);
 
-    Status _killCursor(OperationContext* opCtx, CursorId cursorId, AuthzCheckFn authChecker);
+    Status _killCursor(OperationContext* opCtx,
+                       CursorId cursorId,
+                       KillCursorAuthzCheckFn authChecker);
 
     // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.  May be
     // concurrently accessed by multiple threads.

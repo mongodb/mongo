@@ -124,6 +124,8 @@ protected:
         ASSERT_OK(getManager()->killCursor(killCursorOpCtx.get(), cursorId));
     }
 
+    static KillCursorAuthzCheckFn successKillCursorAuthChecker;
+    static KillCursorAuthzCheckFn failKillCursorAuthChecker;
 
 private:
     // List of flags representing whether our allocated cursors have been killed yet.  The value of
@@ -135,6 +137,15 @@ private:
     ClockSourceMock _clockSourceMock;
     ClusterCursorManager _manager{&_clockSourceMock};
     ServiceContext::UniqueOperationContext _opCtx;
+};
+
+KillCursorAuthzCheckFn ClusterCursorManagerTest::successKillCursorAuthChecker =
+    [](KillCursorAuthzCheckFnInputType) -> Status {
+    return Status::OK();
+};
+KillCursorAuthzCheckFn ClusterCursorManagerTest::failKillCursorAuthChecker =
+    [](KillCursorAuthzCheckFnInputType) -> Status {
+    return {ErrorCodes::Unauthorized, "Unauthorized"};
 };
 
 // Test that registering a cursor and checking it out returns a pin to the same cursor.
@@ -632,8 +643,8 @@ TEST_F(ClusterCursorManagerTest, KillCursorsWithAuthCheckSuccessfulAuthCheckSucc
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
     // Kill the cursor and verify that it was successfully killed.
-    ASSERT_OK(
-        getManager()->killCursorWithAuthCheck(getOperationContext(), cursorId, successAuthChecker));
+    ASSERT_OK(getManager()->killCursorWithAuthCheck(
+        getOperationContext(), cursorId, successKillCursorAuthChecker));
     ASSERT(isMockCursorKilled(0));
 }
 
@@ -647,9 +658,9 @@ TEST_F(ClusterCursorManagerTest, KillCursorsWithAuthCheckFailingAuthCheckFails) 
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
     // Kill the cursor and verify that it was successfully killed.
-    ASSERT_EQ(
-        getManager()->killCursorWithAuthCheck(getOperationContext(), cursorId, failAuthChecker),
-        ErrorCodes::Unauthorized);
+    ASSERT_EQ(getManager()->killCursorWithAuthCheck(
+                  getOperationContext(), cursorId, failKillCursorAuthChecker),
+              ErrorCodes::Unauthorized);
 }
 
 // Test that the Client that registered a cursor is correctly recorded.
@@ -1335,13 +1346,40 @@ TEST_F(ClusterCursorManagerTest, CheckAuthForKillCursors) {
                                                boost::none));
 
     ASSERT_EQ(ErrorCodes::CursorNotFound,
-              getManager()->checkAuthForKillCursors(
-                  getOperationContext(), cursorId + 1, successAuthChecker));
+              getManager()
+                  ->checkAuthForKillCursors(
+                      getOperationContext(), cursorId + 1, successKillCursorAuthChecker)
+                  .code());
     ASSERT_EQ(
         ErrorCodes::Unauthorized,
-        getManager()->checkAuthForKillCursors(getOperationContext(), cursorId, failAuthChecker));
-    ASSERT_OK(
-        getManager()->checkAuthForKillCursors(getOperationContext(), cursorId, successAuthChecker));
+        getManager()
+            ->checkAuthForKillCursors(getOperationContext(), cursorId, failKillCursorAuthChecker)
+            .code());
+    ASSERT_OK(getManager()->checkAuthForKillCursors(
+        getOperationContext(), cursorId, successKillCursorAuthChecker));
+}
+
+// Regression test for SERVER-128198: the auth checker for killCursors must receive the cursor's
+// *stored* namespace, not the client-supplied request namespace.
+TEST_F(ClusterCursorManagerTest, KillCursorsAuthCheckerReceivesStoredNamespace) {
+    const NamespaceString cursorNss =
+        NamespaceString::createNamespaceString_forTest("testdb.testcoll");
+    auto cursorId =
+        assertGet(getManager()->registerCursor(getOperationContext(),
+                                               allocateMockCursor(),
+                                               cursorNss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               boost::none));
+
+    NamespaceString receivedNss;
+    KillCursorAuthzCheckFn captureNss =
+        [&receivedNss](KillCursorAuthzCheckFnInputType input) -> Status {
+        receivedNss = input.nss;
+        return Status::OK();
+    };
+    ASSERT_OK(getManager()->killCursorWithAuthCheck(getOperationContext(), cursorId, captureNss));
+    ASSERT_EQ(receivedNss, cursorNss);
 }
 
 TEST_F(ClusterCursorManagerTest, PinnedCursorReturnsUnderlyingCursorTxnNumber) {

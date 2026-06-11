@@ -42,11 +42,14 @@ namespace {
 struct ClusterKillCursorsCmd {
     static constexpr bool supportsReadConcern = true;
     static Status doCheckAuth(OperationContext* opCtx,
-                              const NamespaceString& nss,
+                              const NamespaceString& /* requestNss */,
                               CursorId cursorId) {
         auto const authzSession = AuthorizationSession::get(opCtx->getClient());
-        auto authChecker = [&authzSession, &nss](AuthzCheckFnInputType userName) -> Status {
-            return auth::checkAuthForKillCursors(authzSession, nss, userName);
+        // Auth is evaluated against the cursor's *stored* namespace (input.nss), not the
+        // client-supplied request namespace, to prevent cross-namespace privilege escalation.
+        KillCursorAuthzCheckFn authChecker =
+            [&authzSession](const KillCursorAuthzCheckFnInput& input) -> Status {
+            return auth::checkAuthForKillCursors(authzSession, input.nss, input.userName);
         };
 
         return Grid::get(opCtx)->getCursorManager()->checkAuthForKillCursors(
@@ -54,11 +57,12 @@ struct ClusterKillCursorsCmd {
     }
 
     static Status doKillCursor(OperationContext* opCtx,
-                               const NamespaceString& nss,
+                               const NamespaceString& /* requestNss */,
                                CursorId cursorId) {
         auto const authzSession = AuthorizationSession::get(opCtx->getClient());
-        const auto authChecker = [&authzSession, &nss](AuthzCheckFnInputType userName) -> Status {
-            return auth::checkAuthForKillCursors(authzSession, nss, userName);
+        KillCursorAuthzCheckFn authChecker =
+            [&authzSession](const KillCursorAuthzCheckFnInput& input) -> Status {
+            return auth::checkAuthForKillCursors(authzSession, input.nss, input.userName);
         };
 
         return Grid::get(opCtx)->getCursorManager()->killCursorWithAuthCheck(
