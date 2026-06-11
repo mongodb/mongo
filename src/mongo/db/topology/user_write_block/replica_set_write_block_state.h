@@ -98,6 +98,14 @@ public:
     Status checkIfCompactAllowedToStart(OperationContext* opCtx) const;
 
     /**
+     * Checks that a new convertToCapped operation is allowed to start on the specified namespace.
+     * Returns a Status with ErrorCodes::ReplicaSetWritesBlocked if replica set writes are blocked,
+     * Status::OK() otherwise.
+     */
+    Status checkIfConvertToCappedAllowedToStart(OperationContext* opCtx,
+                                                const NamespaceString& nss) const;
+
+    /**
      * Methods to control the replica set deletions blocking state.
      */
     void enableReplicaSetDeletionsBlocking();

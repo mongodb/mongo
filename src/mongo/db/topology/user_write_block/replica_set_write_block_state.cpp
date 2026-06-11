@@ -116,6 +116,18 @@ Status ReplicaSetWriteBlockState::checkIfCompactAllowedToStart(OperationContext*
     return Status::OK();
 }
 
+Status ReplicaSetWriteBlockState::checkIfConvertToCappedAllowedToStart(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    const auto info = _writeBlockInfo.load();
+    if (info.blocked && !ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() &&
+        !nss.isOnInternalDb()) {
+        return Status(
+            ErrorCodes::ReplicaSetWritesBlocked,
+            fmt::format("convertToCapped blocked, reason: {}", idl::serialize(info.reason)));
+    }
+    return Status::OK();
+}
+
 void ReplicaSetWriteBlockState::enableReplicaSetDeletionsBlocking() {
     _deletionsBlocked.store(true);
 }

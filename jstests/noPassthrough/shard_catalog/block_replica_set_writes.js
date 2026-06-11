@@ -419,6 +419,28 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         assert.commandFailedWithCode(nonEmptyColl.createIndex({b: 1}), ErrorCodes.ReplicaSetWritesBlocked);
     });
 
+    it("Test that convertToCapped on a shard is blocked when blockReplicaSetWrites is enabled", function () {
+        // Create an unsharded collection on the primary shard (shard0), where the block is enabled.
+        const testColl = this.testDB.getCollection("convertToCappedColl");
+        assert.commandWorked(testColl.insert({_id: 1}));
+
+        // Enable write block with allowDeletions:false and check that convertToCapped is rejected.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandFailedWithCode(
+            this.testDB.runCommand({convertToCapped: "convertToCappedColl", size: 100000}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+
+        // Disable write block and check that convertToCapped succeeds.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        assert.commandWorked(this.testDB.runCommand({convertToCapped: "convertToCappedColl", size: 100000}));
+        assert(testColl.stats().capped, "Collection should be capped after convertToCapped succeeds");
+    });
+
     it("Test that new index builds on user collections are blocked when blockReplicaSetWrites is enabled", function () {
         const shard0LocalDB = this.st.shard0.getDB(this.testDBName);
         const testColl = shard0LocalDB.getCollection("testColl");

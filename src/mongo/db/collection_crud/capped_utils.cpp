@@ -69,6 +69,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -349,6 +350,12 @@ void convertToCapped(OperationContext* opCtx,
                      long long size,
                      bool fromMigrate,
                      const boost::optional<UUID>& targetUUID) {
+    // Reject new convertToCapped operations while the replica set write block is enabled.
+    if (opCtx->writesAreReplicated()) {
+        uassertStatusOK(
+            ReplicaSetWriteBlockState::get(opCtx)->checkIfConvertToCappedAllowedToStart(opCtx, ns));
+    }
+
     auto [sourceAcq, tmpAcq, leftoverAcq] = acquireLocksForConvertToCapped(opCtx, ns, targetUUID);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&

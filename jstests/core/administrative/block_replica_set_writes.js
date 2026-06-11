@@ -684,4 +684,27 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             }
         });
     });
+
+    it("Test that new convertToCapped is blocked when replica set write block is enabled", function () {
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const testColl = testDB.getCollection("testColl");
+        assert.commandWorked(testColl.insert({_id: 1}));
+
+        // Enable write block with allowDeletions:false and check that convertToCapped is rejected.
+        enableReplicaSetWriteBlock(
+            this.replicaSetPrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandFailedWithCode(
+            testDB.runCommand({convertToCapped: "testColl", size: 100000}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+        assert(!testColl.stats().capped, "Collection should not have been converted while writes are blocked");
+
+        // Disable write block and check that convertToCapped succeeds.
+        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        assert.commandWorked(testDB.runCommand({convertToCapped: "testColl", size: 100000}));
+        assert(testColl.stats().capped, "Collection should be capped after convertToCapped succeeds");
+    });
 });

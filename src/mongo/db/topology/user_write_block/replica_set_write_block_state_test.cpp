@@ -426,5 +426,73 @@ TEST_F(ReplicaSetWriteBlockStateTest, CompactAllowedWhenBypassEnabled) {
     ASSERT_OK(state->checkIfCompactAllowedToStart(opCtx.get()));
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest, ConvertToCappedAllowedWhenWriteBlockingDisabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_OK(state->checkIfConvertToCappedAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, ConvertToCappedBlockedWheneverWriteBlockingEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+
+    // convertToCapped is blocked whenever the replica set write block is enabled,
+    // regardless of the allowDeletions flag.
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    // allowDeletions = false (deletions blocked) -> blocked.
+    state->enableReplicaSetDeletionsBlocking();
+    ASSERT_EQ(state->checkIfConvertToCappedAllowedToStart(opCtx.get(), nss),
+              ErrorCodes::ReplicaSetWritesBlocked);
+
+    // allowDeletions = true (deletions allowed) -> still blocked.
+    state->disableReplicaSetDeletionsBlocking();
+    ASSERT_EQ(state->checkIfConvertToCappedAllowedToStart(opCtx.get(), nss),
+              ErrorCodes::ReplicaSetWritesBlocked);
+
+    // Disabling the write block allows convertToCapped again.
+    state->disableReplicaSetWriteBlocking();
+    ASSERT_OK(state->checkIfConvertToCappedAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, ConvertToCappedAllowedOnInternalDb) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("admin.coll");
+    ASSERT_OK(state->checkIfConvertToCappedAllowedToStart(opCtx.get(), nss));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, ConvertToCappedAllowedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+    ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_OK(state->checkIfConvertToCappedAllowedToStart(opCtx.get(), nss));
+}
+
 }  // namespace
 }  // namespace mongo
