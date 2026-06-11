@@ -43,6 +43,7 @@
 #include <utility>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -218,6 +219,13 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
         return uniqueCtx->get();
     }();
 
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
+    if (uniqueCtx && logicalSessionCacheJobTimeoutEnabled.load()) {
+        opCtx->setDeadlineAfterNowBy(Milliseconds(logicalSessionRefreshMillis) * 9 / 10,
+                                     ErrorCodes::MaxTimeMSExpired);
+    }
+
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->getSettings().isReplSet() &&
         replCoord->getMemberState().arbiter()) {
@@ -283,6 +291,13 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
         uniqueCtx.emplace(client->makeOperationContext());
         return uniqueCtx->get();
     }();
+
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx, AdmissionContext::Priority::kExempt);
+    if (uniqueCtx && logicalSessionCacheJobTimeoutEnabled.load()) {
+        opCtx->setDeadlineAfterNowBy(Milliseconds(logicalSessionRefreshMillis) * 9 / 10,
+                                     ErrorCodes::MaxTimeMSExpired);
+    }
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->getSettings().isReplSet() &&
@@ -373,6 +388,13 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
                     "Failed to refresh active sessions, continuing without this",
                     "error"_attr = redact(ex));
         refreshStatus = ex.toStatus();
+        // If the job deadline fired, don't re-store sessions — they create a backlog
+        // that causes the next cycle to hit the same timeout.  Sessions still in use
+        // will be re-vivified; unused ones expire via the TTL index.
+        if (logicalSessionCacheJobTimeoutEnabled.load() &&
+            ex.code() == ErrorCodes::MaxTimeMSExpired) {
+            activeSessionsBackSwapper.dismiss();
+        }
     }
 
     // Remove the ending sessions from the sessions collection.

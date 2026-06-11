@@ -75,6 +75,7 @@ mongo_cc_library(
         "//src/mongo/db:coll_mod_idl",
         "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/session:logical_session_cache_idl",
         "//src/mongo/db/session:logical_session_id",
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/session:sessions_server_parameters_idl",
@@ -155,6 +156,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:internal_transactions_feature_flag_idl",
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/session:kill_sessions",
         "//src/mongo/db/session:logical_session_cache",
         "//src/mongo/db/session:logical_session_id_helpers",
