@@ -532,14 +532,25 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
     // upsert, but because it writes an identical document the two operations do not conflict.
     upsertCollectionEntryLocally(opCtx, nss, coll);
 
-    // There is no need to invalidate or clear the in-memory filtering metadata here, neither on the
-    // primary nor on the secondaries: the current CSS state is always either unknown or already
-    // correct, and never a stale "untracked" entry that would have to be evicted.
+    // There is no need to invalidate or clear the in-memory filtering metadata here, except for a
+    // specific case:
+    //   - If the CSR is non-authoritative, it will become authoritative later, and will sort ifself
+    //     out.
     //   - If this shard owns chunks, its CSS is tracked (or unknown if it has not been refreshed
-    //     yet).
-    //   - If this shard owns no chunks, its CSS is still tracked or unknown, but never untracked,
-    //     because movePrimary is responsible for handling untracked collections when cloning and
-    //     for cleaning them up on the old primary shard.
+    //     yet). No need to do anything.
+    //   - If this shard owns no chunks, then the CSS would be either unknown or unowned. In the
+    //     latter case, we need to invalidate it so that the CSS is recreated with state "tracked"
+    //     (a DB primary can't have "kUnowned" entries in the CSS by definition).
+
+    const auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+    const auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
+    if (scopedCsr->getAuthoritativeState() ==
+            CollectionShardingRuntime::AuthoritativeState::kAuthoritative &&
+        scopedCsr->isUnowned()) {
+        invalidateCollectionMetadataOnSecondaries(
+            opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
+        scopedCsr->clearFilteringMetadata_authoritative(opCtx);
+    }
 }
 
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
