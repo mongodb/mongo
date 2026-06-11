@@ -43,7 +43,9 @@ class FieldListInfo:
         # type: () -> MethodInfo
         """Get the hasField method for a generic argument or generic reply field list."""
         class_name = common.title_case(self.struct.cpp_name)
-        return MethodInfo(class_name, "hasField", ["StringData fieldName"], "bool", static=True)
+        return MethodInfo(
+            class_name, "hasField", ["std::string_view fieldName"], "bool", static=True
+        )
 
     def get_should_forward_name(self):
         """Get the name of the shard-forwarding rule for a generic argument or reply field."""
@@ -65,7 +67,7 @@ class FieldListInfo:
         return MethodInfo(
             class_name,
             self.get_should_forward_name(),
-            ["StringData fieldName"],
+            ["std::string_view fieldName"],
             "bool",
             static=True,
         )

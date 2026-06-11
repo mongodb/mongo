@@ -143,7 +143,7 @@ class CppTypeBase(metaclass=ABCMeta):
     def get_storage_type_setter_body(self, member_name, validator_method_name):
         # type: (str, str) -> str
         """Get the body of the setter that takes a parameter of the storage type."""
-        return f'{_optionally_make_call(validator_method_name, "value")} {member_name} = std::move(value);'
+        return f"{_optionally_make_call(validator_method_name, 'value')} {member_name} = std::move(value);"
 
     @abstractmethod
     def get_transform_to_getter_type(self, expression):
@@ -191,7 +191,7 @@ class _CppTypeBasic(CppTypeBase):
 
     def get_setter_body(self, member_name, validator_method_name):
         # type: (str, str) -> str
-        return f'{_optionally_make_call(validator_method_name, "value")} {member_name} = std::move(value);'
+        return f"{_optionally_make_call(validator_method_name, 'value')} {member_name} = std::move(value);"
 
     def get_transform_to_getter_type(self, expression):
         # type: (str) -> Optional[str]
@@ -427,7 +427,7 @@ class _CppTypeOptional(_CppTypeDelegating):
         if convert:
             # We need to convert between two different types of optional<T> and yet provide
             # the ability for the user specifiy an uninitialized optional. This occurs
-            # for vector<mongo::StringData> and vector<std::string> paired together.
+            # for vector<std::string_view> and vector<std::string> paired together.
             return f"""\
 if ({member_name}.is_initialized()) {{
     return {convert};
@@ -472,7 +472,7 @@ def get_cpp_type_from_cpp_type_name(field, cpp_type_name, array):
     """Get the C++ Type information for the given C++ type name, e.g. std::string."""
     cpp_type_info: CppTypeBase
     if cpp_type_name == "std::string":
-        cpp_type_info = _CppTypeView(field, "std::string", "std::string", "StringData")
+        cpp_type_info = _CppTypeView(field, "std::string", "std::string", "std::string_view")
     elif cpp_type_name == "std::vector<std::uint8_t>":
         cpp_type_info = _CppTypeVector(field)
     else:

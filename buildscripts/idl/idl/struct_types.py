@@ -481,7 +481,7 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('builder->append("%s"_sd, 1);' % (self._command.name))
+        indented_writer.write_line(f'builder->append("{self._command.name}", 1);')
 
     def gen_namespace_check(self, indented_writer, db_name, element):
         # type: (writer.IndentedTextWriter, str, str) -> None
@@ -656,13 +656,11 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
         # type: (writer.IndentedTextWriter) -> None
         if self._struct.allow_global_collection_name:
             indented_writer.write_line(
-                '_nss.serializeCollectionName(builder, "%s"_sd);' % (self._command.name)
+                '_nss.serializeCollectionName(builder, "%s");' % (self._command.name)
             )
         else:
             indented_writer.write_line("invariant(!_nss.isEmpty());")
-            indented_writer.write_line(
-                'builder->append("%s"_sd, _nss.coll());' % (self._command.name)
-            )
+            indented_writer.write_line('builder->append("%s", _nss.coll());' % (self._command.name))
         indented_writer.write_empty_line()
 
     def gen_namespace_check(self, indented_writer, db_name, element):
@@ -766,14 +764,16 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('_nssOrUUID.serialize(builder, "%s"_sd);' % (self._command.name))
+        indented_writer.write_line(
+            '_nssOrUUID.serialize(builder, std::string_view{"%s"});' % (self._command.name)
+        )
         indented_writer.write_empty_line()
 
     def gen_namespace_check(self, indented_writer, db_name, element):
         # type: (writer.IndentedTextWriter, str, str) -> None
         indented_writer._stream.write(f"""
     auto collOrUUID = ctxt.checkAndAssertCollectionNameOrUUID({element});
-    _nssOrUUID = std::holds_alternative<StringData>(collOrUUID) ? NamespaceStringUtil::deserialize({db_name}, get<StringData>(collOrUUID)) : NamespaceStringOrUUID({db_name}, get<UUID>(collOrUUID));
+    _nssOrUUID = std::holds_alternative<std::string_view>(collOrUUID) ? NamespaceStringUtil::deserialize({db_name}, get<std::string_view>(collOrUUID)) : NamespaceStringOrUUID({db_name}, get<UUID>(collOrUUID));
     uassert(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace specified: " << _nssOrUUID.toStringForErrorMsg(), !_nssOrUUID.isNamespaceString() || _nssOrUUID.nss().isValid());
 """)
 

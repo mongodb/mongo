@@ -472,7 +472,7 @@ class TestGenerator(testcase.IDLTestcase):
         )
 
         expected = dedent(
-            'constexpr inline auto kTestServerParameterName = "testServerParameter"_sd;'
+            'constexpr inline std::string_view kTestServerParameterName = "testServerParameter";'
         )
         self.assertIn(expected, header)
 
@@ -969,7 +969,7 @@ class TestGenerator(testcase.IDLTestcase):
             )
         )
         self.assertStringsInFile(
-            header, ['static constexpr auto kIgnored_fieldFieldName = "ignored_field"_sd;']
+            header, ['static constexpr std::string_view kIgnored_fieldFieldName = "ignored_field";']
         )
         self.assertStringNotInFile(header, "std::int32_t _ignored_field;")
 
@@ -1332,7 +1332,7 @@ class TestGenerator(testcase.IDLTestcase):
         # 'strict: true', a usedFieldSet is generated to check for extra field duplicates.
         self.assertStringInFile(
             source,
-            "std::set<StringData> usedFieldSet;",
+            "std::set<std::string_view> usedFieldSet;",
         )
         _, source = self.assert_generate_with_basic_types(
             dedent(
@@ -1348,7 +1348,7 @@ class TestGenerator(testcase.IDLTestcase):
         )
         self.assertStringNotInFile(
             source,
-            "std::set<StringData> usedFieldSet;",
+            "std::set<std::string_view> usedFieldSet;",
         )
 
     def test_generic_arguments(self) -> None:
@@ -1378,7 +1378,7 @@ class TestGenerator(testcase.IDLTestcase):
             [
                 "const mongo::GenericStruct& getGenericStruct() const",
                 "std::int32_t getField1() const",
-                "StringData getField2() const",
+                "std::string_view getField2() const",
                 "mongo::GenericStruct _genericStruct;",
             ],
         )
@@ -1589,7 +1589,7 @@ class TestGenerator(testcase.IDLTestcase):
         self.assertStringsInFile(
             source,
             [
-                'mongo::FCVGatedFeatureFlag gToaster{false, ""_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{false, std::string_view{""}};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1618,7 +1618,7 @@ class TestGenerator(testcase.IDLTestcase):
         self.assertStringsInFile(
             source,
             [
-                'mongo::FCVGatedFeatureFlag gToaster{true, "123"_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{true, std::string_view{"123"}};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1650,7 +1650,7 @@ class TestGenerator(testcase.IDLTestcase):
         self.assertStringsInFile(
             source,
             [
-                'mongo::FCVGatedFeatureFlag gToaster{true, "123"_sd, true};',
+                'mongo::FCVGatedFeatureFlag gToaster{true, std::string_view{"123"}, true};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1680,7 +1680,7 @@ class TestGenerator(testcase.IDLTestcase):
         self.assertStringsInFile(
             source,
             [
-                'mongo::FCVGatedFeatureFlag gToaster{true, "123"_sd};',
+                'mongo::FCVGatedFeatureFlag gToaster{true, std::string_view{"123"}};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1708,7 +1708,7 @@ class TestGenerator(testcase.IDLTestcase):
         self.assertStringsInFile(
             source,
             [
-                'mongo::OperationFCVOnlyFCVGatedFeatureFlag gOnlyOFCV{true, "123"_sd};',
+                'mongo::OperationFCVOnlyFCVGatedFeatureFlag gOnlyOFCV{true, std::string_view{"123"}};',
                 '<FeatureFlagServerParameter>("featureFlagOnlyOFCV", &gOnlyOFCV);',
             ],
         )
@@ -1736,7 +1736,7 @@ class TestGenerator(testcase.IDLTestcase):
         self.assertStringsInFile(
             source,
             [
-                'mongo::LegacyFCVSnapshotOnlyFCVGatedFeatureFlag gLegacyAPIToaster{true, "123"_sd};',
+                'mongo::LegacyFCVSnapshotOnlyFCVGatedFeatureFlag gLegacyAPIToaster{true, std::string_view{"123"}};',
                 '<FeatureFlagServerParameter>("featureFlagLegacyAPIToaster", &gLegacyAPIToaster);',
             ],
         )
@@ -1763,7 +1763,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::inDevelopment, false};',
+                + '"featureFlagToaster", RolloutPhase::inDevelopment, false};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1790,7 +1790,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::rollout, true};',
+                + '"featureFlagToaster", RolloutPhase::rollout, true};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1817,7 +1817,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::release, true};',
+                + '"featureFlagToaster", RolloutPhase::release, true};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1846,7 +1846,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::inDevelopment, false, "8.3"_sd};',
+                + '"featureFlagToaster", RolloutPhase::inDevelopment, false, std::string_view{"8.3"}};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )

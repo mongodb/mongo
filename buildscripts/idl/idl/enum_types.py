@@ -118,7 +118,7 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         """Return a constexpr function returning the default fieldName for IDLParserContext.
         The generated function is found via ADL."""
         cpp_type = self.get_cpp_type_name()
-        return f'{mod_tag}constexpr ::mongo::StringData {_DEFAULT_PARSER_ADL_HOOK}({cpp_type}) {{ return "{cpp_type}"; }}'
+        return f'{mod_tag}constexpr std::string_view {_DEFAULT_PARSER_ADL_HOOK}({cpp_type}) {{ return "{cpp_type}"; }}'
 
     def _get_populated_extra_values(self):
         # type: () -> List[Union[syntax.EnumValue,ast.EnumValue]]
@@ -231,7 +231,7 @@ void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, std::int32_t value, const IDLParse
         """Generate the serializer ADL hook function definition."""
 
         indented_writer._stream.write(f"""
-{self.get_serializer_adl_hook_declaration('')} {{
+{self.get_serializer_adl_hook_declaration("")} {{
     return static_cast<std::int32_t>(value);
 }}""")
 
@@ -260,7 +260,7 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
     def get_deserializer_adl_hook_declaration(self, mod_tag):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
-        return f"{mod_tag}void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, ::mongo::StringData value, const IDLParserContext& ctxt)"
+        return f"{mod_tag}void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, std::string_view value, const IDLParserContext& ctxt)"
 
     def gen_deserializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -275,12 +275,12 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
                 indented_writer, f"constexpr std::array {cpp_type}_names{{", "};"
             ):
                 for e in self._enum.values:
-                    indented_writer.write_line(f'"{e.value}"_sd,')
+                    indented_writer.write_line(f'std::string_view{{"{e.value}"}},')
         indented_writer.write_empty_line()
 
         with writer.IndentedScopedBlock(
             indented_writer,
-            f"void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, ::mongo::StringData value, const IDLParserContext& ctxt) {{",
+            f"void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, std::string_view value, const IDLParserContext& ctxt) {{",
             "}",
         ):
             indented_writer.write_line(
@@ -299,14 +299,14 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: () -> str
         """Get the serializer ADL hook function declaration minus trailing semicolon."""
         cpp_type = self.get_cpp_type_name()
-        return f"{mod_tag}::mongo::StringData {_SERIALIZER_ADL_HOOK}({cpp_type} value)"
+        return f"{mod_tag} std::string_view {_SERIALIZER_ADL_HOOK}({cpp_type} value)"
 
     def gen_serializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         """Generate the serializer ADL hook function definition."""
         cpp_type = self.get_cpp_type_name()
         indented_writer._stream.write(f"""
-::mongo::StringData {_SERIALIZER_ADL_HOOK}({cpp_type} value) {{
+std::string_view {_SERIALIZER_ADL_HOOK}({cpp_type} value) {{
     auto idx = static_cast<size_t>(value);
     invariant(idx < {cpp_type}_names.size());
     return {cpp_type}_names[idx];

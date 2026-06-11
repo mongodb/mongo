@@ -324,7 +324,7 @@ class TestBinder(testcase.IDLTestcase):
             types:
                 foofoo:
                     description: foo
-                    cpp_type: StringData
+                    cpp_type: std::string_view
                     bson_serialization_type: string
                     deserializer: bar
                     is_view: false
@@ -513,7 +513,7 @@ class TestBinder(testcase.IDLTestcase):
             types:
                 foofoo:
                     description: foo
-                    cpp_type: StringData
+                    cpp_type: std::string_view
                     bson_serialization_type:
                                 - bindata
                                 - string

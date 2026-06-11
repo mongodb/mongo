@@ -111,8 +111,8 @@ def _validate_cpp_type(ctxt, idl_type, syntax_type):
     """Validate the cpp_type is correct."""
 
     # Validate cpp_type
-    # Do not allow StringData, use std::string instead.
-    if "StringData" in idl_type.cpp_type:
+    # Do not allow std::string_view, use std::string instead.
+    if "std::string_view" in idl_type.cpp_type:
         ctxt.add_no_string_data_error(idl_type, syntax_type, idl_type.name)
 
     # We do not support C++ char and float types for style reasons
@@ -623,7 +623,7 @@ def _bind_variant_field(ctxt, ast_field, idl_type):
             for variant_type in ast_field.type.variant_struct_types:
                 yield variant_type.cpp_type
 
-    ast_field.type.cpp_type = f'std::variant<{", ".join(gen_cpp_types())}>'
+    ast_field.type.cpp_type = f"std::variant<{', '.join(gen_cpp_types())}>"
 
     # Validation doc_sequence types
     _validate_doc_sequence_field(ctxt, ast_field)
@@ -1623,11 +1623,11 @@ def _bind_ifr_feature_flag_default(ctxt, param, feature_flag_phase):
         return None
 
     serialize_version_arg = (
-        f', "{param.version}"_sd' if param.serialize_on_outgoing_requests else ""
+        f', std::string_view{{"{param.version}"}}' if param.serialize_on_outgoing_requests else ""
     )
     expr_for_default = syntax.Expression(param.file_name, param.line, param.column)
     expr_for_default.expr = (
-        f'"{param.name}"_sd, RolloutPhase::'
+        f'"{param.name}", RolloutPhase::'
         f"{feature_flag_phase.to_camel_case_string()}, {default_value}{serialize_version_arg}"
     )
 
@@ -1642,7 +1642,9 @@ def _bind_non_ifr_feature_flag_default(ctxt, param):
         param.default.file_name, param.default.line, param.default.column
     )
     if param.fcv_gated.literal == "true":
-        expr_for_default.expr = f'{param.default.literal}, "{param.version or ""}"_sd'
+        expr_for_default.expr = (
+            f'{param.default.literal}, std::string_view{{"{param.version or ""}"}}'
+        )
         if param.enable_on_transitional_fcv_UNSAFE:
             expr_for_default.expr += ", true"
     else:

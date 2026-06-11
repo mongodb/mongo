@@ -524,7 +524,7 @@ class ParserContext(object):
         self._add_error(
             location,
             ERROR_ID_NO_STRINGDATA,
-            ("Do not use mongo::StringData for %s '%s', use std::string instead")
+            ("Do not use std::string_view for %s '%s', use std::string instead")
             % (ast_type, ast_parent),
         )
 
