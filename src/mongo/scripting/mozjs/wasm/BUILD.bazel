@@ -238,6 +238,7 @@ mongo_cc_unit_test(
     deps = [
         ":wasmtime_engine",
         "//src/mongo:base",
+        "//src/mongo/db:service_context",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/scripting:scripting_common",
     ],

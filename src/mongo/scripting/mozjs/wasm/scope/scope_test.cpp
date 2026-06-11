@@ -31,10 +31,14 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/js_regex.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -884,4 +888,49 @@ TEST(WasmtimeScope, TimeoutSleep) {
     ASSERT_THROWS_WITH_CHECK(scope->invoke(fn, nullptr, nullptr, 1),
                              AssertionException,
                              [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
+}
+
+// Fixture for tests that need a real OperationContext (e.g. to test opCtx kill-status
+// propagation through the WASM bridge).
+class WasmtimeScopeWithOpCtxTest : public unittest::Test {
+protected:
+    void setUp() override {
+        setGlobalServiceContext(ServiceContext::make());
+        setGlobalScriptEngine(new WasmtimeScriptEngine());
+    }
+    void tearDown() override {
+        setGlobalScriptEngine(nullptr);
+        setGlobalServiceContext({});
+    }
+    Service* getService() const {
+        return getGlobalServiceContext()->getService();
+    }
+};
+
+// When the OperationContext is killed with MaxTimeMSExpired (code 50), invoke() must surface
+// MaxTimeMSExpired rather than the generic Interrupted (code 11601) that the WASM bridge emits.
+// This verifies the translateInterrupted path in WasmtimeImplScope::invoke().
+TEST_F(WasmtimeScopeWithOpCtxTest, MaxTimeMSExpiredKillTranslatesErrorCode) {
+    auto& engine = *static_cast<WasmtimeScriptEngine*>(getGlobalScriptEngine());
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    auto client = getService()->makeClient("MaxTimeMSExpiredTest");
+    auto opCtx = client->makeOperationContext();
+    scope->registerOperation(opCtx.get());
+
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    stdx::thread killer([&] {
+        sleepmillis(50);
+        opCtx->markKilled(ErrorCodes::MaxTimeMSExpired);
+        scope->kill();
+    });
+
+    ASSERT_THROWS_WITH_CHECK(
+        scope->invoke(fn, nullptr, nullptr, 0),
+        AssertionException,
+        [](const AssertionException& ex) { ASSERT_EQ(ex.code(), ErrorCodes::MaxTimeMSExpired); });
+
+    killer.join();
+    scope->unregisterOperation();
 }

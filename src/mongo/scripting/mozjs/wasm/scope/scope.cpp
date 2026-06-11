@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/deadline_monitor.h"
@@ -139,38 +140,47 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
     const BSONObj& bsonArg =
         (recv && !recv->isEmpty()) ? *recv : (args ? *args : BSONObj::kEmptyObject);
     auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(bsonArg);
+    bool predicateResult = false;
+    StatusWith<BSONObj> result{BSONObj{}};
+
+    // The deadline monitor is scoped only around the JS invocations. Post-call work
+    // (_drainEmitToCallback, result extraction) is host-side C++ and should not be charged
+    // against the JS timeout.
+    _deadlineMonitor.startDeadline(this, timeoutMs);
+    try {
+        ScopeGuard deadlineGuard([&] { _deadlineMonitor.stopDeadline(this); });
+        if (recv && !recv->isEmpty()) {
+            if (_emitCallback) {
+                uassert(ErrorCodes::BadValue,
+                        "emit() cannot be used in a function that returns a value",
+                        ignoreReturn);
+                _bridge->invokeMap(func, std::move(bsonVal));
+            } else {
+                predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
+            }
+        } else {
+            result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
+        }
+    } catch (const DBException& ex) {
+        // When the WASM epoch interrupt fires, the bridge always throws Interrupted (11601).
+        // Translate to the real kill reason (e.g. MaxTimeMSExpired) so callers see the correct
+        // error code.
+        if (ex.code() == ErrorCodes::Interrupted && _opCtx)
+            uassertStatusOK(_opCtx->checkForInterruptNoAssert());
+        throw;
+    }
 
     if (recv && !recv->isEmpty()) {
         if (_emitCallback) {
-            uassert(ErrorCodes::BadValue,
-                    "emit() cannot be used in a function that returns a value",
-                    ignoreReturn);
-            _deadlineMonitor.startDeadline(this, timeoutMs);
-            {
-                ScopeGuard mapGuard([&] { _deadlineMonitor.stopDeadline(this); });
-                _bridge->invokeMap(func, std::move(bsonVal));
-            }
             _drainEmitToCallback();
             return 0;
-        }
-
-        bool predicateResult;
-        _deadlineMonitor.startDeadline(this, timeoutMs);
-        {
-            ScopeGuard predGuard([&] { _deadlineMonitor.stopDeadline(this); });
-            predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
         }
         if (!ignoreReturn) {
             _lastReturnValue = BSON(kReturnValueField << predicateResult);
         }
         return 0;
     }
-    StatusWith<BSONObj> result{BSONObj{}};
-    _deadlineMonitor.startDeadline(this, timeoutMs);
-    {
-        ScopeGuard funcGuard([&] { _deadlineMonitor.stopDeadline(this); });
-        result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
-    }
+
     uassertStatusOK(result.getStatus());
     if (!ignoreReturn) {
         // invokeFunction's direct return goes through getGlobal which flattens JS arrays
