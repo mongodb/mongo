@@ -29,6 +29,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
@@ -285,9 +286,21 @@ public:
     }
 };
 
-
 /**
  * Small utility function to make a namepace string from collection name.
  */
 NamespaceString makeNSS(StringData collName);
+
+/**
+ * Pipeline construction helpers for use in tests.
+ */
+std::unique_ptr<Pipeline> makePipelineForTest(
+    std::vector<BSONObj> bsonStages,
+    std::vector<StringData> collNames,
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx);
+std::unique_ptr<Pipeline> makePipelineForTest(
+    StringData query,
+    std::vector<StringData> collNames,
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx);
+
 }  // namespace mongo::join_ordering

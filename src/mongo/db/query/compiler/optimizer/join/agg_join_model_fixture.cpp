@@ -29,49 +29,12 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
 
-#include "mongo/db/pipeline/optimization/optimize.h"
-
 namespace mongo::join_ordering {
 std::string AggJoinModelFixture::toString(const std::unique_ptr<Pipeline>& pipeline) {
     auto bson = pipeline->serializeToBson();
     BSONArrayBuilder ba{};
     ba.append(bson.begin(), bson.end());
     return toString(BSON("pipeline" << ba.arr()));
-}
-
-std::vector<BSONObj> AggJoinModelFixture::pipelineFromJsonArray(StringData jsonArray) {
-    auto inputBson = fromjson("{pipeline: " + std::string(jsonArray) + "}");
-    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
-    std::vector<BSONObj> rawPipeline;
-    for (auto&& stageElem : inputBson["pipeline"].Array()) {
-        ASSERT_EQUALS(stageElem.type(), BSONType::object);
-        rawPipeline.push_back(stageElem.embeddedObject().getOwned());
-    }
-    return rawPipeline;
-}
-
-std::unique_ptr<Pipeline> AggJoinModelFixture::makePipeline(std::vector<BSONObj> bsonStages,
-                                                            std::vector<StringData> collNames) {
-    stdx::unordered_set<NamespaceString> secondaryNamespaces;
-    for (auto&& collName : collNames) {
-        secondaryNamespaces.insert(
-            NamespaceString::createNamespaceString_forTest("test", collName));
-    }
-    auto expCtx = getExpCtx();
-    expCtx->addResolvedNamespaces(secondaryNamespaces);
-    auto pipeline =
-        pipeline_factory::makePipeline(bsonStages,
-                                       expCtx,
-                                       pipeline_factory::MakePipelineOptions{
-                                           .alreadyOptimized = false, .attachCursorSource = false});
-
-    return pipeline;
-}
-
-std::unique_ptr<Pipeline> AggJoinModelFixture::makePipeline(StringData query,
-                                                            std::vector<StringData> collNames) {
-    const auto bsonStages = pipelineFromJsonArray(query);
-    return makePipeline(std::move(bsonStages), std::move(collNames));
 }
 
 std::unique_ptr<Pipeline> AggJoinModelFixture::makePipelineOfSize(size_t numJoins) {

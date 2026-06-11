@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
+#include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/util/modules.h"
 
@@ -47,12 +48,15 @@ public:
     }
 
     static std::string toString(const std::unique_ptr<Pipeline>& pipeline);
-    static std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray);
 
     std::unique_ptr<Pipeline> makePipeline(std::vector<BSONObj> bsonStages,
-                                           std::vector<StringData> collNames);
+                                           std::vector<StringData> collNames) {
+        return makePipelineForTest(bsonStages, collNames, getExpCtx());
+    }
 
-    std::unique_ptr<Pipeline> makePipeline(StringData query, std::vector<StringData> collNames);
+    std::unique_ptr<Pipeline> makePipeline(StringData query, std::vector<StringData> collNames) {
+        return makePipelineForTest(query, collNames, getExpCtx());
+    }
 
     std::unique_ptr<Pipeline> makePipelineOfSize(size_t numJoins);
 

@@ -29,7 +29,9 @@
 
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
@@ -187,4 +189,45 @@ void JoinOrderingTestFixture::initGraph(size_t numNodes, bool withIndexes) {
         resolvedPaths.emplace_back(ResolvedPath{(NodeId)i, FieldPath(fieldName)});
     }
 }
+
+namespace {
+std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
+    auto inputBson = fromjson("{pipeline: " + std::string(jsonArray) + "}");
+    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
+    std::vector<BSONObj> rawPipeline;
+    for (auto&& stageElem : inputBson["pipeline"].Array()) {
+        ASSERT_EQUALS(stageElem.type(), BSONType::object);
+        rawPipeline.push_back(stageElem.embeddedObject().getOwned());
+    }
+    return rawPipeline;
+}
+}  // namespace
+
+std::unique_ptr<Pipeline> makePipelineForTest(
+    std::vector<BSONObj> bsonStages,
+    std::vector<StringData> collNames,
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx) {
+    stdx::unordered_set<NamespaceString> secondaryNamespaces;
+    for (auto&& collName : collNames) {
+        secondaryNamespaces.insert(
+            NamespaceString::createNamespaceString_forTest("test", collName));
+    }
+    expCtx->addResolvedNamespaces(secondaryNamespaces);
+    auto pipeline =
+        pipeline_factory::makePipeline(bsonStages,
+                                       expCtx,
+                                       pipeline_factory::MakePipelineOptions{
+                                           .alreadyOptimized = false, .attachCursorSource = false});
+
+    return pipeline;
+}
+
+std::unique_ptr<Pipeline> makePipelineForTest(
+    StringData query,
+    std::vector<StringData> collNames,
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx) {
+    const auto bsonStages = pipelineFromJsonArray(query);
+    return makePipelineForTest(std::move(bsonStages), std::move(collNames), expCtx);
+}
+
 }  // namespace mongo::join_ordering
