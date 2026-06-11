@@ -304,7 +304,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
 
 Status ClusterCursorManager::checkAuthForKillCursors(OperationContext* opCtx,
                                                      CursorId cursorId,
-                                                     AuthzCheckFn authChecker) {
+                                                     KillCursorAuthzCheckFn authChecker) {
     stdx::lock_guard<Latch> lk(_mutex);
     auto entry = _getEntry(lk, cursorId);
 
@@ -314,7 +314,7 @@ Status ClusterCursorManager::checkAuthForKillCursors(OperationContext* opCtx,
 
     // Note that getAuthenticatedUser() is thread-safe, so it's okay to call even if there's
     // an operation using the cursor.
-    return authChecker(entry->getAuthenticatedUser());
+    return authChecker({entry->getNamespace(), entry->getAuthenticatedUser()});
 }
 
 void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry) {
@@ -329,7 +329,7 @@ void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry
 }
 
 Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursorId) {
-    AuthzCheckFn passingAuthChecker = [](AuthzCheckFnInputType) -> Status {
+    KillCursorAuthzCheckFn passingAuthChecker = [](const KillCursorAuthzCheckFnInput&) -> Status {
         return Status::OK();
     };
     return _killCursor(opCtx, cursorId, passingAuthChecker);
@@ -337,13 +337,13 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursor
 
 Status ClusterCursorManager::killCursorWithAuthCheck(OperationContext* opCtx,
                                                      CursorId cursorId,
-                                                     AuthzCheckFn authChecker) {
+                                                     KillCursorAuthzCheckFn authChecker) {
     return _killCursor(opCtx, cursorId, std::move(authChecker));
 }
 
 Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
                                          CursorId cursorId,
-                                         AuthzCheckFn authChecker) {
+                                         KillCursorAuthzCheckFn authChecker) {
     invariant(opCtx);
 
     stdx::unique_lock<Latch> lk(_mutex);
@@ -353,7 +353,7 @@ Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
         return cursorNotFoundStatus(cursorId);
     }
 
-    auto authCheckStatus = authChecker(entry->getAuthenticatedUser());
+    auto authCheckStatus = authChecker({entry->getNamespace(), entry->getAuthenticatedUser()});
     if (!authCheckStatus.isOK()) {
         return authCheckStatus.withContext(str::stream()
                                            << "cursor id " << cursorId
