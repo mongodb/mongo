@@ -326,7 +326,6 @@ private:
             logv2::CompositeBackend<logv2::LogCaptureBackend, logv2::UserAssertSink>;
 
         explicit LogDiverter(EnhancedReporter::Impl* reporter) {
-            boost::log::core::get()->remove_all_sinks();
             auto sink = boost::make_shared<LogDiverterBackend>(
                 boost::make_shared<logv2::LogCaptureBackend>(std::make_unique<Listener>(reporter),
                                                              false),
@@ -342,6 +341,7 @@ private:
 #else
             _sink->set_formatter(logv2::JSONFormatter());
 #endif
+            boost::log::core::get()->remove_all_sinks();
             boost::log::core::get()->add_sink(_sink);
         }
 

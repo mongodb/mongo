@@ -251,8 +251,9 @@ void initializeDeathTestChild() {
 
 void installEnhancedReporter(EnhancedReporter::Options options) {
     auto& listeners = testing::UnitTest::GetInstance()->listeners();
-    std::unique_ptr<testing::TestEventListener> originalPrinter{
-        listeners.Release(listeners.default_result_printer())};
+    auto* defaultListener = listeners.default_result_printer();
+    invariant(defaultListener, "GoogleTest default listener already removed.");
+    std::unique_ptr<testing::TestEventListener> originalPrinter{listeners.Release(defaultListener)};
     auto enhanced =
         std::make_unique<EnhancedReporter>(std::move(originalPrinter), std::move(options));
     gEnhancedReporter = enhanced.get();
@@ -311,6 +312,16 @@ void MainProgress::initialize() {
 
     setDefaultMockBehavior(MockBehavior::nice);
     callInitGoogleTest(_argVec);
+
+    if (!isDeathTestChild()) {
+        if (_options.enhancedReporter) {
+            EnhancedReporter::Options ero;
+            ero.showEachTest = _options.showEachTest;
+            installEnhancedReporter(ero);
+        } else {
+            installMongoReporter();
+        }
+    }
 
     // Colorize when explicitly asked to. If no position is taken, colorize when we are writing
     // to a TTY.
@@ -418,15 +429,9 @@ boost::optional<ExitCode> MainProgress::_parseAndAcceptOptions() {
         getAutoUpdateConfig() = std::move(auc);
     }
 
-    if (!isDeathTestChild()) {
-        if (uto.enhancedReporter.value_or(false)) {
-            EnhancedReporter::Options ero;
-            ero.showEachTest = uto.showEachTest.value_or(ero.showEachTest);
-            installEnhancedReporter(ero);
-        } else {
-            installMongoReporter();
-        }
-    }
+    _options.enhancedReporter = uto.enhancedReporter.value_or(true);
+    _options.showEachTest = uto.showEachTest.value_or(false);
+
     return {};
 }
 

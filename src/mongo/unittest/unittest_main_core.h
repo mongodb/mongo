@@ -57,6 +57,8 @@ struct FilterOptions {
 struct MONGO_MOD_PUBLIC MainOptions {
     bool startSignalProcessingThread = true;
     bool suppressGlobalInitializers = false;
+    bool enhancedReporter = false;
+    bool showEachTest = false;
 
     /** Overrides if engaged */
     boost::optional<FilterOptions> filter;
