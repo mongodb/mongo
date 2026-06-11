@@ -11,22 +11,27 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const NUM_DOCS = 10;
 
-const conn = MongoRunner.runMongod({
-    setParameter: {
-        featureFlagPathArrayness: true,
-        internalEnablePathArrayness: true,
-        internalQueryExecYieldIterations: 1,
-        internalQueryFrameworkControl: "forceClassicEngine",
-        featureFlagTimeseriesUpdatesSupport: true,
-        featureFlagImprovedDepsAnalysis: true,
-    },
-});
+const setParameter = {
+    featureFlagPathArrayness: true,
+    internalEnablePathArrayness: true,
+    internalQueryExecYieldIterations: 1,
+    internalQueryFrameworkControl: "forceClassicEngine",
+    featureFlagTimeseriesUpdatesSupport: true,
+    featureFlagImprovedDepsAnalysis: true,
+};
+
+const conn = MongoRunner.runMongod({setParameter});
 assert.neq(null, conn, "mongod failed to start");
 
 const db = conn.getDB("test");
+
+function getInvalidationCount(db) {
+    return db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+}
 
 function setupColl(name) {
     const coll = db[name];
@@ -40,7 +45,7 @@ function setupColl(name) {
 const kKilledMsg = "non-array path became multikey during yield";
 
 function runPhases({runQuery, isWriteCmd}) {
-    const before = db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+    const before = getInvalidationCount(db);
     const fp = configureFailPoint(db, "pathArraynessYieldInvalidation", {}, {times: 1});
     try {
         // Verify query is killed with the path-arrayness invalidation message.
@@ -56,8 +61,54 @@ function runPhases({runQuery, isWriteCmd}) {
     } finally {
         fp.off();
     }
-    const after = db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+    const after = getInvalidationCount(db);
     assert.eq(after, before + 1, "expected invalidation counter to be incremented", {before, after});
+}
+
+function runTransactionTest({label, createIndexes, runQuery, expectedCount}) {
+    jsTest.log.info("Testing snapshot read does not invalidate", {label});
+
+    const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter}});
+    rst.startSet();
+    rst.initiate();
+    const primary = rst.getPrimary();
+
+    const testDb = primary.getDB("test");
+    const coll = testDb[label];
+    coll.drop();
+    for (let i = 0; i < NUM_DOCS; i++) {
+        assert.commandWorked(coll.insert({_id: i, a: i, b: i, val: "hello world"}));
+    }
+    createIndexes(coll);
+
+    // Force the arrayness check to kill the query if and only if it is reached on a yield.
+    const fp = configureFailPoint(testDb, "pathArraynessYieldInvalidation");
+    try {
+        // Positive control: a normal read yields (YIELD_AUTO), reaches the check, and is killed.
+        const beforeControl = getInvalidationCount(testDb);
+        const err = assert.throws(() => runQuery(coll));
+        assert.eq(err.code, ErrorCodes.QueryPlanKilled, err.message);
+        assert(err.message.includes(kKilledMsg), err.message);
+        assert.eq(getInvalidationCount(testDb) - beforeControl, 1, "control must increment the counter");
+
+        // Snapshot read: INTERRUPT_ONLY means yieldOrInterrupt never reaches the check.
+        const beforeTxn = getInvalidationCount(testDb);
+        const session = primary.startSession();
+        try {
+            session.startTransaction({readConcern: {level: "snapshot"}});
+            const sessionColl = session.getDatabase(testDb.getName())[coll.getName()];
+            const results = runQuery(sessionColl);
+            assert.eq(results.length, expectedCount, "snapshot read must not be killed", {results});
+            session.commitTransaction();
+        } finally {
+            session.endSession();
+        }
+        assert.eq(getInvalidationCount(testDb) - beforeTxn, 0, "snapshot read must not invoke the arrayness check");
+    } finally {
+        fp.off();
+    }
+
+    rst.stopSet();
 }
 
 {
@@ -229,3 +280,20 @@ function runPhases({runQuery, isWriteCmd}) {
 }
 
 MongoRunner.stopMongod(conn);
+
+runTransactionTest({
+    label: "txn_collscan",
+    createIndexes: () => {},
+    runQuery: (coll) => coll.find({}).hint({$natural: 1}).toArray(),
+    expectedCount: NUM_DOCS,
+});
+runTransactionTest({
+    label: "txn_fetch",
+    createIndexes: (coll) => assert.commandWorked(coll.createIndex({a: 1})),
+    runQuery: (coll) =>
+        coll
+            .find({a: {$gte: 0}})
+            .hint({a: 1})
+            .toArray(),
+    expectedCount: NUM_DOCS,
+});
