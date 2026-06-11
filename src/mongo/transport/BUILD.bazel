@@ -32,6 +32,25 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "message_filter_hooks",
+    srcs = [],
+    srcs_select = [{
+        "//bazel/config:build_enterprise_linux_enabled": [],
+        "//conditions:default": [
+            "message_filter_hooks.cpp",
+        ],
+    }],
+    deps = select({
+        "//bazel/config:build_enterprise_linux_enabled": [
+            "//src/mongo/db/modules/enterprise/src/mfp:message_filter_hooks_enterprise",
+        ],
+        "//conditions:default": [
+            "//src/mongo:base",  # needed for third-party includes not handled by auto-header
+        ],
+    }),
+)
+
+mongo_cc_library(
     name = "transport_layer_manager",
     srcs = [
         "transport_layer_manager_impl.cpp",
@@ -256,6 +275,7 @@ mongo_cc_library(
     deps = [
         ":ingress_handshake_metrics",
         ":message_compressor",
+        ":message_filter_hooks",
         ":service_executor",
         ":transport_layer_common",
         "//src/mongo/db:error_labels",

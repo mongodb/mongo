@@ -86,7 +86,7 @@ namespace MONGO_MOD_PARENT_PRIVATE grpc {
  */
 class GRPCSession : public Session {
 public:
-    explicit GRPCSession(TransportLayer* tl, HostAndPort remote);
+    explicit GRPCSession(bool isIngress, TransportLayer* tl, HostAndPort remote);
 
     ~GRPCSession() override = default;
 
@@ -153,33 +153,7 @@ public:
         return !_terminationStatus->has_value() && !_isCancelled();
     }
 
-    /**
-     * For ingress sessions, we do not distinguish between load-balanced and non-load-balanced
-     * streams. Egress sessions never originate from load-balancers.
-     */
-    bool isConnectedToLoadBalancerPort() const final {
-        return false;
-    }
-
-    bool isLoadBalancerPeer() const final {
-        return false;
-    }
-
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) final;
-
-    /**
-     * The priority port is unavailable with grpc enabled.
-     */
-    bool isConnectedToPriorityPort() const final {
-        return false;
-    }
-
-    /**
-     * Returns true if the connection is on the proxy unix socket.
-     */
-    bool isConnectedToProxyUnixSocket() const final {
-        return false;
-    }
 
     /**
      * Returns the status of unix socket peer permission validation

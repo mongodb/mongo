@@ -48,10 +48,11 @@ namespace transport {
 
 class MONGO_MOD_UNFORTUNATELY_OPEN MockSessionBase : public Session {
 public:
-    MockSessionBase() = default;
+    MockSessionBase() : Session(/*ingress=*/true) {}  // Not always true but good enough for now.
 
     explicit MockSessionBase(HostAndPort remote, SockAddr remoteAddr, SockAddr localAddr)
-        : _remote(std::move(remote)),
+        : Session(/*ingress=*/true),
+          _remote(std::move(remote)),
           _remoteAddr(std::move(remoteAddr)),
           _localAddr(std::move(localAddr)),
           _local(HostAndPort(_localAddr.getAddr(), _localAddr.getPort())),
@@ -79,22 +80,6 @@ public:
 
     bool isConnected() override {
         return true;
-    }
-
-    bool isLoadBalancerPeer() const override {
-        return false;
-    };
-
-    bool isConnectedToLoadBalancerPort() const override {
-        return false;
-    };
-
-    bool isConnectedToPriorityPort() const override {
-        return false;
-    }
-
-    bool isConnectedToProxyUnixSocket() const override {
-        return false;
     }
 
     Status validateProxyUnixSocketPeerPermissions() override {
@@ -239,10 +224,8 @@ protected:
 
 class MockPrioritySession : public MockSession {
 public:
-    explicit MockPrioritySession(TransportLayer* tl) : MockSession(tl) {}
-
-    bool isConnectedToPriorityPort() const override {
-        return true;
+    explicit MockPrioritySession(TransportLayer* tl) : MockSession(tl) {
+        _isConnectedToPriorityPort = true;
     }
 };
 

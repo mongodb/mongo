@@ -36,13 +36,20 @@
 namespace mongo {
 namespace transport {
 
+MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
+MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
+
 namespace {
 
 AtomicWord<unsigned long long> sessionIdCounter(0);
 
 }  // namespace
 
-Session::Session() : _id(sessionIdCounter.addAndFetch(1)) {}
+// Note: not initializing _isPreauthIngress to isIngress here because that doesn't correctly handle
+// the case where auth is disabled. It is initialized in the SessionWorkflow constructor prior to
+// reading the first request.
+Session::Session(bool isIngress) : _id(sessionIdCounter.addAndFetch(1)), _isIngress(isIngress) {}
+
 Session::~Session() {
     if (_opCounters && _inOperation) {
         _opCounters->completed.fetchAndAddRelaxed(1);

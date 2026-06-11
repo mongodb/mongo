@@ -695,6 +695,7 @@ networking.core:
     - src/mongo/transport/
     - src/mongo/util/net/
     - src/mongo/s/load_balancer_support*
+    - src/mongo/db/modules/enterprise/src/mfp
 
 networking.commands:
   meta:

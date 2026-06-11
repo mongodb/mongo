@@ -240,6 +240,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
@@ -526,6 +527,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     serviceContext->getService()->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointShardRole>());
+
+    transport::initMessageFilterPluginLoader("mongod");
 
     {
         // Set up the periodic runner for background job execution. This is required to be running

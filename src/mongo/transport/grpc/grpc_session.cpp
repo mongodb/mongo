@@ -44,8 +44,8 @@
 
 namespace mongo::transport::grpc {
 
-GRPCSession::GRPCSession(TransportLayer* tl, HostAndPort remote)
-    : _tl(tl), _remote(std::move(remote)) {
+GRPCSession::GRPCSession(bool isIngress, TransportLayer* tl, HostAndPort remote)
+    : Session(isIngress), _tl(tl), _remote(std::move(remote)) {
     SockAddr remoteAddr;
     try {
         remoteAddr = SockAddr::create(_remote.host(), _remote.port(), AF_UNSPEC);
@@ -157,7 +157,7 @@ IngressSession::IngressSession(TransportLayer* tl,
                                boost::optional<UUID> clientId,
                                boost::optional<std::string> authToken,
                                boost::optional<StringData> encodedClientMetadata)
-    : GRPCSession(tl, ctx->getRemote()),
+    : GRPCSession(/*isIngress=*/true, tl, ctx->getRemote()),
       _ctx(ctx),
       _stream(stream),
       _authToken(std::move(authToken)),
@@ -246,7 +246,7 @@ EgressSession::EgressSession(TransportLayer* tl,
                              UUID channelId,
                              UUID clientId,
                              std::shared_ptr<EgressSession::SharedState> sharedState)
-    : GRPCSession(tl, ctx->getRemote()),
+    : GRPCSession(/*isIngress=*/false, tl, ctx->getRemote()),
       _reactor(reactor),
       _ctx(std::move(ctx)),
       _stream(std::move(stream)),

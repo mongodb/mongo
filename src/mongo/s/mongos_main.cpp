@@ -124,6 +124,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
@@ -756,6 +757,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         "mongosMain", serviceContext->getService(), ClientOperationKillableByStepdown{false});
 
     logMongosVersionInfo(nullptr);
+
+    transport::initMessageFilterPluginLoader("mongos");
 
     // Set up the periodic runner for background job execution
     {

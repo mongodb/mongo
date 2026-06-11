@@ -39,6 +39,7 @@
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/cidr.h"
@@ -60,6 +61,9 @@ namespace mongo {
 class SSLManagerInterface;
 
 namespace transport {
+
+extern FailPoint clientIsConnectedToLoadBalancerPort;
+extern FailPoint clientIsLoadBalancedPeer;
 
 class Session;
 class SessionManager;
@@ -121,12 +125,17 @@ public:
      */
     virtual void end() = 0;
 
-    void setRestrictedMode(bool mode) {
-        _restrictedMode = mode;
+    bool isIngress() const {
+        return _isIngress;
     }
 
-    bool getRestrictedMode() const {
-        return _restrictedMode;
+    bool isPreauthIngress() const {
+        return _isPreauthIngress;
+    }
+    void setPreauthIngress(bool b) {
+        invariant(_isIngress,
+                  "this should only ever be called for ingress sessions, even to set to false");
+        _isPreauthIngress = b;
     }
 
     /**
@@ -179,12 +188,17 @@ public:
     /**
      * Returns true if this session was connected through an L4 load balancer.
      */
-    virtual bool isLoadBalancerPeer() const = 0;
+    bool isLoadBalancerPeer() const {
+        return MONGO_unlikely(clientIsLoadBalancedPeer.shouldFail()) || _isLoadBalancerPeer;
+    }
 
     /**
      * Returns true if the connection is on a load balancer port.
      */
-    virtual bool isConnectedToLoadBalancerPort() const = 0;
+    bool isConnectedToLoadBalancerPort() const {
+        return MONGO_unlikely(clientIsConnectedToLoadBalancerPort.shouldFail()) ||
+            _isConnectedToLoadBalancerPort;
+    }
 
     /**
      * Signal the session that the client declared being from a load balancer.
@@ -194,12 +208,16 @@ public:
     /**
      * Returns true if the connection is on the priority port or corresponding unix socket.
      */
-    virtual bool isConnectedToPriorityPort() const = 0;
+    bool isConnectedToPriorityPort() const {
+        return _isConnectedToPriorityPort;
+    }
 
     /**
      * Returns true if the connection is on the proxy unix socket.
      */
-    virtual bool isConnectedToProxyUnixSocket() const = 0;
+    bool isConnectedToProxyUnixSocket() const {
+        return _isConnectedToProxyUnixSocket;
+    }
 
     /**
      * Returns the status of unix socket peer permission validation
@@ -276,13 +294,35 @@ public:
     virtual const RestrictionEnvironment& getAuthEnvironment() const = 0;
 
 protected:
-    Session();
+    explicit Session(bool isIngress);
 
-    bool _restrictedMode{false};
+    /**
+     * We have a distinction here. A load balancer port can accept connections that are
+     * either attempting to connect to a load balancer or as a normal targeted connection.
+     * The bools below describe if 1/ the connection is connecting to the load balancer port,
+     * and 2/ the connection is a load balancer type connection. We only find out if the
+     * connection is a LoadBalancerConnection if the hello command parses {loadBalancer: 1}.
+     */
+    bool _isConnectedToLoadBalancerPort{false};
+    bool _isLoadBalancerPeer{false};
+
+    /**
+     * Indicates whether the connection targets the priority port or its corresponding unix
+     * socket. These connections are intended to allow high-priority operations during connection
+     * storms.
+     */
+    bool _isConnectedToPriorityPort{false};
+
+    /**
+     * Indicates whether this is a proxy unix domain socket connection.
+     */
+    bool _isConnectedToProxyUnixSocket{false};
 
 private:
     const Id _id;
+    const bool _isIngress;
     bool _inOperation{false};
+    bool _isPreauthIngress{false};  // Only ever true if _isIngress is also true.
     std::shared_ptr<SessionManagerOpCounters> _opCounters;
 };
 

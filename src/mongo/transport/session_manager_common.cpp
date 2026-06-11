@@ -48,6 +48,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_manager_common_gen.h"
 #include "mongo/transport/session_workflow.h"
@@ -320,6 +321,10 @@ SessionManagerCommon::~SessionManagerCommon() = default;
 
 void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
+    invariant(session->isIngress());
+
+    MessageHooks::onConnectionEstablished(*session);
+
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
     connectionsProcessedCounter.add(1);
