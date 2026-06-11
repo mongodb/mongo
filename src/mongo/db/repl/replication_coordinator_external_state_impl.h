@@ -248,6 +248,11 @@ private:
     // ReplicationCoordinator.
     std::unique_ptr<BackgroundSync> _bgSync MONGO_LOCKING_GUARDED_BY(_threadMutex);
 
+    // Set by stopProducer() when _bgSync is null, so that startSteadyStateReplication() can stop
+    // the producer immediately after creating _bgSync. Guarded by _threadMutex to prevent race
+    // conditions.
+    bool _stopProducerRequested MONGO_LOCKING_GUARDED_BY(_threadMutex) = false;
+
     // Thread running SyncSourceFeedback::run().
     std::unique_ptr<stdx::thread> _syncSourceFeedbackThread MONGO_LOCKING_GUARDED_BY(_threadMutex);
 

@@ -245,6 +245,12 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 
+    // Capture whether the node is already primary before taking _threadMutex. We must not call into
+    // the ReplicationCoordinator while holding _threadMutex, to avoid a lock-order inversion with
+    // stopProducer(), which is called while holding the ReplicationCoordinator mutex and acquires
+    // _threadMutex.
+    const bool nodeIsAlreadyPrimary = replCoord->getMemberState().primary();
+
     clang_checked::unique_lock<ThreadMutex> lk(_threadMutex);
 
     // We've shut down the external state, don't start again.
@@ -312,6 +318,29 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     invariant(!_bgSync);
     _bgSync = std::make_unique<BackgroundSync>(
         replCoord, this, _replicationProcess, _oplogWriter.get(), _oplogApplier.get());
+
+    // Prevent the oplog producer from starting and having the primary read its own writes from its
+    // sync source. This is a rare race that can happen if we step up when _bgSync had not been
+    // created yet. The internal state defaults to Starting, but we expect it to be Stopped during
+    // stepup, so we call stop to set the state correctly before proceeding. If startup is called
+    // below and the state is not Stopped we will begin actively fetching oplog which we do not
+    // want, since we are primary.
+    //
+    // We check both nodeIsAlreadyPrimary (captured before _threadMutex) and _stopProducerRequested
+    // (set by stopProducer() under _threadMutex). Together they prevent race conditions: if the
+    // node won an election after nodeIsAlreadyPrimary was captured but before _bgSync was created,
+    // stopProducer() will have set _stopProducerRequested and we catch it here.
+    if (nodeIsAlreadyPrimary || _stopProducerRequested) {
+        _stopProducerRequested = false;
+        _bgSync->stop(false /* resetLastFetchedOptime */);
+        // The oplog writer automatically drains the oplog applier once it has drained. This pattern
+        // is used in stopProcuer() also.
+        if (_oplogWriteBuffer) {
+            _oplogWriteBuffer->enterDrainMode();
+        } else if (_oplogApplyBuffer) {
+            _oplogApplyBuffer->enterDrainMode();
+        }
+    }
 
     LOGV2(21299, "Starting replication fetcher thread");
     _bgSync->startup(opCtx);
@@ -1053,6 +1082,10 @@ void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource
 
 void ReplicationCoordinatorExternalStateImpl::stopProducer() {
     clang_checked::lock_guard<ThreadMutex> lk(_threadMutex);
+    // Set the flag regardless of whether _bgSync exists yet. If _bgSync is null here (because
+    // startSteadyStateReplication hasn't run yet), startSteadyStateReplication will check this
+    // flag after creating _bgSync and stop the producer immediately.
+    _stopProducerRequested = true;
     if (_bgSync) {
         _bgSync->stop(false);
     }

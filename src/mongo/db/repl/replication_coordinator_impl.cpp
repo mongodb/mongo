@@ -199,6 +199,13 @@ MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
 // Hang before allowing the transition from RECOVERING to SECONDARY.
 MONGO_FAIL_POINT_DEFINE(hangBeforeFinishRecovery);
 
+// Forces steady-state replication to start after this node has already finished recovery
+// and become primary, reproducing the ordering where the oplog producer is created while the node
+// is already primary/draining (see the stepup-during-startup race). When enabled,
+// _startDataReplication runs finishRecoveryIfEligible (allowing the node to reach SECONDARY and be
+// elected) and then pauses just before starting steady-state replication.
+MONGO_FAIL_POINT_DEFINE(hangBeforeStartingSteadyStateReplicationAfterRecovery);
+
 // Reports number of waiters in _replicationWaiterList.
 Counter64& replicationWaiterListMetric = *MetricBuilder<Counter64>("repl.waiters.replication");
 // Reports total number of waiters in both _lastAppliedOpTimeWaiterList and
@@ -992,6 +999,13 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
         // Set an initial sync ID, in case we were upgraded or restored from backup without doing
         // an initial sync.
         _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
+        if (MONGO_unlikely(hangBeforeStartingSteadyStateReplicationAfterRecovery.shouldFail())) {
+            // Allow this node to finish recovery so a test can elect it, then pause before starting
+            // steady-state replication. This reproduces the case where the oplog producer is
+            // created while the node is already primary.
+            finishRecoveryIfEligible(opCtx);
+            hangBeforeStartingSteadyStateReplicationAfterRecovery.pauseWhileSet(opCtx);
+        }
         _externalState->startSteadyStateReplication(opCtx, this);
         finishRecoveryIfEligible(opCtx);
         return;
