@@ -67,6 +67,7 @@ enum NetworkOp : int32_t {
     // dbCommandReply = 2011, // by any driver. Deprecated in 3.6 by OP_MSG and removed in 4.2.
     dbCompressed = 2012,
     dbMsg = 2013,
+    dbSessionHandoff = 2014,
 };
 
 inline bool isSupportedRequestNetworkOp(NetworkOp op) {
@@ -81,6 +82,7 @@ inline bool isSupportedRequestNetworkOp(NetworkOp op) {
             return true;
 
         case dbCompressed:  // Can be used in requests, but must be decompressed prior to handling.
+        case dbSessionHandoff:  // To be used by pre-auth proxy to hand off a session to mongod/s.
         case opReply:
         case opInvalid:
             return false;
@@ -123,7 +125,8 @@ inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
             return LogicalOp::opInvalid;
 
         case opReply:
-            break;  // This has no logical op since it should never be used in a request.
+        case dbSessionHandoff:
+            break;  // These have no logical op since they should never be used in a request.
     }
     masserted(34348, str::stream() << "cannot translate opcode " << int32_t(networkOp));
 }
@@ -150,6 +153,8 @@ inline const char* networkOpToString(NetworkOp networkOp) {
             return "compressed";
         case dbMsg:
             return "msg";
+        case dbSessionHandoff:
+            return "sessionHandoff";
     }
     masserted(16141, str::stream() << "cannot translate opcode " << int32_t(networkOp));
 }
