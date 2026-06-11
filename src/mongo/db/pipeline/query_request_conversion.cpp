@@ -121,8 +121,6 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
         // above). If 'batchSize' is also 1, an open cursor will be returned, contradicting the
         // 'singleBatch' option. We set 'batchSize' to 2 as a workaround to ensure no cursor is
         // returned.
-        // TODO SERVER-83077 This workaround will be unnecessary if a full batch of size 1 doesn't
-        // open a cursor.
         if (findCommand.getSingleBatch() && *batchSize == 1LL) {
             cursor.setBatchSize(2);
         } else {
