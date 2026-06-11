@@ -1565,17 +1565,10 @@ Status _runAggregate(OperationContext* opCtx,
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
-        if (shouldDoFLERewrite(request)) {
-            {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-            }
-
-            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                pipeline = processFLEPipelineD(
-                    opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
-                request.getEncryptionInformation()->setCrudProcessed(true);
-            }
+        if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
+            pipeline = processFLEPipelineD(
+                opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
+            request.getEncryptionInformation()->setCrudProcessed(true);
         }
 
         if (search_helpers::isMongotPipeline(pipeline.get())) {

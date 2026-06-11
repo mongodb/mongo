@@ -717,13 +717,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
     invariant(insertDocs.size() == numOps);
 
     // Handle FLE inserts.
-    if (nsEntry.getEncryptionInformation().has_value()) {
-        {
-            // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-        }
-
+    if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
         auto processed = attemptGroupedFLEInserts(opCtx, req, firstOpIdx, insertDocs, nsEntry, out);
         if (processed) {
             responses.addInsertReplies(opCtx, firstOpIdx, out);
@@ -1062,7 +1056,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE deletes.
-        if (nsEntry.getEncryptionInformation().has_value()) {
+        if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
             return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
 
@@ -1148,21 +1142,14 @@ BSONObj getQueryForExplain(OperationContext* opCtx,
                            const BulkWriteCommandRequest& req,
                            const BulkWriteUpdateOrDeleteOp* op,
                            const NamespaceInfoEntry& nsEntry) {
-    if (shouldDoFLERewrite(nsEntry)) {
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-        }
-
-        if (!nsEntry.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-            return processFLEWriteExplainD(opCtx,
-                                           op->getCollation().value_or(BSONObj()),
-                                           nsEntry.getNs(),
-                                           nsEntry.getEncryptionInformation().get(),
-                                           boost::none, /* runtimeConstants */
-                                           req.getLet(),
-                                           op->getFilter());
-        }
+    if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
+        return processFLEWriteExplainD(opCtx,
+                                       op->getCollation().value_or(BSONObj()),
+                                       nsEntry.getNs(),
+                                       nsEntry.getEncryptionInformation().get(),
+                                       boost::none, /* runtimeConstants */
+                                       req.getLet(),
+                                       op->getFilter());
     }
 
     return op->getFilter();
@@ -1612,10 +1599,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE updates.
-        if (nsEntry.getEncryptionInformation().has_value()) {
-            // For BulkWrite, re-entry is un-expected.
-            invariant(!nsEntry.getEncryptionInformation()->getCrudProcessed().value_or(false));
-
+        if (prepareForFLERewrite(opCtx, nsEntry.getEncryptionInformation())) {
             // Map to processFLEUpdate.
             return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
@@ -1837,6 +1821,9 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         uassert(ErrorCodes::BadValue,
                 "BulkWrite with Queryable Encryption supports only a single namespace.",
                 req.getNsInfo().size() == 1);
+        // Check that the crudProcessed field is valid in advance. Throws if crudProcessed=true
+        // and the current user is unauthorized.
+        prepareForFLERewrite(opCtx, req.getNsInfo().front().getEncryptionInformation());
     }
 
     for (; idx < ops.size(); ++idx) {

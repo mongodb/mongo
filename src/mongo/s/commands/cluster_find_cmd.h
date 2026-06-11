@@ -316,18 +316,11 @@ public:
                     "BSON field 'querySettings' is an unknown field",
                     !findCommand->getQuerySettings().has_value());
 
-            if (shouldDoFLERewrite(findCommand)) {
+            if (prepareForFLERewrite(opCtx, findCommand->getEncryptionInformation())) {
                 invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
 
-                if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    processFLEFindS(
-                        opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
-                    _didDoFLERewrite = true;
-                }
-                {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-                }
+                processFLEFindS(opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
+                _didDoFLERewrite = true;
             }
 
             return findCommand;

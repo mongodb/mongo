@@ -1055,19 +1055,14 @@ public:
 
         void _rewriteFLEPayloads(OperationContext* opCtx) {
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
-            if (shouldDoFLERewrite(_cmdRequest)) {
+            if (prepareForFLERewrite(opCtx, _cmdRequest->getEncryptionInformation())) {
                 invariant(_cmdRequest->getNamespaceOrUUID().isNamespaceString());
                 LOGV2_DEBUG(7964101,
                             2,
                             "Processing Queryable Encryption command",
                             "cmd"_attr = _request.body);
 
-                if (!_cmdRequest->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    processFLEFindD(
-                        opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
-                }
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+                processFLEFindD(opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
             }
         }
     };

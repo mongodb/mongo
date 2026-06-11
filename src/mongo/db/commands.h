@@ -92,6 +92,7 @@ class AuthorizationContract;
 class Command;
 
 class CommandInvocation;
+class EncryptionInformation;
 class OperationContext;
 
 namespace mutablebson {
@@ -105,6 +106,15 @@ extern const std::set<std::string> kNoApiVersions;
 extern const std::set<std::string> kApiVersions1;
 
 boost::optional<BSONArray>& errorLabelsOverride(OperationContext* opCtx);
+
+/**
+ * Whether or not the caller should rewrite the request for FLE. If this function returns false,
+ * no FLE rewriting is needed.
+ * A side effect of calling this function is that diagnostics can be disabled in the passed
+ * OperationContext.
+ */
+bool prepareForFLERewrite(OperationContext* opCtx,
+                          const boost::optional<EncryptionInformation>& encryptionInformation);
 
 /**
  * A simple set of type-erased hooks for pre and post command actions.

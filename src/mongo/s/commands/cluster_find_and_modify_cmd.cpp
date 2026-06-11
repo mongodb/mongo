@@ -610,12 +610,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         // Check whether the query portion needs to be rewritten for FLE.
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
             IDLParserContext("ClusterFindAndModify"), request.body);
-        if (shouldDoFLERewrite(findAndModifyRequest)) {
-            {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-            }
-
+        if (prepareForFLERewrite(opCtx, findAndModifyRequest.getEncryptionInformation())) {
             auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
             return newRequest.first.toBSON(request.body);
         } else {
@@ -718,8 +713,12 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                            BSONObjBuilder& result) {
     NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
-    if (processFLEFindAndModify(opCtx, cmdObj, result) == FLEBatchResult::kProcessed) {
-        return true;
+    if (auto request = write_ops::FindAndModifyCommandRequest::parse(
+            IDLParserContext("clusterFindAndModify"), cmdObj);
+        prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
+        if (processFLEFindAndModify(opCtx, request, result) == FLEBatchResult::kProcessed) {
+            return true;
+        }
     }
 
     // Collect metrics.
