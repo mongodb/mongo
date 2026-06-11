@@ -430,35 +430,24 @@ value::TagValueView ByteCode::getArraySize(value::TagValueView arr) {
     return value::TagValueView::numberInt64(static_cast<int64_t>(result));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags accTag,
-                                                                value::Value accValue,
-                                                                value::TypeTags fieldTag,
-                                                                value::Value fieldValue) {
-    value::ValueGuard guard{accTag, accValue};
-
+value::TagValueOwned ByteCode::aggSum(value::TagValueOwned acc, value::TagValueView field) {
     // Skip aggregation step if the input is Nothing or non-numeric.
-    if (!value::isNumber(fieldTag)) {
-        guard.reset();
-        return {true, accTag, accValue};
+    if (!value::isNumber(field.tag)) {
+        return acc;
     }
 
     // Initialize the accumulator.
-    if (accTag == value::TypeTags::Nothing) {
-        accTag = value::TypeTags::NumberInt32;
-        accValue = value::bitcastFrom<int32_t>(0);
+    if (acc.tag() == value::TypeTags::Nothing) {
+        acc = value::TagValueOwned::numberInt32(0);
     }
 
-    auto result = genericAdd(accTag, accValue, fieldTag, fieldValue);
-
-    guard.reset();
-    return result.releaseToRaw();
+    return genericAdd(acc.tag(), acc.value(), field.tag, field.value).moveToOwned();
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggCount(value::TypeTags accTag,
-                                                                  value::Value accValue) {
-    value::ValueGuard guard{accTag, accValue};
-    int64_t n = accTag == value::TypeTags::NumberInt64 ? value::bitcastTo<int64_t>(accValue) : 0;
-    return {true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(n + 1)};
+value::TagValueOwned ByteCode::aggCount(value::TagValueOwned acc) {
+    int64_t n =
+        acc.tag() == value::TypeTags::NumberInt64 ? value::bitcastTo<int64_t>(acc.value()) : 0;
+    return value::TagValueOwned::numberInt64(n + 1);
 }
 
 void ByteCode::genericResetDoubleDoubleSumState(value::Array* state) {
@@ -483,59 +472,47 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericInitializeDoubleDouble
     return {accTag, accValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags accTag,
-                                                                value::Value accValue,
-                                                                value::TypeTags fieldTag,
-                                                                value::Value fieldValue,
-                                                                CollatorInterface* collator) {
+value::TagValueOwned ByteCode::aggMin(value::TagValueView acc,
+                                      value::TagValueView field,
+                                      CollatorInterface* collator) {
     // Skip aggregation step if we don't have the input.
-    if (fieldTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
+    if (field.tag == value::TypeTags::Nothing) {
+        return acc.copy();
     }
 
     // Initialize the accumulator.
-    if (accTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
+    if (acc.tag == value::TypeTags::Nothing) {
+        return field.copy();
     }
 
-    auto [tag, val] = value::compare3way(accTag, accValue, fieldTag, fieldValue, collator);
+    auto [tag, val] = value::compare3way(acc.tag, acc.value, field.tag, field.value, collator);
 
     if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) < 0) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
+        return acc.copy();
     } else {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
+        return field.copy();
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags accTag,
-                                                                value::Value accValue,
-                                                                value::TypeTags fieldTag,
-                                                                value::Value fieldValue,
-                                                                CollatorInterface* collator) {
+value::TagValueOwned ByteCode::aggMax(value::TagValueView acc,
+                                      value::TagValueView field,
+                                      CollatorInterface* collator) {
     // Skip aggregation step if we don't have the input.
-    if (fieldTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
+    if (field.tag == value::TypeTags::Nothing) {
+        return acc.copy();
     }
 
     // Initialize the accumulator.
-    if (accTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
+    if (acc.tag == value::TypeTags::Nothing) {
+        return field.copy();
     }
 
-    auto [tag, val] = value::compare3way(accTag, accValue, fieldTag, fieldValue, collator);
+    auto [tag, val] = value::compare3way(acc.tag, acc.value, field.tag, field.value, collator);
 
     if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) > 0) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
+        return acc.copy();
     } else {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
+        return field.copy();
     }
 }
 

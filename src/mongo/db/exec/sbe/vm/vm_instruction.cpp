@@ -1115,18 +1115,18 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
         popStack();
 
-        auto [accTag, accVal] = moveRawOwnedFromStack(0);
+        auto acc = moveOwnedFromStack(0);
 
-        auto [owned, tag, val] = aggSum(accTag, accVal, fieldTag, fieldVal);
-
+        auto result = aggSum(std::move(acc), {fieldTag, fieldVal});
+        auto [owned, tag, val] = result.releaseToMaybeOwnedRaw();
         topStack(owned, tag, val);
     }
     DISPATCH();
     INSTRUCTION(aggCount) {
-        auto [accTag, accVal] = moveRawOwnedFromStack(0);
+        auto acc = moveOwnedFromStack(0);
 
-        auto [owned, tag, val] = aggCount(accTag, accVal);
-
+        auto result = aggCount(std::move(acc));
+        auto [owned, tag, val] = result.releaseToMaybeOwnedRaw();
         topStack(owned, tag, val);
     }
     DISPATCH();
@@ -1137,9 +1137,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
         auto [accOwned, accTag, accVal] = getFromStack(0);
 
-        auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal);
-
-        topStack(owned, tag, val);
+        auto result = aggMin({accTag, accVal}, {fieldTag, fieldVal});
+        topStack(true, result.tag(), result.value());
+        result.disown();
         if (accOwned) {
             value::releaseValue(accTag, accVal);
         }
@@ -1167,9 +1167,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         }
         auto collator = value::getCollatorView(collVal);
 
-        auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal, collator);
-
-        topStack(owned, tag, val);
+        auto result = aggMin({accTag, accVal}, {fieldTag, fieldVal}, collator);
+        topStack(true, result.tag(), result.value());
+        result.disown();
         if (accOwned) {
             value::releaseValue(accTag, accVal);
         }
@@ -1182,9 +1182,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
         auto [accOwned, accTag, accVal] = getFromStack(0);
 
-        auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal);
-
-        topStack(owned, tag, val);
+        auto result = aggMax({accTag, accVal}, {fieldTag, fieldVal});
+        topStack(true, result.tag(), result.value());
+        result.disown();
         if (accOwned) {
             value::releaseValue(accTag, accVal);
         }
@@ -1212,9 +1212,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         }
         auto collator = value::getCollatorView(collVal);
 
-        auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal, collator);
-
-        topStack(owned, tag, val);
+        auto result = aggMax({accTag, accVal}, {fieldTag, fieldVal}, collator);
+        topStack(true, result.tag(), result.value());
+        result.disown();
         if (accOwned) {
             value::releaseValue(accTag, accVal);
         }

@@ -537,13 +537,9 @@ private:
 
     value::TagValueView getArraySize(value::TagValueView arr);
 
-    FastTuple<bool, value::TypeTags, value::Value> aggSum(value::TypeTags accTag,
-                                                          value::Value accValue,
-                                                          value::TypeTags fieldTag,
-                                                          value::Value fieldValue);
+    value::TagValueOwned aggSum(value::TagValueOwned acc, value::TagValueView field);
 
-    FastTuple<bool, value::TypeTags, value::Value> aggCount(value::TypeTags accTag,
-                                                            value::Value accValue);
+    value::TagValueOwned aggCount(value::TagValueOwned acc);
 
     // This is an implementation of the following algorithm:
     // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
@@ -554,17 +550,13 @@ private:
 
     value::TagValueMaybeOwned aggStdDevFinalizeImpl(value::Value fieldValue, bool isSamp);
 
-    FastTuple<bool, value::TypeTags, value::Value> aggMin(value::TypeTags accTag,
-                                                          value::Value accValue,
-                                                          value::TypeTags fieldTag,
-                                                          value::Value fieldValue,
-                                                          CollatorInterface* collator = nullptr);
+    value::TagValueOwned aggMin(value::TagValueView acc,
+                                value::TagValueView field,
+                                CollatorInterface* collator = nullptr);
 
-    FastTuple<bool, value::TypeTags, value::Value> aggMax(value::TypeTags accTag,
-                                                          value::Value accValue,
-                                                          value::TypeTags fieldTag,
-                                                          value::Value fieldValue,
-                                                          CollatorInterface* collator = nullptr);
+    value::TagValueOwned aggMax(value::TagValueView acc,
+                                value::TagValueView field,
+                                CollatorInterface* collator = nullptr);
 
     FastTuple<bool, value::TypeTags, value::Value> aggFirst(value::TypeTags accTag,
                                                             value::Value accValue,
