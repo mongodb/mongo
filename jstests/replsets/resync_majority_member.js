@@ -77,6 +77,11 @@ resyncNode = rst.restart(resyncNode, {
         "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
         "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": syncSource.host}}),
         "numInitialSyncAttempts": 1,
+        // The sync source (minority member) has uncommitted writes ahead of its stable recovery
+        // timestamp and is disconnected from the primary, so its stable timestamp will never
+        // advance to meet beginApplyingTimestamp. Disable the wait to allow initial sync to
+        // proceed as intended by this test.
+        "initialSyncWaitForSyncSourceLastStableRecoveryTs": false,
     },
 });
 
