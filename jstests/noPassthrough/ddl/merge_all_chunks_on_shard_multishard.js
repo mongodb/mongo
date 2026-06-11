@@ -1,12 +1,9 @@
 /**
- * Exercises the shard-scoping semantics of `mergeAllChunksOnShard` on the authoritative path
- * across a 3-shard fixture. Verifies that only chunks owned by the named shard collapse, that
- * non-contiguous owned chunks are left untouched, and that other shards' chunks are unaffected.
- *
- * @tags: [
- *   featureFlagAuthoritativeShardsDDL,
- * ]
+ * Checks that mergeAllChunksOnShard only merges chunks on the named shard: it collapses that
+ * shard's contiguous chunks, leaves its non-contiguous chunks alone, and does not touch other
+ * shards' chunks. Uses a 3-shard cluster.
  */
+
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -19,7 +16,7 @@ describe("mergeAllChunksOnShard scoped per-shard", function () {
         this.collName = "coll";
         this.ns = this.dbName + "." + this.collName;
 
-        // Allow the merge to fire regardless of the snapshot-history window.
+        // Let mergeAllChunksOnShard merge chunks no matter how recently they were created.
         configureFailPointForRS(this.st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
 
         assert.commandWorked(
@@ -58,8 +55,8 @@ describe("mergeAllChunksOnShard scoped per-shard", function () {
     it("collapses the contiguous pair on shard0 and leaves other shards untouched", () => {
         assert.commandWorked(this.st.s.adminCommand({mergeAllChunksOnShard: this.ns, shard: this.st.shard0.shardName}));
 
-        // shard0: [MinKey, 0) + [0, 10) collapsed to [MinKey, 10); [20, 30) untouched (no
-        // contiguous shard0 neighbor). Net: 3 -> 2.
+        // shard0's [MinKey, 0) and [0, 10) merge into [MinKey, 10); [20, 30) has no shard0
+        // neighbor, so it stays. 3 chunks become 2.
         const shard0Chunks = findChunksUtil
             .findChunksByNs(this.st.s.getDB("config"), this.ns, {shard: this.st.shard0.shardName})
             .sort({min: 1})
@@ -70,7 +67,7 @@ describe("mergeAllChunksOnShard scoped per-shard", function () {
         assert.docEq({x: 20}, shard0Chunks[1].min);
         assert.docEq({x: 30}, shard0Chunks[1].max);
 
-        // shard1 and shard2 are byte-for-byte unchanged.
+        // shard1 and shard2 are unchanged.
         assert.eq(2, this.countChunksOnShard(this.st.shard1.shardName), "shard1 must be untouched");
         assert.eq(2, this.countChunksOnShard(this.st.shard2.shardName), "shard2 must be untouched");
     });
