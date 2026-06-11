@@ -254,6 +254,31 @@ assert.commandFailedWithCode(
 db[tsCollName].drop();
 
 // =============================================================================
+// BSON document size limit
+// =============================================================================
+
+// analyze should fail when sampled docs exceed the 16 MB BSON size limit.
+cleanup();
+{
+    // Five documents at ~4 MB each accumulate to ~20 MB in the docs array, which exceeds
+    // BSONObjMaxInternalSize (~16 MB) when building the persisted sample BSON document.
+    const bigPayload = "x".repeat(4 * 1024 * 1024);
+    assert.commandWorked(coll.insertMany(Array.from({length: 5}, (_, i) => ({_id: i, payload: bigPayload}))));
+
+    // sampleSize 5 == numRecords so all five documents are sampled deterministically.
+    assert.commandFailedWithCode(
+        db.runCommand({
+            analyze: collName,
+            mode: "sample",
+            sampleSize: 5,
+            samplingMethod: "random",
+        }),
+        10334, // BSONObjectTooLarge
+        "analyze should fail when the accumulated sample docs exceed the 16 MB BSON limit",
+    );
+}
+
+// =============================================================================
 // featureFlagPersistentStats disabled
 // =============================================================================
 
