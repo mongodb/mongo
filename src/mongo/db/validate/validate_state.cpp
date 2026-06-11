@@ -227,10 +227,7 @@ bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx, FastCountTyp
             .shouldUseReplicatedFastCount()) {
         // Oplog writers only take a global IX lock, so the oplog can still be written to even
         // during full validation despite validation taking the collection X lock.
-        // TODO SERVER-128375: Remove early return when table type is neither, enforce state in
-        // separate check.
-        return !_nss.isOplog() && type != FastCountType::neither &&
-            isReplicatedFastCountEligible(_nss);
+        return !_nss.isOplog() && isReplicatedFastCountEligible(_nss);
     } else {
         // TODO SERVER-128302: Re-enable validation when the fast count type is both.
         return type != FastCountType::both && _isNSEligibleForSizeStorerValidation() &&
@@ -250,10 +247,7 @@ bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType
             .shouldUseReplicatedFastCount()) {
         // Oplog writers only take a global IX lock, so the oplog can still be written to even
         // during full validation despite validation taking the collection X lock.
-        // TODO SERVER-128375: Remove early return when table type is neither, enforce state in
-        // separate check.
-        return !_nss.isOplog() && type != FastCountType::neither &&
-            isReplicatedFastCountEligible(_nss);
+        return !_nss.isOplog() && isReplicatedFastCountEligible(_nss);
     } else {
         // TODO SERVER-128302: Re-enable validation when the fast count type is both.
         return type != FastCountType::both && _isNSEligibleForSizeStorerValidation() &&
@@ -273,6 +267,24 @@ FastCountType ValidateState::getDetectedFastCountType(OperationContext* opCtx) c
     } else {
         return FastCountType::neither;
     }
+}
+
+FastCountType ValidateState::getExpectedFastCountType(OperationContext* opCtx) const {
+    const bool persistenceProviderUsesRFC = rss::ReplicatedStorageService::get(opCtx)
+                                                .getPersistenceProvider()
+                                                .shouldUseReplicatedFastCount();
+    const bool featureFlagEnabled =
+        gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool isOplogPresent = static_cast<bool>(LocalOplogInfo::get(opCtx)->getRecordStore());
+
+    if (persistenceProviderUsesRFC) {
+        return FastCountType::replicated;
+    }
+
+    return (featureFlagEnabled && isOplogPresent) ? FastCountType::both
+                                                  : FastCountType::legacySizeStorer;
 }
 
 void ValidateState::yieldCursors(OperationContext* opCtx) {

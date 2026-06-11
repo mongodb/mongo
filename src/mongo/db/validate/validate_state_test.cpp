@@ -29,6 +29,7 @@
 
 #include "mongo/db/validate/validate_state.h"
 
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
@@ -63,7 +64,7 @@ public:
 
 }  // namespace
 
-TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsLegazySizeStorer) {
+TEST_F(ValidateStateTest, GetDetectedFastCountTypeReturnsLegacySizeStorer) {
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()),
               FastCountType::legacySizeStorer);
@@ -94,6 +95,33 @@ TEST(FastCountTypeToStringTest, Works) {
     EXPECT_EQ(toString(FastCountType::replicated), "replicated");
     EXPECT_EQ(toString(FastCountType::both), "both");
     EXPECT_EQ(toString(FastCountType::neither), "neither");
+}
+
+TEST_F(ValidateStateTest, GetExpectedFastCountTypeReturnsLegacySizeStorer) {
+    ValidateState validateState(operationContext(), kNss, kValidationOptions);
+    EXPECT_EQ(validateState.getExpectedFastCountType(operationContext()),
+              FastCountType::legacySizeStorer);
+};
+
+TEST_F(ValidateStateTest, GetExpectedFastCountTypeReturnsLegacySizeStorerNoOplog) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    // Reset the oplog collection, to simulate this node never having been part of a replica set.
+    LocalOplogInfo::get(operationContext())->resetRecordStore();
+    ValidateState validateState(operationContext(), kNss, kValidationOptions);
+    EXPECT_EQ(validateState.getExpectedFastCountType(operationContext()),
+              FastCountType::legacySizeStorer);
+};
+
+TEST_F(ValidateStateTest, GetExpectedFastCountTypeReturnsBoth) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    ValidateState validateState(operationContext(), kNss, kValidationOptions);
+    EXPECT_EQ(validateState.getExpectedFastCountType(operationContext()), FastCountType::both);
+};
+
+TEST_F(ValidateStateWithoutSizeStorerTest, GetExpectedFastCountTypeReturnsReplicated) {
+    ValidateState validateState(operationContext(), kNss, kValidationOptions);
+    EXPECT_EQ(validateState.getExpectedFastCountType(operationContext()),
+              FastCountType::replicated);
 }
 
 // Alias for test cases checking whether certain collections should have their fast count and size

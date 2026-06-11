@@ -537,6 +537,25 @@ boost::optional<std::string> getConfigOverrideOrThrow(const BSONElement& raw) {
     return {raw.str()};
 }
 
+void _validateFastCountState(OperationContext* opCtx,
+                             ValidateState* validateState,
+                             FastCountType detectedType,
+                             ValidateResults* results) {
+    const FastCountType expectedType = validateState->getExpectedFastCountType(opCtx);
+    if (detectedType != expectedType) {
+        LOGV2_ERROR(ErrorCodes::InvalidOptions,
+                    "Detected fast count store type does not match expected type",
+                    "detectedType"_attr = toString(detectedType),
+                    "expected"_attr = toString(expectedType));
+        results->addError(
+            fmt::format("Detected fast count store type '{}' does not match expected type "
+                        "'{}'",
+                        toString(detectedType),
+                        toString(expectedType)),
+            /*stopValidation=*/false);
+    }
+}
+
 }  // namespace
 
 void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLength) {
@@ -961,14 +980,9 @@ Status validate(OperationContext* opCtx,
         const FastCountType fastCountType = validateState.getDetectedFastCountType(opCtx);
         results->setFastCountType({fastCountType});
 
-        const bool shouldEnforceFastCountOrSize =
-            validateState.shouldEnforceFastCount(opCtx, fastCountType) ||
-            validateState.shouldEnforceFastSize(opCtx, fastCountType);
-        // TODO SERVER-128375: Add more thorough checks around the state of the fast count store
-        // type.
-        if (shouldEnforceFastCountOrSize && fastCountType == FastCountType::neither) {
-            LOGV2_ERROR(ErrorCodes::InvalidOptions, "Neither FastCount table found");
-            results->addError("Neither FastCount table found", false);
+        if (validateState.shouldEnforceFastCount(opCtx, fastCountType) ||
+            validateState.shouldEnforceFastSize(opCtx, fastCountType)) {
+            _validateFastCountState(opCtx, &validateState, fastCountType, results);
         }
 
         _validateCatalogEntry(opCtx, &validateState, results);

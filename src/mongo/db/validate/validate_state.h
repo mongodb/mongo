@@ -138,7 +138,21 @@ public:
      */
     bool shouldEnforceFastSize(OperationContext* opCtx, FastCountType type) const;
 
+    /**
+     * Returns the fast count type that is detected for this node.
+     */
     FastCountType getDetectedFastCountType(OperationContext* opCtx) const;
+
+    /**
+     * Returns the fast count type that is expected for this node.
+     *
+     * If the persistence provider uses replicated fast count, returns FastCountType::replicated.
+     *
+     * If the persistence provider does not use replicated fast count, returns FastCountType::both
+     * if the replicated fast count feature flag is enabled and the oplog collection is present;
+     * otherwise, returns FastCountType::legacySizeStorer.
+     */
+    FastCountType getExpectedFastCountType(OperationContext* opCtx) const;
 
     BSONValidateModeEnum getBSONValidateMode() const {
         return isBSONConformanceValidation() ? BSONValidateModeEnum::kFull
