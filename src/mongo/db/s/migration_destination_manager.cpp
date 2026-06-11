@@ -363,6 +363,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep7);
 MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
 MONGO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
 MONGO_FAIL_POINT_DEFINE(migrationRecipientFailPostCommitRefresh);
+MONGO_FAIL_POINT_DEFINE(hangMigrationRecipientAfterPersistingRecoveryDoc);
 
 }  // namespace
 
@@ -767,9 +768,10 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
                               << _sessionId->toString()};
     }
 
-    // Only cancel if the recipient hasn't entered the critical section yet. Interrupting the opCtx
-    // after entering kEnteredCritSec would skip critical section recovery.
-    if (_state < kEnteredCritSec) {
+    // Only cancel before kCommitStart. From kCommitStart onward, the thread may be inside
+    // acquireRecoverableCriticalSectionBlockWrites, and interrupting it mid-flight leaves an
+    // uncleared recovery document.
+    if (_state < kCommitStart) {
         _cancellationSource.cancel();
     }
 
@@ -782,7 +784,7 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
 
 void MigrationDestinationManager::abortWithoutSessionIdCheck() {
     std::lock_guard<std::mutex> sl(_mutex);
-    if (_state < kEnteredCritSec) {
+    if (_state < kCommitStart) {
         _cancellationSource.cancel();
     }
 
@@ -1897,6 +1899,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 // the new primary will resume the MigrationDestinationManager and retake the
                 // critical section.
                 migrationutil::persistMigrationRecipientRecoveryDocument(opCtx, recoveryDoc);
+                hangMigrationRecipientAfterPersistingRecoveryDoc.pauseWhileSet();
 
                 LOGV2_DEBUG(5899113,
                             2,
