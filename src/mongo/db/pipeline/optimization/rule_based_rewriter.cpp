@@ -154,6 +154,14 @@ void PipelineRewriteContext::postTransform() {
     // position. The conservative approach with graph invalidation is to invalidate from the
     // previous position onwards. This could potentially be improved if we keep track of this
     // iterator.
+    //
+    // When _itr == end(), optimizeAt() may have erased stages the graph still references.
+    // hasMore() is false so the rewriter loop exits immediately after this returns. This clears
+    // the whole graph, and it is rebuilt lazily on the next getGraph() call.
+    if (_itr == _container.end()) {
+        _depGraphCtx.invalidateFrom(_container.begin());
+        return;
+    }
     _depGraphCtx.invalidateFrom(_itr == _container.begin() ? _container.begin() : std::prev(_itr));
 }
 

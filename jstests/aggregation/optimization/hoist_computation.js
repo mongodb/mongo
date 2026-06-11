@@ -14,7 +14,7 @@
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {inhibitOptimizationPerStage} from "jstests/aggregation/extras/utils.js";
+import {assertArrayEq, inhibitOptimizationPerStage} from "jstests/aggregation/extras/utils.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {it} from "jstests/libs/mochalite.js";
 
@@ -703,4 +703,60 @@ runTest({
     optimized: [{$addFields: {b: "$a"}}, lookupStage("x"), {$project: {_id: 0, b: 1, x: 1}}],
     expected: [{b: 0, x: [{fromLookup: 1}]}],
     policy: "always",
+});
+
+/// ------------------------------------
+/// $match pushdown inside a $lookup inner pipeline ($sequentialCache interaction)
+/// ------------------------------------
+
+it("match pushdown in $lookup inner pipeline does not crash in $sequentialCache serving mode (SERVER-127822)", () => {
+    // The correlated $lookup inner pipeline below has an uncorrelated leading $match, a chain of
+    // single-document $project transformations, and a trailing correlated $match. The match-pushdown
+    // rule (PUSH_MATCH_BEFORE_SINGLE_DOC_TRANSFORMATION) pushes the correlated $match ahead of the
+    // $project stages. On the 2nd outer document the $sequentialCache is in "serving" mode and erases
+    // the uncorrelated prefix; postTransform() then tries to resize the dependency graph from the
+    // (now-erased) last stage. The test makes sure this doesn't cause a tassert (error 12299003).
+    // Two outer documents are required so the cache reaches serving mode.
+    runWithParamsAllNonConfigNodes(db, {internalQueryTransformHoistPolicy: "forMatchPushdown"}, () => {
+        const coll = db.hoist_computation;
+        coll.drop();
+        assert.commandWorked(
+            coll.insertMany([
+                {_id: 0, bar: 53},
+                {_id: 1, bar: 100},
+            ]),
+        );
+
+        const pipeline = [
+            {
+                $lookup: {
+                    from: coll.getName(),
+                    let: {outerId: "$_id"},
+                    pipeline: [
+                        // Uncorrelated leading $match: cached as the uncorrelated prefix and erased
+                        // in serving mode once the correlated $match is pushed in front of the
+                        // $project stages.
+                        {$match: {$expr: {$gt: ["$_id", {$literal: null}]}}},
+                        // A chain of single-document transformations for the correlated $match to be
+                        // pushed in front of.
+                        {$project: {wrapped: "$$ROOT", _id: 0}},
+                        {$project: {inner: {id: "$wrapped._id", bar: "$wrapped.bar"}, _id: 0}},
+                        {$project: {u: "$inner", _id: 0}},
+                        // Correlated $match referencing the let variable.
+                        {$match: {$expr: {$eq: ["$$outerId", "$u.id"]}}},
+                    ],
+                    as: "joined",
+                },
+            },
+        ];
+
+        // Each outer document self-joins with the inner document having the same _id.
+        assertArrayEq({
+            actual: coll.aggregate(pipeline).toArray(),
+            expected: [
+                {_id: 0, bar: 53, joined: [{u: {id: 0, bar: 53}}]},
+                {_id: 1, bar: 100, joined: [{u: {id: 1, bar: 100}}]},
+            ],
+        });
+    });
 });
