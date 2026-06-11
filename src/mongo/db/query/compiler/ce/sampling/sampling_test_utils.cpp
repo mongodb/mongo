@@ -31,6 +31,7 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -469,7 +470,8 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
                 actualSampleSize,
                 samplingAlgoAndChunk.first,
                 samplingAlgoAndChunk.second,
-                SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+                SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+                nullptr);
             samplingEstimator.generateSample(ce::NoProjection{});
 
             auto error = runQueries(queryConfig, dataBSON, &samplingEstimator);
@@ -514,7 +516,8 @@ void SamplingAccuracyTest::runNDVSamplingEstimatorTestConfiguration(
                         actualSampleSize,
                         samplingAlgoAndChunk.first,
                         samplingAlgoAndChunk.second,
-                        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+                        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+                        nullptr);
                     samplingEstimator.generateSample(ce::NoProjection{});
 
 
@@ -552,7 +555,8 @@ SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTes
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   boost::none,
-                                                  makeCardinalityEstimate(collCard));
+                                                  makeCardinalityEstimate(collCard),
+                                                  nullptr);
     samplingEstimator.generateSample(projectionParams);
 
     return samplingEstimator;

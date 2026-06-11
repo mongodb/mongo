@@ -786,7 +786,8 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         sampleSize,
         SamplingCEMethodEnum::kRandom,
         boost::none,
-        ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard));
+        ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard),
+        nullptr);
     samplingEstimator.generateSample(projectionParams);
 
     // Running only on sampling estimator.
@@ -944,7 +945,8 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
         sampleSize,
         SamplingCEMethodEnum::kRandom,
         boost::none,
-        ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard));
+        ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard),
+        nullptr);
     samplingEstimator.generateSample(projectionParams);
 
     // Running only on sampling estimator.

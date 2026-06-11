@@ -143,7 +143,8 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                                     static_cast<size_t>(sampleSize),
                                                     samplingStyle,
                                                     numChunks,
-                                                    collCard);
+                                                    collCard,
+                                                    nullptr /*customerQueryExpCtx*/);
 
     QueryPlannerParams plannerParams{
         QueryPlannerParams::ArgsForSingleCollectionQuery{

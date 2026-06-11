@@ -1213,7 +1213,8 @@ void BM_RunAllConfigs(benchmark::State& state) {
                         sampleSize,
                         samplingStyle.first,
                         samplingStyle.second,
-                        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+                        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+                        nullptr /*customerQueryExpCtx*/);
                     samplingEstimator.generateSample(ce::NoProjection{});
 
                     auto createSample_end = high_resolution_clock::now();
@@ -1305,7 +1306,8 @@ void BM_CreateSample(benchmark::State& state) {
             sampleSize,
             sampling.first,
             sampling.second,
-            SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+            SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+            nullptr /*customerQueryExpCtx*/);
         samplingEstimator.generateSample(ce::NoProjection{});
     }
 }
@@ -1352,7 +1354,8 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
         sampleSize,
         sampling.first,
         sampling.second,
-        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+        nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate queries.
@@ -1418,7 +1421,8 @@ void BM_RunCardinalityEstimationOnSampleWithProjection(benchmark::State& state) 
         sampleSize,
         sampling.first,
         sampling.second,
-        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+        nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(queryFieldNames);
 
     // Generate queries.

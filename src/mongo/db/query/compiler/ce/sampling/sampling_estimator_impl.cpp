@@ -314,19 +314,20 @@ StringSet extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr) 
 std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(
     const NamespaceString& nss,
     OperationContext* opCtx,
-    boost::intrusive_ptr<const ExpressionContext> outerExpCtx) {
+    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
     ExpressionContextBuilder builder;
     builder.fromRequest(opCtx, *findCommand);
-    if (outerExpCtx) {
-        builder.pathArraynessFrom(*outerExpCtx).nonArrayPathsForNssFrom(*outerExpCtx);
+    if (customerQueryExpCtx) {
+        builder.pathArraynessFrom(*customerQueryExpCtx)
+            .nonArrayPathsForNssFrom(*customerQueryExpCtx);
     }
-    auto expCtx = builder.build();
-    if (outerExpCtx) {
-        expCtx->setQuerySettings(outerExpCtx->getOptionalQuerySettings());
+    auto samplingQueryExpCtx = builder.build();
+    if (customerQueryExpCtx) {
+        samplingQueryExpCtx->setQuerySettings(customerQueryExpCtx->getOptionalQuerySettings());
     }
     auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = expCtx,
+        {.expCtx = samplingQueryExpCtx,
          .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});
 
     return std::move(statusWithCQ.getValue());
@@ -482,7 +483,7 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 
 void SamplingEstimatorImpl::generateFullCollScanSample() {
     // Create a CanonicalQuery for the CollScan plan.
-    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _outerExpCtx);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
@@ -528,7 +529,7 @@ void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
                       "error"_attr = tryLoadStatus);
     }
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _outerExpCtx);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
@@ -555,7 +556,7 @@ void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
                       "error"_attr = tryLoadStatus);
     }
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _outerExpCtx);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto plan = generateChunkSamplingPlan(sbeYieldPolicy.get());
@@ -621,7 +622,7 @@ void SamplingEstimatorImpl::generateSampleForTesting(
                 technique == cost_based_ranker::SamplingTechnique::kStrides);
 
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _outerExpCtx);
+    auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _customerQueryExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
@@ -1028,12 +1029,12 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
     SamplingCEMethodEnum samplingStyle,
     boost::optional<int> numChunks,
     CardinalityEstimate collectionCard,
-    SamplingSourceEnum samplingSource,
-    boost::intrusive_ptr<const ExpressionContext> outerExpCtx)
+    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
+    SamplingSourceEnum samplingSource)
     : _sampleSize(sampleSize),
       _opCtx(opCtx),
       _collections(collections),
-      _outerExpCtx(std::move(outerExpCtx)),
+      _customerQueryExpCtx(std::move(customerQueryExpCtx)),
       _nss(nss),
       _yieldPolicy(yieldPolicy),
       _samplingStyle(samplingStyle),
@@ -1053,8 +1054,8 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
     SamplingConfidenceIntervalEnum ci,
     double marginOfError,
     boost::optional<int> numChunks,
-    SamplingSourceEnum samplingSource,
-    boost::intrusive_ptr<const ExpressionContext> outerExpCtx)
+    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
+    SamplingSourceEnum samplingSource)
     : SamplingEstimatorImpl(opCtx,
                             collections,
                             nss,
@@ -1063,18 +1064,20 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
                             samplingStyle,
                             numChunks,
                             collectionCard,
-                            samplingSource,
-                            std::move(outerExpCtx)) {}
+                            std::move(customerQueryExpCtx),
+                            samplingSource) {}
 
-SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
-                                             const MultipleCollectionAccessor& collections,
-                                             const NamespaceString& nss,
-                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                             size_t sampleSize,
-                                             SamplingCEMethodEnum samplingStyle,
-                                             boost::optional<int> numChunks,
-                                             long long numRecords,
-                                             SamplingSourceEnum samplingSource)
+SamplingEstimatorImpl::SamplingEstimatorImpl(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    size_t sampleSize,
+    SamplingCEMethodEnum samplingStyle,
+    boost::optional<int> numChunks,
+    long long numRecords,
+    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
+    SamplingSourceEnum samplingSource)
     : SamplingEstimatorImpl(opCtx,
                             collections,
                             nss,
@@ -1084,6 +1087,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                             numChunks,
                             CardinalityEstimate{CardinalityType{static_cast<double>(numRecords)},
                                                 EstimationSource::Metadata},
+                            std::move(customerQueryExpCtx),
                             samplingSource) {}
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
@@ -1289,8 +1293,8 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
                                       qkc.getConfidenceInterval(),
                                       qkc.getSamplingMarginOfError(),
                                       qkc.getNumChunksForChunkBasedSampling(),
-                                      samplingSource,
-                                      cq.getExpCtx()));
+                                      cq.getExpCtx(),
+                                      samplingSource));
 }
 
 }  // namespace mongo::ce

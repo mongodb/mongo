@@ -314,7 +314,8 @@ void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state)
         sampleSize,
         samplingStyle.first,
         samplingStyle.second,
-        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+        nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate query intervals.
@@ -383,7 +384,8 @@ void BM_RunCardinalityEstimationOnSampleWithMatchExpressions(benchmark::State& s
         sampleSize,
         samplingStyle.first,
         samplingStyle.second,
-        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
+        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size),
+        nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Generate query intervals.

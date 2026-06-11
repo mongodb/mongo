@@ -216,6 +216,7 @@ void runSampleMode(OperationContext* opCtx,
                                             samplingMethod,
                                             numChunksOpt,
                                             numRecords,
+                                            nullptr /*customerQueryExpCtx*/,
                                             SamplingSourceEnum::kOnTheFlySample);
         estimator.generateSample(ce::NoProjection{});
 

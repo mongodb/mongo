@@ -154,7 +154,8 @@ std::unique_ptr<ce::SamplingEstimator> JoinOrderingTestFixture::samplingEstimato
         sampleSize,
         SamplingCEMethodEnum::kRandom,
         boost::none,
-        CardinalityEstimate{CardinalityType{static_cast<double>(size)}, EstimationSource::Code});
+        CardinalityEstimate{CardinalityType{static_cast<double>(size)}, EstimationSource::Code},
+        nullptr /*customerQueryExpCtx*/);
     samplingEstimator->generateSample(ce::NoProjection{});
     return samplingEstimator;
 }

@@ -71,17 +71,18 @@ public:
      * 'analyze' passes kOnTheFlySample to bypass the persisted read. Prefer the factory method
      * above outside tests.
      */
-    SamplingEstimatorImpl(OperationContext* opCtx,
-                          const MultipleCollectionAccessor& collections,
-                          const NamespaceString& nss,
-                          PlanYieldPolicy::YieldPolicy yieldPolicy,
-                          SamplingCEMethodEnum samplingStyle,
-                          CardinalityEstimate collectionCard,
-                          SamplingConfidenceIntervalEnum ci,
-                          double marginOfError,
-                          boost::optional<int> numChunks,
-                          SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
-                          boost::intrusive_ptr<const ExpressionContext> outerExpCtx = nullptr);
+    SamplingEstimatorImpl(
+        OperationContext* opCtx,
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        SamplingCEMethodEnum samplingStyle,
+        CardinalityEstimate collectionCard,
+        SamplingConfidenceIntervalEnum ci,
+        double marginOfError,
+        boost::optional<int> numChunks,
+        boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -89,16 +90,17 @@ public:
      * to do preliminary data distribution analysis with a small sample size. Testing cases may
      * require only a small sample. Prefer the factory method above outside tests.
      */
-    SamplingEstimatorImpl(OperationContext* opCtx,
-                          const MultipleCollectionAccessor& collections,
-                          const NamespaceString& nss,
-                          PlanYieldPolicy::YieldPolicy yieldPolicy,
-                          size_t sampleSize,
-                          SamplingCEMethodEnum samplingStyle,
-                          boost::optional<int> numChunks,
-                          CardinalityEstimate collectionCard,
-                          SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
-                          boost::intrusive_ptr<const ExpressionContext> outerExpCtx = nullptr);
+    SamplingEstimatorImpl(
+        OperationContext* opCtx,
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        size_t sampleSize,
+        SamplingCEMethodEnum samplingStyle,
+        boost::optional<int> numChunks,
+        CardinalityEstimate collectionCard,
+        boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     /*
      * Convenience constructor that accepts a raw record count instead of a CardinalityEstimate,
@@ -113,6 +115,7 @@ public:
         SamplingCEMethodEnum samplingStyle,
         boost::optional<int> numChunks,
         long long numRecords,
+        boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
         SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     ~SamplingEstimatorImpl() override;
@@ -323,7 +326,7 @@ protected:
     static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
         const NamespaceString& nss,
         OperationContext* opCtx,
-        boost::intrusive_ptr<const ExpressionContext> outerExpCtx = nullptr);
+        boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx);
 
     /**
      * This helper calls the given callback for each document
@@ -417,7 +420,7 @@ private:
     // The collection the sampling plan runs against and is the one accessed by the query being
     // optimized.
     const MultipleCollectionAccessor& _collections;
-    boost::intrusive_ptr<const ExpressionContext> _outerExpCtx;
+    boost::intrusive_ptr<const ExpressionContext> _customerQueryExpCtx;
     NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     SamplingCEMethodEnum _samplingStyle;

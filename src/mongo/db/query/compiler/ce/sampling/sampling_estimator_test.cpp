@@ -115,7 +115,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -140,7 +141,8 @@ TEST_F(SamplingEstimatorTest, HashModStrideSampling) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(collCard));
+                                                  makeCardinalityEstimate(collCard),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     const auto expectedIds = expectedHashModSampleIds(collCard, sampleSize);
@@ -175,7 +177,8 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingSmallCollection) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(collCard));
+                                                  makeCardinalityEstimate(collCard),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     ASSERT_EQUALS(samplingEstimator.getSample().size(), collCard);
@@ -199,7 +202,8 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingWithProjection) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(collCard));
+                                                  makeCardinalityEstimate(collCard),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(includedSampleFields);
 
     const auto expectedIds = expectedHashModSampleIds(collCard, sampleSize);
@@ -233,7 +237,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(includedSampleFields);
 
     auto sample = samplingEstimator.getSample();
@@ -264,7 +269,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
                                                       sampleSize,
                                                       SamplingCEMethodEnum::kChunk,
                                                       chunkNum,
-                                                      makeCardinalityEstimate(2000));
+                                                      makeCardinalityEstimate(2000),
+                                                      nullptr /*customerQueryExpCtx*/);
         samplingEstimator.generateSample(ce::NoProjection{});
 
         auto sample = samplingEstimator.getSample();
@@ -318,7 +324,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
                                                       sampleSize,
                                                       SamplingCEMethodEnum::kChunk,
                                                       chunkNum,
-                                                      makeCardinalityEstimate(2000));
+                                                      makeCardinalityEstimate(2000),
+                                                      nullptr /*customerQueryExpCtx*/);
         samplingEstimator.generateSample(includedSampleFields);
 
         auto sample = samplingEstimator.getSample();
@@ -378,7 +385,8 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   boost::none, /* numChunks */
-                                                  makeCardinalityEstimate(collectionSize));
+                                                  makeCardinalityEstimate(collectionSize),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -404,7 +412,8 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   boost::none, /* numChunks */
-                                                  makeCardinalityEstimate(collectionSize));
+                                                  makeCardinalityEstimate(collectionSize),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(includedSampleFields);
 
     auto sample = samplingEstimator.getSample();
@@ -435,7 +444,8 @@ TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
@@ -466,7 +476,8 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
@@ -493,7 +504,8 @@ TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -523,7 +535,8 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
@@ -550,7 +563,8 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -595,7 +609,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // All documents in the collection satisfy the predicate.
@@ -648,7 +663,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
@@ -659,7 +675,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
         sampleSize,
         SamplingCEMethodEnum::kRandom,
         numChunks,
-        makeCardinalityEstimate(card));
+        makeCardinalityEstimate(card),
+        nullptr /*customerQueryExpCtx*/);
     samplingEstimatorWithProjection.generateSample(StringSet{"a", "b"});
 
     {  // All documents in the collection satisfy the predicate.
@@ -727,7 +744,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // Range predicate on "a" with 20% selectivity: a > 40 && a < 60.
@@ -807,7 +825,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 30);
@@ -858,7 +877,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
         operationContext(),
@@ -868,7 +888,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
         sampleSize,
         SamplingCEMethodEnum::kRandom,
         numChunks,
-        makeCardinalityEstimate(card));
+        makeCardinalityEstimate(card),
+        nullptr /*customerQueryExpCtx*/);
     samplingEstimatorWithProjection.generateSample(StringSet{"nil"});
 
     // 1 doc that does not have field "nil".
@@ -897,7 +918,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Test IndexBounds with single field.
@@ -985,7 +1007,8 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
     // Test IndexBounds with single field.
     OrderedIntervalList list("arr");
@@ -1110,7 +1133,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 20);
@@ -1237,7 +1261,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     OrderedIntervalList list("a");
@@ -1270,7 +1295,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a", "b.c"});
 }
 
@@ -1288,7 +1314,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{});
 }
 
@@ -1308,7 +1335,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a"});
 
     auto operand = BSON("$eq" << 5);
@@ -1332,7 +1360,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a"});
 
     auto operand = BSON("$eq" << 5);
@@ -1356,7 +1385,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a"});
     auto operand = BSON("$eq" << 5);
     EqualityMatchExpression eq("b"_sd, operand["$eq"]);
@@ -1386,7 +1416,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a", "b"});
 
     const auto filter = fromjson("{a: 1, b: 2}");
@@ -1423,7 +1454,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a", "b"});
 
     const auto filter = fromjson("{a: 1, b: 2}");
@@ -1460,7 +1492,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
 
     const auto filter = fromjson("{a: 1}");
     const auto expr = parse(filter);
@@ -1488,7 +1521,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
 
     const auto filter = fromjson("{a: 1}");
     const auto expr = parse(filter);
@@ -1516,7 +1550,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kSampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(10));
+                                                  makeCardinalityEstimate(10),
+                                                  nullptr /*customerQueryExpCtx*/);
 
     const auto filter = fromjson("{a: 1}");
     const auto expr = parse(filter);
@@ -1613,7 +1648,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeOnePercent) {
                                           sampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(card));
+                                          makeCardinalityEstimate(card),
+                                          nullptr /*customerQueryExpCtx*/);
     makeNDVAssertions(estimator, sampleSize);
 }
 
@@ -1633,7 +1669,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTwoPercent) {
                                           sampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(card));
+                                          makeCardinalityEstimate(card),
+                                          nullptr /*customerQueryExpCtx*/);
     makeNDVAssertions(estimator, sampleSize);
 }
 
@@ -1653,7 +1690,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
                                           sampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(card));
+                                          makeCardinalityEstimate(card),
+                                          nullptr /*customerQueryExpCtx*/);
     makeNDVAssertions(estimator, sampleSize);
 }
 
@@ -1730,7 +1768,8 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                 sampleSize,
                                                 SamplingCEMethodEnum::kRandom,
                                                 numChunks,
-                                                makeCardinalityEstimate(card));
+                                                makeCardinalityEstimate(card),
+                                                nullptr /*customerQueryExpCtx*/);
     scalarEstimator.generateSample(ce::NoProjection{});
     auto ndvScalar = scalarEstimator.estimateNDV({{.path = "a"}});
     auto ndvScalarMK = scalarEstimator.estimateNDVMultiKey({{.path = "a"}});
@@ -1747,7 +1786,8 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                     sampleSize,
                                                     SamplingCEMethodEnum::kRandom,
                                                     numChunks,
-                                                    makeCardinalityEstimate(card));
+                                                    makeCardinalityEstimate(card),
+                                                    nullptr /*customerQueryExpCtx*/);
     singleElemEstimator.generateSample(ce::NoProjection{});
     auto ndvSingleElem = singleElemEstimator.estimateNDVMultiKey({{.path = "a"}});
     ASSERT_EQ(ndvScalar, ndvSingleElem);
@@ -1762,7 +1802,8 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                    sampleSize,
                                                    SamplingCEMethodEnum::kRandom,
                                                    numChunks,
-                                                   makeCardinalityEstimate(card));
+                                                   makeCardinalityEstimate(card),
+                                                   nullptr /*customerQueryExpCtx*/);
     multiElemEstimator.generateSample(ce::NoProjection{});
     auto ndvMultiElem = multiElemEstimator.estimateNDVMultiKey({{.path = "a"}});
     assertBetween(ndvMultiElem, n * 0.5, n * 2.0 + 1.0);
@@ -1794,7 +1835,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(StringSet{"a"});
     // Ignore $expr semantics for now.
     absl::flat_hash_set<FieldPath> exprPaths;
@@ -1834,7 +1876,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityAndOfEqualitiesFastPath) {
                                                   card,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Helper: build AND(EQ(path, v0), EQ(path, v1), ...) and return the CE.
@@ -1884,7 +1927,8 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
                                                   sampleSize,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Each document has arr: [10, 20, 30, 40, 50]. A $all query is canonically represented as an
@@ -1966,7 +2010,8 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithNonEqChildInMiddle) {
                                                   card,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto opEq1 = BSON("x" << 1);
@@ -2014,7 +2059,8 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithDifferentPathEqChildInMiddle) 
                                                   card,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
-                                                  makeCardinalityEstimate(card));
+                                                  makeCardinalityEstimate(card),
+                                                  nullptr /*customerQueryExpCtx*/);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto opEq1 = BSON("x" << 1);
@@ -2049,7 +2095,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVReturnsCollCardWhenDuplicateDocsFromSam
                                           sampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(card));
+                                          makeCardinalityEstimate(card),
+                                          nullptr /*customerQueryExpCtx*/);
 
     // Build a sample with 10 unique documents and all-unique "a" values, then append a duplicate
     // of the first document (simulating sampling with replacement producing a duplicate).
@@ -2083,7 +2130,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {
                                           sampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(card));
+                                          makeCardinalityEstimate(card),
+                                          nullptr /*customerQueryExpCtx*/);
 
     // 5 documents with distinct _id values, but "a" is not unique: docs 0 and 4 share a=0.
     std::vector<BSONObj> sample = {
@@ -2115,7 +2163,8 @@ TEST_F(SamplingEstimatorTest, EstimateKeysScannedEmptySampleReturnsZero) {
                                           kSampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(5000));
+                                          makeCardinalityEstimate(5000),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.setSampleForTesting({});  // empty sample
 
     OrderedIntervalList list("a");
@@ -2141,7 +2190,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasse
                                           kSampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(5000));
+                                          makeCardinalityEstimate(5000),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.setSampleForTesting({});  // empty sample
 
     estimator.estimateNDVMultiKey({{.path = "a"}}, boost::none /* non-bounded */);
@@ -2180,7 +2230,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
                                           persistedDocs.size(),
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(100));
+                                          makeCardinalityEstimate(100),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2214,7 +2265,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingFallsBackOnPersistedMiss) {
                                           kSampleSize,
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(10));
+                                          makeCardinalityEstimate(10),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2262,6 +2314,7 @@ TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(10),
+                                          nullptr /*customerQueryExpCtx*/,
                                           SamplingSourceEnum::kOnTheFlySample);
     estimator.generateSample(ce::NoProjection{});
 
@@ -2310,7 +2363,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
                                           persistedDocs.size(),
                                           SamplingCEMethodEnum::kChunk,
                                           testNumChunks,
-                                          makeCardinalityEstimate(100));
+                                          makeCardinalityEstimate(100),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2358,7 +2412,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlag
                                           persistedDocs.size(),
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(10));
+                                          makeCardinalityEstimate(10),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2409,7 +2464,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagD
                                           persistedDocs.size(),
                                           SamplingCEMethodEnum::kChunk,
                                           testNumChunks,
-                                          makeCardinalityEstimate(100));
+                                          makeCardinalityEstimate(100),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2471,7 +2527,8 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
                                           persistedDocs.size(),
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
-                                          makeCardinalityEstimate(100));
+                                          makeCardinalityEstimate(100),
+                                          nullptr /*customerQueryExpCtx*/);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
