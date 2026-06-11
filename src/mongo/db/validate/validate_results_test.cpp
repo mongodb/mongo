@@ -32,7 +32,14 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <vector>
 
 namespace mongo {
 
@@ -241,6 +248,144 @@ TEST(ValidateResultsTest, SpecAppearsInOutput) {
                   .getObjectField("spec")
                   .getStringField("k"),
               "v");
+}
+
+// Merging chunked validation results must be commutative: the order in which per-chunk results are
+// folded together cannot affect the observable (order-independent) outcome.
+TEST(ValidateResultsTest, MergeIsCommutative) {
+    const auto uuid = UUID::gen();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    // Two results with overlapping and disjoint findings, sharing the same collection identity.
+    auto makeA = [&] {
+        ValidateResults vr;
+        vr.setUUID(uuid);
+        vr.setNamespaceString(nss);
+        vr.addError("e_common");
+        vr.addError("e_a");
+        vr.addWarning("w_common");
+        vr.addWarning("w_a");
+        vr.setNumRecords(10);
+        vr.setNumInvalidDocuments(1);
+        vr.setNumNonCompliantDocuments(2);
+        vr.addNumRemovedCorruptRecords(3);
+        vr.addCorruptRecord(RecordId(1));
+        vr.addCorruptRecord(RecordId(2));
+        vr.addRecordTimestamp(Timestamp(1, 1));
+        auto& idx = vr.getIndexValidateResult("idx");
+        idx.addError("ie_a");
+        idx.addKeysTraversed(5);
+        return vr;
+    };
+    auto makeB = [&] {
+        ValidateResults vr;
+        vr.setUUID(uuid);
+        vr.setNamespaceString(nss);
+        vr.addError("e_common");
+        vr.addError("e_b");
+        vr.addWarning("w_common");
+        vr.addWarning("w_b");
+        vr.setNumRecords(20);
+        vr.setNumInvalidDocuments(4);
+        vr.setNumNonCompliantDocuments(8);
+        vr.addNumRemovedCorruptRecords(7);
+        vr.addCorruptRecord(RecordId(3));
+        vr.addRecordTimestamp(Timestamp(2, 2));
+        auto& idx = vr.getIndexValidateResult("idx");
+        idx.addError("ie_b");
+        idx.addKeysTraversed(6);
+        auto& idx2 = vr.getIndexValidateResult("idx2");
+        idx2.addError("ie_b2");
+        idx2.addKeysTraversed(9);
+        return vr;
+    };
+
+    ValidateResults ab = makeA();
+    ab.merge(makeB());
+    ValidateResults ba = makeB();
+    ba.merge(makeA());
+
+    auto getLong = [](const ValidateResults& vr, StringData field) {
+        BSONObjBuilder bob;
+        vr.appendToResultObj(&bob, /*debugging=*/true);
+        return bob.done().getField(field).safeNumberLong();
+    };
+    // Corrupt records are concatenated, so they are commutative only as a multiset; sort to
+    // compare.
+    auto sortedCorrupt = [](const ValidateResults& vr) {
+        std::vector<RecordId> recs = vr.getCorruptRecords();
+        std::sort(recs.begin(), recs.end());
+        return recs;
+    };
+
+    // Commutativity: merging in either order produces equivalent results.
+    EXPECT_TRUE(ab.getErrors() == ba.getErrors());
+    EXPECT_TRUE(ab.getWarnings() == ba.getWarnings());
+    EXPECT_TRUE(ab.getRecordTimestamps() == ba.getRecordTimestamps());
+    EXPECT_TRUE(sortedCorrupt(ab) == sortedCorrupt(ba));
+    EXPECT_EQ(ab.getNumRemovedCorruptRecords(), ba.getNumRemovedCorruptRecords());
+    EXPECT_EQ(getLong(ab, "nrecords"), getLong(ba, "nrecords"));
+    EXPECT_EQ(getLong(ab, "nInvalidDocuments"), getLong(ba, "nInvalidDocuments"));
+    EXPECT_EQ(getLong(ab, "nNonCompliantDocuments"), getLong(ba, "nNonCompliantDocuments"));
+
+    EXPECT_EQ(ab.getIndexResultsMap().size(), ba.getIndexResultsMap().size());
+    for (const auto& [name, ivr] : ab.getIndexResultsMap()) {
+        const auto& other = ba.getIndexResultsMap().at(name);
+        EXPECT_TRUE(ivr.getErrors() == other.getErrors());
+        EXPECT_TRUE(ivr.getWarnings() == other.getWarnings());
+        EXPECT_EQ(ivr.getKeysTraversed(), other.getKeysTraversed());
+    }
+
+    // Correctness: the merge actually unions/sums, so the symmetry checks above aren't vacuous.
+    EXPECT_EQ(ab.getErrors().size(), 3);    // e_common, e_a, e_b
+    EXPECT_EQ(ab.getWarnings().size(), 3);  // w_common, w_a, w_b
+    EXPECT_EQ(getLong(ab, "nrecords"), 30);
+    EXPECT_EQ(getLong(ab, "nInvalidDocuments"), 5);
+    EXPECT_EQ(getLong(ab, "nNonCompliantDocuments"), 10);
+    EXPECT_EQ(ab.getNumRemovedCorruptRecords(), 10);
+    EXPECT_EQ(ab.getCorruptRecords().size(), 3);
+    EXPECT_EQ(ab.getRecordTimestamps().size(), 2);
+    EXPECT_EQ(ab.getIndexResultsMap().size(), 2);
+    EXPECT_EQ(ab.getIndexResultsMap().at("idx").getErrors().size(), 2);  // ie_a, ie_b
+    EXPECT_EQ(ab.getIndexResultsMap().at("idx").getKeysTraversed(), 11);
+    EXPECT_EQ(ab.getIndexResultsMap().at("idx2").getKeysTraversed(), 9);
+}
+
+TEST(ValidateResultsTest, MergeThrowsAndIsAtomicOnSpecMismatch) {
+    const auto uuid = UUID::gen();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    ValidateResults base;
+    base.setUUID(uuid);
+    base.setNamespaceString(nss);
+    base.addError("existing error");
+    base.addWarning("existing warning");
+    base.setNumRecords(10);
+    auto& idx = base.getIndexValidateResult("idx");
+    idx.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                           << "idx"));
+    idx.addKeysTraversed(5);
+
+    ValidateResults conflicting;
+    conflicting.setUUID(uuid);
+    conflicting.setNamespaceString(nss);
+    conflicting.addError("new error");
+    auto& conflictIdx = conflicting.getIndexValidateResult("idx");
+    conflictIdx.setSpec(BSON("key" << BSON("b" << 1) << "name"
+                                   << "idx"));
+    conflictIdx.addKeysTraversed(3);
+
+    const auto preErrors = base.getErrors();
+    const auto preWarnings = base.getWarnings();
+    const auto preNumRecords = base.getIndexResultsMap().at("idx").getKeysTraversed();
+    const auto preSpec = base.getIndexResultsMap().at("idx").getSpec().getOwned();
+
+    ASSERT_THROWS_CODE(base.merge(conflicting), DBException, 12759605);
+
+    EXPECT_EQ(base.getErrors(), preErrors);
+    EXPECT_EQ(base.getWarnings(), preWarnings);
+    EXPECT_EQ(base.getIndexResultsMap().at("idx").getKeysTraversed(), preNumRecords);
+    ASSERT_BSONOBJ_EQ(base.getIndexResultsMap().at("idx").getSpec(), preSpec);
 }
 
 }  // namespace mongo

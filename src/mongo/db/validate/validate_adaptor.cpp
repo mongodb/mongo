@@ -368,7 +368,7 @@ void ValidateAdaptor::computeMetadataHash(OperationContext* opCtx,
             }
         }
     }
-    results->setMetadataHash(metadataHash.toHexString());
+    results->setMetadataHash(metadataHash);
 }
 
 void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* results) {
@@ -506,7 +506,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     // Place an empty hash in the results to override later. This result will only be used
     // for empty collections.
     if (_validateState->isCollHashValidation()) {
-        results->setCollectionHash(SHA256Block::computeHash({}).toHexString());
+        results->setCollectionHash(SHA256Block::computeHash({}));
     }
 
     if (_validateState->getFirstRecordId().isNull()) {
@@ -782,7 +782,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     }
 
     if (_validateState->isCollHashValidation()) {
-        results->setCollectionHash(accumulatedBlock.toHexString());
+        results->setCollectionHash(accumulatedBlock);
         if (revealHashedIds) {
             results->setRevealedIds(std::move(revealedIds));
         }

@@ -94,6 +94,10 @@ public:
     }
 
 protected:
+    // Merges the class members, this does not consume the other container and requires a copy.
+    void _mergeBase(const ValidateResultsIf& other);
+
+private:
     bool _continueValidation = true;
     bool _fatalError = false;
 
@@ -106,7 +110,7 @@ protected:
 class IndexValidateResults final : public ValidateResultsIf {
 public:
     bool isValid() const override {
-        return _errors.empty();
+        return getErrors().empty();
     }
 
     int64_t getKeysTraversed() const {
@@ -117,14 +121,14 @@ public:
         _keysTraversed += keysTraversed;
     }
 
-    int64_t getKeysRemovedFromRecordStore() {
+    int64_t getKeysRemovedFromRecordStore() const {
         return _keysRemovedFromRecordStore;
     }
     void addKeysRemovedFromRecordStore(int64_t keysRemovedFromRecordStore) {
         _keysRemovedFromRecordStore += keysRemovedFromRecordStore;
     }
 
-    bool hasStructuralDamage() {
+    bool hasStructuralDamage() const {
         return _hasStructuralDamage;
     }
 
@@ -162,7 +166,7 @@ using ValidateResultsMap = std::map<std::string, IndexValidateResults>;
 class ValidateResults final : public ValidateResultsIf {
 public:
     bool isValid() const override {
-        if (_errors.size())
+        if (getErrors().size())
             return false;
         for (const auto& [k, v] : getIndexResultsMap()) {
             if (!v.isValid()) {
@@ -197,17 +201,17 @@ public:
         _corruptRecords.push_back(std::move(record));
     }
 
-    const boost::optional<std::string>& getCollectionHash() const {
+    const boost::optional<SHA256Block>& getCollectionHash() const {
         return _collectionHash;
     }
-    void setCollectionHash(std::string collectionHash) {
+    void setCollectionHash(SHA256Block collectionHash) {
         _collectionHash = std::move(collectionHash);
     }
 
-    const boost::optional<std::string>& getMetadataHash() const {
+    const boost::optional<SHA256Block>& getMetadataHash() const {
         return _metadataHash;
     }
-    void setMetadataHash(std::string metadataHash) {
+    void setMetadataHash(SHA256Block metadataHash) {
         _metadataHash = std::move(metadataHash);
     }
 
@@ -336,6 +340,8 @@ public:
         bool debugging,
         const SerializationContext& sc = SerializationContext::stateCommandReply()) const;
 
+    void merge(const ValidateResults& other);
+
 private:
     boost::optional<UUID> _uuid;
     boost::optional<NamespaceString> _nss;
@@ -349,9 +355,9 @@ private:
     bool _repaired = false;
     std::string _repairMode;
     bool _hasStructuralDamage = false;
-    boost::optional<Timestamp> _readTimestamp = boost::none;
+    boost::optional<Timestamp> _readTimestamp;
 
-    boost::optional<collection_validation::FastCountType> _fastCountType = boost::none;
+    boost::optional<collection_validation::FastCountType> _fastCountType;
 
     // Collection stats.
     // If validate doesn't progress far enough to determine these, they will remain nullopt.
@@ -360,8 +366,8 @@ private:
     boost::optional<long long> _numRecords;
 
     // Hashes computed for extended validate.
-    boost::optional<std::string> _collectionHash;
-    boost::optional<std::string> _metadataHash;
+    boost::optional<SHA256Block> _collectionHash;
+    boost::optional<SHA256Block> _metadataHash;
     boost::optional<stdx::unordered_map<std::string, std::pair<std::string, int>>> _partialHashes;
     boost::optional<stdx::unordered_map<std::string, std::vector<BSONObj>>> _revealedIds;
 

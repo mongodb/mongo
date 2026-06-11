@@ -41,9 +41,9 @@ namespace mongo {
 namespace {
 
 // Up to 1MB of "inconsistency" errors will be kept, i.e. missing/extra index fields.
-const int kMaxIndexInconsistencySize = 1 * 1024 * 1024;
+static constexpr int kMaxIndexInconsistencySize = 1 * 1024 * 1024;
 // Reserving 4MB for index details' error and warning messages.
-static constexpr std::size_t kMaxIndexDetailsSizeBytes = 4 * 1024 * 1024;
+static constexpr size_t kMaxIndexDetailsSizeBytes = 4 * 1024 * 1024;
 
 struct LargestObjsPopFirstCmp {
     bool operator()(const BSONObj& l, const BSONObj& r) {
@@ -53,16 +53,17 @@ struct LargestObjsPopFirstCmp {
 
 // Helper for adding |obj| to a list of bson objs, where only the smallest objects up to a limit
 // will be kept. At least 1 object will always be kept. Returns true if an element was removed.
-bool addWithSizeLimit(BSONObj obj, std::vector<BSONObj>& list, size_t& usedBytes) {
+bool addWithSizeLimit(const BSONObj& obj, std::vector<BSONObj>& dst, size_t& usedBytes) {
+    invariant(obj.objsize() > 0);
     usedBytes += static_cast<size_t>(obj.objsize());
-    list.push_back(std::move(obj));
-    std::push_heap(list.begin(), list.end(), LargestObjsPopFirstCmp{});
-    if (usedBytes <= kMaxIndexInconsistencySize || list.size() <= 1) {
+    dst.push_back(std::move(obj));
+    std::push_heap(dst.begin(), dst.end(), LargestObjsPopFirstCmp{});
+    if (usedBytes <= kMaxIndexInconsistencySize || dst.size() <= 1) {
         return false;
     }
-    std::pop_heap(list.begin(), list.end(), LargestObjsPopFirstCmp{});
-    usedBytes -= list.back().objsize();
-    list.pop_back();
+    std::pop_heap(dst.begin(), dst.end(), LargestObjsPopFirstCmp{});
+    usedBytes -= dst.back().objsize();
+    dst.pop_back();
     return true;
 }
 
@@ -86,6 +87,15 @@ void buildFixedSizedArray(BSONObjBuilder& output,
 }
 
 }  // namespace
+
+void ValidateResultsIf::_mergeBase(const ValidateResultsIf& other) {
+    // Expect continuation to require all-of
+    _continueValidation &= other._continueValidation;
+    // fatalError is any-of
+    _fatalError |= other._fatalError;
+    _errors.insert(other._errors.begin(), other._errors.end());
+    _warnings.insert(other._warnings.begin(), other._warnings.end());
+}
 
 void ValidateResults::addExtraIndexEntry(BSONObj entry) {
     if (addWithSizeLimit(std::move(entry), _extraIndexEntries, _extraIndexEntriesUsedBytes)) {
@@ -187,11 +197,11 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     }
 
     if (_collectionHash.has_value()) {
-        resultObj->append("all", _collectionHash.value());
+        resultObj->append("all", _collectionHash->toHexString());
     }
 
     if (_metadataHash.has_value()) {
-        resultObj->append("metadata", _metadataHash.value());
+        resultObj->append("metadata", _metadataHash->toHexString());
     }
 
     if (_partialHashes.has_value()) {
@@ -254,4 +264,104 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         resultObj->appendNumber("numOutdatedMissingIndexEntry", getNumOutdatedMissingIndexEntry());
     }
 }
+
+void ValidateResults::merge(const ValidateResults& other) {
+    uassert(12759600, "Merged results must have the same UUID", _uuid == other._uuid);
+    uassert(12759601, "Merged results must have the same Namespace", _nss == other._nss);
+    uassert(12759602,
+            "Merged ValidateResults must have the same repair mode",
+            _repairMode == other._repairMode);
+    uassert(12759603,
+            "Merging results requires identical snapshot timestamps for each partial result",
+            _readTimestamp == other._readTimestamp);
+    uassert(12759604,
+            "Merging partial hash results from hash drill down is not supported",
+            !_partialHashes && !other._partialHashes && !_revealedIds && !other._revealedIds);
+
+    ValidateResults tmp = *this;
+
+    // Per-index results. Indexes absent from this result are copied in wholesale; shared indexes
+    // have their errors, warnings and counters combined via the public interface. The per-index
+    // continuation/fatal flags have no public setter and aren't produced during the record-store
+    // pass, so they are intentionally left untouched here.
+    // This occurs first in the merge as the index keys must have an identical spec, so there exists
+    // the possibility of an early exit if the specs are mismatched.
+    for (const auto& [indexName, otherIvr] : other._indexResultsMap) {
+        auto [it, inserted] = tmp._indexResultsMap.try_emplace(indexName);
+        if (inserted) {
+            it->second = otherIvr;
+            continue;
+        }
+        auto& ivr = it->second;
+        ivr.getErrorsUnsafe()->insert(otherIvr.getErrors().begin(), otherIvr.getErrors().end());
+        ivr.getWarningsUnsafe()->insert(otherIvr.getWarnings().begin(),
+                                        otherIvr.getWarnings().end());
+        ivr.addKeysTraversed(otherIvr.getKeysTraversed());
+        ivr.addKeysRemovedFromRecordStore(otherIvr.getKeysRemovedFromRecordStore());
+        ivr.setHasStructuralDamage(ivr.hasStructuralDamage() || otherIvr.hasStructuralDamage());
+        ivr.setIsMultikey(ivr.isMultikey() || otherIvr.isMultikey());
+        uassert(12759605,
+                "Merging index results with conflicting specs for index: " + indexName,
+                (ivr.getSpec().isEmpty() && otherIvr.getSpec().isEmpty()) ||
+                    ivr.getSpec().binaryEqual(otherIvr.getSpec()));
+    }
+
+    for (const auto& eia : other._extraIndexEntries) {
+        tmp.addExtraIndexEntry(eia);
+    }
+    for (const auto& mie : other._missingIndexEntries) {
+        tmp.addMissingIndexEntry(mie);
+    }
+
+    tmp._corruptRecords.insert(
+        tmp._corruptRecords.end(), other._corruptRecords.begin(), other._corruptRecords.end());
+
+    tmp._repaired = tmp._repaired || other._repaired;
+    tmp._hasStructuralDamage = tmp._hasStructuralDamage || other._hasStructuralDamage;
+
+    // Identity-valued fields are the same for every chunk of a single collection; adopt them if
+    // this result hasn't recorded them yet.
+    if (!tmp._fastCountType) {
+        tmp._fastCountType = other._fastCountType;
+    }
+
+    // Document and record counters are additive. The optionals only become engaged once a chunk
+    // has progressed far enough to compute them, so treat a missing value as zero.
+    auto addOptional = [](boost::optional<long long>& dst, const boost::optional<long long>& src) {
+        if (src) {
+            dst = dst.value_or(0) + *src;
+        }
+    };
+    addOptional(tmp._numInvalidDocuments, other._numInvalidDocuments);
+    addOptional(tmp._numNonCompliantDocuments, other._numNonCompliantDocuments);
+    addOptional(tmp._numRecords, other._numRecords);
+
+    tmp._numRemovedCorruptRecords += other._numRemovedCorruptRecords;
+    tmp._numRemovedExtraIndexEntries += other._numRemovedExtraIndexEntries;
+    tmp._numInsertedMissingIndexEntries += other._numInsertedMissingIndexEntries;
+    tmp._numDocumentsMovedToLostAndFound += other._numDocumentsMovedToLostAndFound;
+    tmp._numOutdatedMissingIndexEntry += other._numOutdatedMissingIndexEntry;
+
+    tmp._recordTimestamps.insert(other._recordTimestamps.begin(), other._recordTimestamps.end());
+
+    // The collection and partial hashes are order-independent XORs of per-record SHA256 blocks and
+    // must be combined at the SHA256Block level before being stringified, so merge() only adopts a
+    // value when this result doesn't already have one.
+    if (!tmp._collectionHash) {
+        tmp._collectionHash = other._collectionHash;
+    } else if (other._collectionHash) {
+        tmp._collectionHash->xorInline(*other._collectionHash);
+    }
+
+    if (!tmp._metadataHash) {
+        tmp._metadataHash = other._metadataHash;
+    } else if (other._metadataHash) {
+        tmp._metadataHash->xorInline(*other._metadataHash);
+    }
+
+    tmp._mergeBase(other);
+
+    std::swap(*this, tmp);
+}
+
 }  // namespace mongo
