@@ -90,27 +90,26 @@ def setup_pythonpath():
 
     os.environ["RESMOKE_PYTHON"] = sys.executable
 
+    # Export sys.path to PYTHONPATH so that Python subprocesses spawned from JS tests
+    # (via runNonMongoProgram) can import the same packages as this process. Bazel sets up
+    # sys.path for the test process but not for child subprocesses.
+    # Exclude empty-string entries (they mean "cwd" which varies per subprocess).
+    new_paths = [p for p in sys.path if p]
+
+    # Prepend any additional import paths declared via data deps that provide PyInfo.
     python_imports_file = os.environ.get("PYTHON_IMPORTS_FILE")
-    if not python_imports_file or not os.path.exists(python_imports_file):
-        return
-
-    with open(python_imports_file, "r") as f:
-        imports = [line.strip() for line in f if line.strip()]
-
-    if not imports:
-        return
-
-    # Convert runfiles-relative paths to absolute paths
-    test_srcdir = os.environ.get("TEST_SRCDIR")
-    if not test_srcdir:
-        return
-    import_paths = [os.path.join(test_srcdir, imp) for imp in imports]
+    if python_imports_file and os.path.exists(python_imports_file):
+        test_srcdir = os.environ.get("TEST_SRCDIR")
+        if test_srcdir:
+            with open(python_imports_file, "r") as f:
+                imports = [line.strip() for line in f if line.strip()]
+            if imports:
+                new_paths = [os.path.join(test_srcdir, imp) for imp in imports] + new_paths
 
     existing_pythonpath = os.environ.get("PYTHONPATH", "")
-    new_pythonpath = os.pathsep.join(import_paths)
+    new_pythonpath = os.pathsep.join(new_paths)
     if existing_pythonpath:
         new_pythonpath = new_pythonpath + os.pathsep + existing_pythonpath
-
     os.environ["PYTHONPATH"] = new_pythonpath
 
 
@@ -233,13 +232,12 @@ if __name__ == "__main__":
     add_evergreen_build_info(resmoke_args)
     add_multiversion_exclude_tags(resmoke_args)
 
-    if os.environ.get("DEPS_PATH"):
-        # Modify DEPS_PATH to use os.pathsep, rather than ':'
+    # Add each dep binary's directory to PATH. DEPS_PATH is set when running via Bazel
+    # without a pre-installed dist-test tree (i.e. not installed_dist_test_enabled).
+    deps_paths = [p for p in (os.environ.get("DEPS_PATH") or "").split(":") if p]
+    if deps_paths:
         os.environ["PATH"] += os.pathsep + os.pathsep.join(
-            [
-                os.path.dirname(os.path.abspath(path))
-                for path in os.environ.get("DEPS_PATH").split(":")
-            ]
+            os.path.dirname(os.path.abspath(p)) for p in deps_paths
         )
 
     ctx = ResmokeShimContext()

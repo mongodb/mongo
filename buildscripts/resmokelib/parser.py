@@ -54,6 +54,11 @@ def get_parser(usage=None):
         dest="mongo_version_file",
         help="A YAML file containing the current `mongo_version`.",
     )
+    parser.add_argument(
+        "--releasesFile",
+        dest="releases_file",
+        help="An explicit releases YAML.",
+    )
 
     # Add sub-commands.
     for plugin in _PLUGINS:

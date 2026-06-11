@@ -47,9 +47,10 @@ def _multiversion_setup_impl(ctx):
     args.add(output_dir.path + "/multiversion-downloads.json")
     args.add(ctx.executable._resmoke)
     args.add(ctx.file._mongo_version)
+    args.add(ctx.file._releases_file)
 
     ctx.actions.run(
-        inputs = [ctx.file._mongo_version],
+        inputs = [ctx.file._mongo_version, ctx.file._releases_file],
         outputs = [output_dir],
         executable = ctx.executable._wrapper,
         tools = [ctx.executable._db_contrib_tool, ctx.executable._resmoke],
@@ -100,6 +101,10 @@ _multiversion_setup_rule = rule(
         "_mongo_version": attr.label(
             allow_single_file = True,
             default = "//bazel/resmoke:resmoke_mongo_version",
+        ),
+        "_releases_file": attr.label(
+            allow_single_file = True,
+            default = "//src/mongo/util/version:releases.yml",
         ),
         "_wrapper": attr.label(
             executable = True,

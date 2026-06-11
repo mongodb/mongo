@@ -149,10 +149,10 @@ class TestCreateBurnInTarget(unittest.TestCase):
             ("jstests/BUILD.bazel", "core_burn_in_find_js"),
         ]
 
-        mock_bd_print.side_effect = [
-            'resmoke_suite_test(name = "core")',
-            '["--log=debug" "--storageEngine=wiredTiger"]',
-        ]
+        mock_bd_print.return_value = (
+            'resmoke_suite_test(\n    name = "core",\n'
+            '    resmoke_args = ["--log=debug", "--storageEngine=wiredTiger"],\n)'
+        )
 
         # Execute
         under_test.create_burn_in_target(target_original, target_burn_in, test)

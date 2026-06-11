@@ -18,6 +18,7 @@ package(
 )
 
 exports_files([
+    ".bazelrc.target_mongo_version",
     ".prettierrc",
     "pyproject.toml",
     "poetry.lock",

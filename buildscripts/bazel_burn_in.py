@@ -84,6 +84,88 @@ def parse_bazel_target(target: str) -> tuple[str, str]:
     return build_file_path, target_name
 
 
+def _read_rule_from_list_comprehension(build_file: str, target_name: str) -> str | None:
+    """
+    Return the instantiated resmoke_suite_test() text for a target defined inside a
+    Starlark list comprehension that buildozer cannot reach.  Handles the pattern:
+
+        [
+            resmoke_suite_test(
+                name = suite_name,
+                config = "//path/{}.yml".format(suite_name),
+                multiversion_deps = ["//path:{}".format(multiversion)],
+                ...
+            )
+            for suite_name, multiversion in {"name1": "mv1", "name2": "mv2"}.items()
+        ]
+
+    Returns None if the target is not found in any comprehension.
+    """
+    with open(build_file) as f:
+        content = f.read()
+
+    # Find the target name as a dict key: "target_name": "mv_value"
+    key_m = re.search(r'"(' + re.escape(target_name) + r')"\s*:\s*"([^"]+)"', content)
+    if not key_m:
+        return None
+
+    suite_name_val = key_m.group(1)
+    multiversion_val = key_m.group(2)
+
+    # The for-clause appears before the dict entry in the source:
+    #   resmoke_suite_test(...) for suite_name, mv in {"name": "val", ...}.items()
+    # Find the last `for suite_name, <var> in {` that precedes our dict key.
+    for_matches = list(
+        re.finditer(r"for\s+suite_name\s*,\s*\w+\s+in\s*\{", content[: key_m.start()])
+    )
+    if not for_matches:
+        return None
+    for_pos = for_matches[-1].start()
+
+    # Find the `[` that opens the list comprehension, identified by the distinctive
+    # `[\n    resmoke_suite_test(` pattern at file scope.
+    bracket_matches = list(re.finditer(r"\[\s*\n\s*resmoke_suite_test\s*\(", content[:for_pos]))
+    if not bracket_matches:
+        return None
+    bracket_pos = bracket_matches[-1].start()
+
+    # Everything between `[` and `for suite_name` is the rule template.
+    template = content[bracket_pos + 1 : for_pos].strip()
+
+    # Instantiate: substitute `.format(suite_name)` string calls.
+    template = re.sub(
+        r'"([^"]*)"\s*\.format\s*\(\s*suite_name\s*\)',
+        lambda m: '"' + m.group(1).replace("{}", suite_name_val) + '"',
+        template,
+    )
+    # Instantiate: substitute `.format(multiversion)` string calls.
+    template = re.sub(
+        r'"([^"]*)"\s*\.format\s*\(\s*multiversion\s*\)',
+        lambda m: '"' + m.group(1).replace("{}", multiversion_val) + '"',
+        template,
+    )
+    # Instantiate: substitute the bare `suite_name` identifier used as a value
+    # (e.g. `name = suite_name`).
+    template = re.sub(r"\bsuite_name\b", f'"{suite_name_val}"', template)
+
+    return template + "\n"
+
+
+def _extract_list_attr_from_rule(rule_text: str, attr: str) -> str:
+    """
+    Extract a list attribute from rule text, returning it in the same format that
+    buildozer's `print <attr>` command uses: unquoted elements separated by spaces
+    inside square brackets, e.g. ``[--arg1 --arg2]``.
+
+    Returns ``(missing)`` when the attribute is absent, matching buildozer's behaviour.
+    """
+    m = re.search(rf"\b{re.escape(attr)}\s*=\s*(\[.*?\])", rule_text, re.DOTALL)
+    if not m:
+        return "(missing)"
+    elements = re.findall(r'"([^"]*)"', m.group(1))
+    return "[" + " ".join(elements) + "]" if elements else "(missing)"
+
+
 def create_burn_in_target(target_original: str, target_burn_in: str, test: str):
     """ """
     # Create the label "//jstests:foo.js" from jstests/foo.js
@@ -94,8 +176,19 @@ def create_burn_in_target(target_original: str, target_burn_in: str, test: str):
 
     # Buildozer does not provide a convenient way to clone an entire rule, so we print the original,
     # replace the "name" attribute, and then write it back to the BUILD.bazel.
-    # To reduce the  likelihood of errors, all other edits are made using buildozer.
-    rule_original = buildozer.bd_print([target_original], ["rule"])
+    # To reduce the likelihood of errors, all other edits are made using buildozer.
+    # For rules defined via Starlark list comprehensions buildozer cannot locate them by
+    # name, so we fall back to parsing the BUILD file directly.
+    try:
+        rule_original = buildozer.bd_print([target_original], ["rule"])
+    except buildozer.BuildozerRuleNotFoundError:
+        rule_original = _read_rule_from_list_comprehension(build_file, name_original)
+        if rule_original is None:
+            raise ValueError(
+                f"Rule '{name_original}' not found in {build_file} "
+                "(neither as a top-level rule nor inside a list comprehension)"
+            )
+
     rule_new = re.sub(rf'(name\s*=\s*"){name_original}(")', rf"\1{name_burn_in}\2", rule_original)
     with open(build_file, "a") as f:
         f.write(rule_new)
@@ -115,8 +208,12 @@ def create_burn_in_target(target_original: str, target_burn_in: str, test: str):
     buildozer.bd_set([target_burn_in], "srcs", test_label)
     buildozer.bd_set([target_burn_in], "shard_count", "1")
 
-    # Add burn-in arguments to the suite to repeat the test
-    resmoke_args_str = buildozer.bd_print([target_original], ["resmoke_args"])
+    # Add burn-in arguments to the suite to repeat the test.
+    # rule_original always contains the full rule text (from buildozer or the BUILD-file
+    # fallback), so extract resmoke_args from it directly rather than making a second
+    # buildozer call.
+    resmoke_args_str = _extract_list_attr_from_rule(rule_original, "resmoke_args")
+
     resmoke_args = resmoke_args_str.strip().removeprefix("[").removesuffix("]").split()
 
     # "(missing)" is buildozer's response if an attribute is not present

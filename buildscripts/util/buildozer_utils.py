@@ -1,6 +1,12 @@
 import subprocess
 
 
+class BuildozerRuleNotFoundError(Exception):
+    """Raised when buildozer cannot locate a named rule, e.g. rules defined via list comprehensions."""
+
+    pass
+
+
 def _bd_command(cmd: str, labels: list[str]):
     print(
         f"buildozer '{cmd}' " + " ".join(labels),
@@ -14,6 +20,8 @@ def _bd_command(cmd: str, labels: list[str]):
     )
     if p.returncode != 0:
         print(p.stdout, p.stderr)
+        if "not found" in p.stderr:
+            raise BuildozerRuleNotFoundError(p.stderr.strip())
         raise Exception()
     return p
 

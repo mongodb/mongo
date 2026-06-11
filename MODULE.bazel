@@ -5,6 +5,9 @@ bazel_dep(name = "bazel_features", version = "1.37.0")
 bazel_features_deps = use_extension("//bazel:bzlmod.bzl", "bazel_features_deps")
 use_repo(bazel_features_deps, "bazel_features_globals", "bazel_features_version")
 
+multiversion_compat = use_extension("//bazel/resmoke/multiversion:version_compat.bzl", "multiversion_compat")
+use_repo(multiversion_compat, "multiversion_compat_settings")
+
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")

@@ -125,6 +125,12 @@ def _resolve_suite_srcs(config):
 
     return None
 
+def _dep_target_name(dep):
+    """Extract the target name from a label string, e.g. '//pkg:name' → 'name'."""
+    if ":" in dep:
+        return dep.rsplit(":", 1)[1]
+    return dep.rsplit("/", 1)[-1]
+
 def resmoke_suite_test(
         name,
         config,
@@ -134,6 +140,7 @@ def resmoke_suite_test(
         size = "small",
         srcs = [],
         tags = [],
+        target_compatible_with = [],
         timeout = "eternal",
         exec_properties = {},
         multiversion_deps = [],
@@ -155,6 +162,11 @@ def resmoke_suite_test(
         size: Bazel test size.
         srcs: Override for test source files. If empty, auto-derived from config.
         tags: Bazel tags.
+        target_compatible_with: Compatibility constraints forwarded to py_test.
+            Suites whose multiversion_deps consist solely of last-continuous
+            automatically gain an additional incompatibility with
+            @platforms//:incompatible when
+            //bazel/resmoke/multiversion:last_continuous_redundant is True.
         timeout: Bazel test timeout.
         exec_properties: Execution properties for remote execution.
         multiversion_deps: List of multiversion_setup targets whose output
@@ -266,6 +278,17 @@ def resmoke_suite_test(
     # default resmoke infrastructure, and multiversion artifacts.
     cquery_safe_data = [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags
 
+    # If this suite's only multiversion dep is last-continuous, it is a
+    # dedicated last-continuous suite.  Mark it incompatible when
+    # last-continuous resolves to the same version as last-lts so that
+    # `bazel test //...` skips it rather than running redundant tests.
+    dep_names = [_dep_target_name(d) for d in multiversion_deps]
+    if dep_names == ["last-continuous"]:
+        target_compatible_with = target_compatible_with + select({
+            "//bazel/resmoke/multiversion:last_continuous_redundant": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        })
+
     py_test(
         name = name,
         srcs = [resmoke_shim],
@@ -304,6 +327,7 @@ def resmoke_suite_test(
             for tag in multiversion_exclude_tags
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "resources:port_block:1", "resmoke_suite_test"],
+        target_compatible_with = target_compatible_with,
         timeout = timeout,
         size = size,
         env = {

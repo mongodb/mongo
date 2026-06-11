@@ -1,3 +1,5 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@multiversion_compat_settings//:settings.bzl", "LAST_CONTINUOUS_IS_LAST_LTS")
 load("//bazel/resmoke/multiversion:multiversion.bzl", "multiversion_setup")
 
 # Visibility is restricted to tests because multiversion_setup downloads
@@ -8,6 +10,26 @@ package(default_visibility = [
     "//buildscripts:__subpackages__",
     "//jstests:__subpackages__",
 ])
+
+# True when last-continuous resolves to the same FCV as last-lts (or to an EOL
+# version), making dedicated last-continuous suites redundant.  The default is
+# computed from .bazelrc.target_mongo_version and releases.yml by the
+# multiversion_compat module extension; it can be overridden on the command
+# line for testing or CI purposes:
+#   bazel test ... --//bazel/resmoke/multiversion:last_continuous_is_last_lts=True
+bool_flag(
+    name = "last_continuous_is_last_lts",
+    build_setting_default = LAST_CONTINUOUS_IS_LAST_LTS,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "last_continuous_redundant",
+    flag_values = {
+        "//bazel/resmoke/multiversion:last_continuous_is_last_lts": "True",
+    },
+    visibility = ["//visibility:public"],
+)
 
 sh_binary(
     name = "run_db_contrib_tool",

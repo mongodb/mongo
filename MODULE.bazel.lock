@@ -473,6 +473,23 @@
         ]
       }
     },
+    "//bazel/resmoke/multiversion:version_compat.bzl%multiversion_compat": {
+      "general": {
+        "bzlTransitiveDigest": "ht8HY1acr6ZvwIAjHvG+wAELB172czx5SAXMCxtJwHI=",
+        "usagesDigest": "R4mZQP/JOBtMnHjng8+GXEO6lqaVIOlZ0dRztz3X5ZM=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "multiversion_compat_settings": {
+            "bzlFile": "@@//bazel/resmoke/multiversion:version_compat.bzl",
+            "ruleClassName": "_multiversion_compat_settings",
+            "attributes": {}
+          }
+        },
+        "recordedRepoMappingEntries": []
+      }
+    },
     "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl%setup_mongo_apple_toolchain_extension": {
       "general": {
         "bzlTransitiveDigest": "prC/JJsAXBG1G496p5kkWHsc/N9DlmJkOn0sluvxsWQ=",

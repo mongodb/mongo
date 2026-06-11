@@ -3,6 +3,7 @@
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -245,6 +246,53 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
             for path, content in originals.items():
                 with open(path, "w") as f:
                     f.write(content)
+
+
+class TestListComprehensionRuleParser(unittest.TestCase):
+    """Validates that _read_rule_from_list_comprehension can parse every list-comprehension
+    resmoke_suite_test target defined in jstests/suites/.
+
+    Any new suite added with a format the parser cannot handle will cause this test to fail,
+    surfacing the problem before burn-in breaks in CI.  No Bazel invocation is needed.
+    """
+
+    def _find_list_comprehension_targets(self) -> dict[str, list[str]]:
+        """Return {build_file: [target_name, ...]} for all list-comprehension targets."""
+        import glob
+
+        results: dict[str, list[str]] = {}
+        for build_file in glob.glob("jstests/suites/**/BUILD.bazel", recursive=True):
+            with open(build_file) as f:
+                content = f.read()
+            targets: list[str] = []
+            for m in re.finditer(
+                r"for\s+suite_name\s*,\s*\w+\s+in\s*\{([^}]+)\}\.items\s*\(\)",
+                content,
+            ):
+                targets.extend(re.findall(r'"([^"]+)"\s*:', m.group(1)))
+            if targets:
+                results[build_file] = targets
+        return results
+
+    def test_all_targets_parseable(self):
+        import buildscripts.bazel_burn_in as under_test
+
+        all_targets = self._find_list_comprehension_targets()
+        self.assertTrue(all_targets, "No list-comprehension targets found; check glob path")
+
+        for build_file, targets in all_targets.items():
+            for name in targets:
+                with self.subTest(build_file=build_file, name=name):
+                    rule = under_test._read_rule_from_list_comprehension(build_file, name)
+                    self.assertIsNotNone(
+                        rule,
+                        f"_read_rule_from_list_comprehension returned None for '{name}' in {build_file}",
+                    )
+                    self.assertIn(
+                        f'"{name}"',
+                        rule,
+                        f"Instantiated rule for '{name}' does not contain the expected name",
+                    )
 
 
 class TestBazelCommandConfiguration(unittest.TestCase):
