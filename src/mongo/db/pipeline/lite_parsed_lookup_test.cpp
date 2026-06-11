@@ -43,7 +43,9 @@ protected:
     std::unique_ptr<LiteParsedLookUp> parse(StringData json,
                                             LiteParserOptions options = LiteParserOptions{}) {
         auto spec = fromjson(json);
-        return LiteParsedLookUp::parse(nss, spec.firstElement(), options);
+        auto result = LiteParsedLookUp::parse(nss, spec.firstElement(), options);
+        result->makeOwned();
+        return result;
     }
 
     LookUpStageParams* parseAndGetParams(StringData json,

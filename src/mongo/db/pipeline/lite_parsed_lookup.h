@@ -63,13 +63,12 @@ public:
                       boost::optional<BSONObj> unwindSpec,
                       bool hasForeignDB,
                       bool isHybridSearch,
-                      // TODO SERVER-121262 Have the StageParams be owner of the BSONObj instead.
-                      BSONElement originalBson,
+                      BSONObj ownedBsonObj,
                       boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none,
                       boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
                       bool internalFromIsAView = false,
                       bool isPlaceholderInjected = false)
-        : DefaultStageParams(originalBson),
+        : DefaultStageParams(ownedBsonObj.firstElement()),
           fromNss(std::move(fromNss)),
           as(std::move(as)),
           pipeline(std::move(pipeline)),
@@ -82,7 +81,8 @@ public:
           liteParsedPipeline(std::move(liteParsedPipeline)),
           internalFieldMatchPipelineIdx(std::move(internalFieldMatchPipelineIdx)),
           internalFromIsAView(internalFromIsAView),
-          isPlaceholderInjected(isPlaceholderInjected) {}
+          isPlaceholderInjected(isPlaceholderInjected),
+          _ownedOriginalBson(std::move(ownedBsonObj)) {}
 
     static const Id& id;
     Id getId() const final {
@@ -121,6 +121,10 @@ public:
     // under featureFlagExtensionsInsideHybridSearch. Lets createFromStageParams keep
     // _userPipeline = boost::none instead of [].
     bool isPlaceholderInjected = false;
+
+private:
+    // Owns the BSON buffer that DefaultStageParams::_originalSpec points into.
+    BSONObj _ownedOriginalBson;
 };
 
 class LiteParsedLookUp final : public LiteParsedDocumentSourceNestedPipelines<LiteParsedLookUp> {

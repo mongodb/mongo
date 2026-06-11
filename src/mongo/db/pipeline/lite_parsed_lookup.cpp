@@ -238,7 +238,7 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
                                                _unwindSpec,
                                                _hasForeignDB,
                                                _isHybridSearch,
-                                               getOriginalBson(),
+                                               getOriginalBson().wrap(),
                                                std::move(lpp),
                                                _internalFieldMatchPipelineIdx,
                                                _internalFromIsAView,

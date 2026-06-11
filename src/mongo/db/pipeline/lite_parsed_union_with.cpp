@@ -160,7 +160,7 @@ std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
                                                   _rawPipeline,
                                                   _hasForeignDB,
                                                   _isHybridSearch,
-                                                  getOriginalBson(),
+                                                  getOriginalBson().wrap(),
                                                   std::move(lpp),
                                                   std::move(resolvedView));
 }

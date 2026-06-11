@@ -524,7 +524,8 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
 
     // Create [$lookup] with subpipeline [$expandToHostParse]. The subpipeline should be desugared
     // to [$match].
-    LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON(extStageName << BSONObj())})});
+    auto lookupBson = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
+    LiteParsedPipeline lpp(_nss, {lookupBson});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
     ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
@@ -547,7 +548,8 @@ TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) 
     // Create [$lookup] with subpipeline [$expandToHostParse]. With a null IFR context, subpipeline
     // desugaring is skipped (featureFlagExtensionsInsideHybridSearch is required), so the
     // subpipeline should remain unchanged.
-    LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON(extStageName << BSONObj())})});
+    auto lookupStage = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
+    LiteParsedPipeline lpp(_nss, {lookupStage});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
     // desugar returns false - no top-level expandable stage, and subpipelines are skipped.
@@ -569,7 +571,8 @@ TEST_F(LiteParsedDesugarerTest, NoopOnLookupSubpipelineWithNonExpandableStages) 
                                                      true};
     // Create [$lookup] with subpipeline [$match]. No expandable stages, desugar should return
     // false.
-    LiteParsedPipeline lpp(_nss, {makeLookupWithSubpipeline({BSON("$match" << BSON("a" << 1))})});
+    auto lookupStage = makeLookupWithSubpipeline({BSON("$match" << BSON("a" << 1))});
+    LiteParsedPipeline lpp(_nss, {lookupStage});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
     ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
@@ -587,9 +590,9 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineAndTopLevelExpandableStage) {
 
     // Create [$lookup with subpipeline [$expandToHostParse], $expandToHostParse]. Both the
     // subpipeline and the top-level stage should be desugared.
-    LiteParsedPipeline lpp(_nss,
-                           {makeLookupWithSubpipeline({BSON(extStageName << BSONObj())}),
-                            BSON(extStageName << BSONObj())});
+    auto lookupStage = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
+    auto expandStage = BSON(extStageName << BSONObj());
+    LiteParsedPipeline lpp(_nss, {lookupStage, expandStage});
     ASSERT_EQ(lpp.getStages().size(), 2);
 
     ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));
@@ -644,10 +647,10 @@ TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
     // nested subpipelines: $unionWith -> $lookup -> $expandToHostParse. The innermost expandable
     // stage should be desugared.
     BSONObj lookupStage = makeLookupWithSubpipeline({BSON(extStageName << BSONObj())});
-    LiteParsedPipeline lpp(
-        _nss,
-        {BSON("$unionWith" << BSON("coll" << "otherCollection"
-                                          << "pipeline" << BSON_ARRAY(lookupStage)))});
+    BSONObj unionWithStage =
+        BSON("$unionWith" << BSON("coll" << "otherCollection"
+                                         << "pipeline" << BSON_ARRAY(lookupStage)));
+    LiteParsedPipeline lpp(_nss, {unionWithStage});
     ASSERT_EQ(lpp.getStages().size(), 1);
 
     ASSERT_TRUE(LiteParsedDesugarer::desugar(&lpp, _ifrContext));

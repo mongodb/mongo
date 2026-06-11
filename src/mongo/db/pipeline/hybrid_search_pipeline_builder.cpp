@@ -192,7 +192,7 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
                                             std::move(bsonPipeline),
                                             /* hasForeignDB= */ false,
                                             /* isHybridSearch= */ true,
-                                            /* originalBson= */ BSONElement(),
+                                            /* ownedBsonObj= */ BSONObj{},
                                             std::move(lpp));
                 auto docSources = DocumentSourceUnionWith::createFromStageParams(params, pExpCtx);
                 outputStages.emplace_back(docSources.front());

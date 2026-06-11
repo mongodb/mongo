@@ -1064,7 +1064,7 @@ TEST_F(DocumentSourceLookUpTest,
                              boost::none,
                              false,
                              false,
-                             lookupBson.firstElement(),
+                             lookupBson,
                              boost::none);
 
     auto sources = DocumentSourceLookUp::createFromStageParams(params, expCtx);

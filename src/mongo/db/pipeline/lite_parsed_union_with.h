@@ -61,17 +61,17 @@ public:
                          std::vector<BSONObj> pipeline,
                          bool hasForeignDB,
                          bool isHybridSearch,
-                         // TODO SERVER-121262 Have the StageParams be owner of the BSONObj instead.
-                         BSONElement originalBson,
+                         BSONObj ownedBsonObj,
                          boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none,
                          std::shared_ptr<ViewInfo> resolvedSubPipelineView = nullptr)
-        : DefaultStageParams(originalBson),
+        : DefaultStageParams(ownedBsonObj.firstElement()),
           unionNss(std::move(unionNss)),
           pipeline(std::move(pipeline)),
           hasForeignDB(hasForeignDB),
           isHybridSearch(isHybridSearch),
           liteParsedPipeline(std::move(liteParsedPipeline)),
-          resolvedSubPipelineView(std::move(resolvedSubPipelineView)) {}
+          resolvedSubPipelineView(std::move(resolvedSubPipelineView)),
+          _ownedOriginalBson(std::move(ownedBsonObj)) {}
 
     static const Id& id;
     Id getId() const final {
@@ -98,6 +98,10 @@ public:
     // subpipeline target is not a view. Lets DocumentSourceUnionWith construction consume the
     // resolved view directly, without re-looking it up from expCtx->getResolvedNamespaces().
     std::shared_ptr<ViewInfo> resolvedSubPipelineView;
+
+private:
+    // Owns the BSON buffer that DefaultStageParams::_originalSpec points into.
+    BSONObj _ownedOriginalBson;
 };
 
 class LiteParsedUnionWith final
