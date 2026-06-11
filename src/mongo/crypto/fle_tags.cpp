@@ -112,6 +112,8 @@ std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(FLETagQueryInterface
                                                             boost::optional<int64_t> cm) {
     auto contentionMax = cm.value_or(0);
 
+    EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(contentionMax);
+
     std::vector<FLEEdgePrfBlock> blocks;
     blocks.reserve(contentionMax + 1);
 

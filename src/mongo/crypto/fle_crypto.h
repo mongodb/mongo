@@ -1086,6 +1086,19 @@ public:
      *       greater than kSubstringPreviewMaxLengthMax.
      */
     static void checkSubstringPreviewParameterLimitsNotExceeded(const EncryptedFieldConfig& ef);
+
+    static constexpr int64_t kFLEMaxContentionFactor = 200'000;
+
+    /**
+     * Throws BadValue if any queryable field in ef has a contention factor exceeding
+     * kFLEMaxContentionFactor.
+     */
+    static void checkMaxContentionFactorNotExceeded(const EncryptedFieldConfig& ef);
+
+    /**
+     * Throws BadValue if contention exceeds kFLEMaxContentionFactor.
+     */
+    static void checkMaxContentionFactorNotExceeded(int64_t contention);
 };
 
 /**
