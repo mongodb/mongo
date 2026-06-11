@@ -181,6 +181,7 @@ mongo_cc_library(
         "sessions_collection.h",
     ],
     deps = [
+        ":logical_session_cache",
         ":logical_session_id",  # TODO(SERVER-93876): Remove.
         ":logical_session_id_helpers",  # TODO(SERVER-93876): Remove.
         ":sessions_server_parameters_idl",
@@ -213,6 +214,7 @@ mongo_cc_library(
         ":sessions_collection",
         "//src/mongo/db:internal_transactions_feature_flag",
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/admission:execution_admission_context",
     ],
 )
 

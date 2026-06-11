@@ -107,6 +107,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -658,6 +659,12 @@ public:
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+            }
+            // Session collection reads from internal clients (findRemovedSessions) must make
+            // forward progress to prevent TooManyLogicalSessions errors under heavy load.
+            if (!admissionPriority && _ns == NamespaceString::kLogicalSessionsNamespace &&
+                opCtx->getClient()->isInternalClient()) {
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
 

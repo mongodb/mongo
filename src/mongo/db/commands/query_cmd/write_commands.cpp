@@ -72,6 +72,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
@@ -491,6 +492,15 @@ public:
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
             doTransactionValidationForWrites(opCtx, ns());
+
+            // Session collection upserts from internal clients (refreshSessions) must make forward
+            // progress to prevent TooManyLogicalSessions errors under heavy write load.
+            boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
+            if (ns() == NamespaceString::kLogicalSessionsNamespace &&
+                opCtx->getClient()->isInternalClient()) {
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+            }
+
             write_ops::UpdateCommandReply updateReply;
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 return processFLEUpdate(opCtx, request());
@@ -729,6 +739,15 @@ public:
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
             doTransactionValidationForWrites(opCtx, ns());
+
+            // Session collection deletes from internal clients (removeRecords) must make forward
+            // progress to prevent TooManyLogicalSessions errors under heavy write load.
+            boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
+            if (ns() == NamespaceString::kLogicalSessionsNamespace &&
+                opCtx->getClient()->isInternalClient()) {
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+            }
+
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
 
