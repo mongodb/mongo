@@ -1606,7 +1606,12 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
                   AssertionException);
 }
 
-TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
+// Runs the applyOps history-reconstruction tests for both retryable multiOpType tags.
+class TransactionParticipantRetryableWritesApplyOpsTest
+    : public TransactionParticipantRetryableWritesTest,
+      public testing::WithParamInterface<repl::MultiOplogEntryType> {};
+
+TEST_P(TransactionParticipantRetryableWritesApplyOpsTest, SingleRetryableApplyOps) {
     const auto sessionId = *opCtx()->getLogicalSessionId();
     const TxnNumber txnNum = 2;
 
@@ -1632,7 +1637,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
             Date_t::now(),                       // wall clock time
             {},                                  // statement ids (at top level, should be empty)
             repl::OpTime(),  // optime of previous write within same retryable write
-            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+            GetParam());
 
         insertOplogEntry(entry0);
 
@@ -1656,7 +1661,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
     ASSERT_FALSE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 3));
 }
 
-TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
+TEST_P(TransactionParticipantRetryableWritesApplyOpsTest, MultipleRetryableApplyOps) {
     const auto sessionId = *opCtx()->getLogicalSessionId();
     const TxnNumber txnNum = 2;
 
@@ -1693,7 +1698,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
             Date_t::now(),                // wall clock time
             {},                           // statement ids (at top level, should be empty)
             repl::OpTime(),               // optime of previous write within same retryable write
-            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+            GetParam());
 
         auto entry1 = repl::makeApplyOpsOplogEntry(
             lastOpTime,                   // optime
@@ -1702,7 +1707,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
             Date_t::now(),                // wall clock time
             {},                           // statement ids (at top level, should be empty)
             firstOpTime,                  // optime of previous write within same retryable write
-            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+            GetParam());
 
         insertOplogEntry(entry0);
         insertOplogEntry(entry1);
@@ -1731,6 +1736,11 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
     ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 6));
     ASSERT_FALSE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 7));
 }
+
+INSTANTIATE_TEST_SUITE_P(RetryableApplyOpsMultiOpType,
+                         TransactionParticipantRetryableWritesApplyOpsTest,
+                         testing::Values(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                         repl::MultiOplogEntryType::kApplyOpsAppliedAtomically));
 
 TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
     const auto sessionId = *opCtx()->getLogicalSessionId();
