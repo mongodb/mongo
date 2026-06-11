@@ -91,7 +91,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterThrowWouldChangeOwningShardRetryableWrite);
@@ -585,16 +584,16 @@ bool cluster_write_cmd::runExplainWithoutShardKey(OperationContext* opCtx,
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
                 auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
                     opCtx, originalRoutingCtx, originalNss, req, targeter);
-                if (!write_without_shard_key::useTwoPhaseProtocol(
-                        opCtx,
-                        translatedNss,
-                        true /* isUpdateOrDelete */,
-                        isUpsert,
-                        query,
-                        collation,
-                        req.getLet(),
-                        req.getLegacyRuntimeConstants(),
-                        false /* isTimeseriesViewRequest */)) {
+                const bool isTimeseriesViewRequest = (translatedNss != originalNss);
+                if (!write_without_shard_key::useTwoPhaseProtocol(opCtx,
+                                                                  translatedNss,
+                                                                  true /* isUpdateOrDelete */,
+                                                                  isUpsert,
+                                                                  query,
+                                                                  collation,
+                                                                  req.getLet(),
+                                                                  req.getLegacyRuntimeConstants(),
+                                                                  isTimeseriesViewRequest)) {
                     return false;
                 }
 

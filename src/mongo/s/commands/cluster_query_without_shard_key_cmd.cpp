@@ -71,6 +71,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/db/version_context.h"
@@ -134,6 +135,29 @@ struct AsyncRequestSenderResponseData {
     AsyncRequestSenderResponseData(ShardId shardId, CursorResponse cursorResponse)
         : shardId(shardId), cursorResponse(std::move(cursorResponse)) {}
 };
+
+// Returns the timeseries fields from the chunk manager if this is a sharded timeseries collection
+// being accessed at the logical (user-facing) level, meaning we need to add an unpack bucket stage
+// and potentially translate hints. Returns boost::none otherwise. All conditions must hold:
+// - isSharded: the collection must be sharded.
+// - getTimeseriesFields: the routing table must have timeseries metadata, confirming this is a
+//   timeseries collection.
+// - !isRawDataOperation: the client is not requesting raw bucket access. Raw data operations bypass
+//   timeseries translation and operate directly on the underlying bucket format.
+// - isNewTimeseriesWithoutView || isTimeseriesNamespace: covers both timeseries formats.
+//   isNewTimeseriesWithoutView is true for viewless timeseries (where the routing table tracks the
+//   user-facing namespace). isTimeseriesNamespace is true for viewful timeseries (where the
+//   namespace was already rewritten to system.buckets.* and the flag records that fact).
+boost::optional<TypeCollectionTimeseriesFields> getShardedTimeseriesFieldsIfLogicalOp(
+    OperationContext* opCtx,
+    const CollectionRoutingInfo& cri,
+    const ParsedCommandInfo& parsedInfo) {
+    const auto& cm = cri.getChunkManager();
+    const auto isShardedTimeseriesLogicalOperation = cm.isSharded() &&
+        cm.isTimeseriesCollection() && !isRawDataOperation(opCtx) &&
+        (cm.isNewTimeseriesWithoutView() || parsedInfo.isTimeseriesNamespace);
+    return isShardedTimeseriesLogicalOperation ? cm.getTimeseriesFields() : boost::none;
+}
 
 // Computes the final sort pattern if necessary metadata is needed.
 BSONObj parseSortPattern(OperationContext* opCtx,
@@ -199,7 +223,27 @@ BSONObj createAggregateCmdObj(
     }
 
     if (parsedInfo.hint) {
-        aggregate.setHint(parsedInfo.hint);
+        // Translate the user-facing timeseries index hint into the equivalent buckets index
+        // spec. All three conditions must hold:
+        // - timeseriesFields: the collection must be a timeseries collection so we have access
+        //   to TimeseriesOptions (timeField, metaField), which the translation needs to map
+        //   user-facing field names to bucket-internal ones (e.g. "ts" → "control.min.ts").
+        // - isHintIndexKey: the hint must be an index key pattern (e.g. {field: 1}). Named
+        //   index hints ({$hint: "name"}) and {$natural: 1} don't contain field names, so
+        //   they don't require translation.
+        // - isTimeseriesBucketsCollection: for viewful timeseries, the namespace has already
+        //   been rewritten to system.buckets.* before reaching this code, so the hint must
+        //   be translated here to match the buckets index spec. For viewless timeseries, the
+        //   namespace is the user-facing view namespace (not system.buckets.*), so this
+        //   check is false and hint translation is handled downstream on the shard.
+        if (timeseriesFields && timeseries::isHintIndexKey(*parsedInfo.hint) &&
+            nss.isTimeseriesBucketsCollection()) {
+            auto translated = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                timeseriesFields->getTimeseriesOptions(), *parsedInfo.hint);
+            aggregate.setHint(translated.isOK() ? translated.getValue() : *parsedInfo.hint);
+        } else {
+            aggregate.setHint(parsedInfo.hint);
+        }
     }
 
     aggregate.setLet(parsedInfo.let);
@@ -417,14 +461,8 @@ public:
 
                     const auto& collectionUUID = cm.getUUID();
 
-                    const auto isShardedTimeseriesLogicalOperation = cm.isSharded() &&
-                        cm.getTimeseriesFields().has_value() && !isRawDataOperation(opCtx) &&
-                        (cm.isNewTimeseriesWithoutView() ||
-                         parsedInfoFromRequest.isTimeseriesNamespace);
-
-                    const auto& timeseriesFields = isShardedTimeseriesLogicalOperation
-                        ? cm.getTimeseriesFields()
-                        : boost::none;
+                    const auto timeseriesFields =
+                        getShardedTimeseriesFieldsIfLogicalOp(opCtx, cri, parsedInfoFromRequest);
 
                     const auto cmdObj =
                         createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
@@ -567,8 +605,11 @@ public:
                 [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
+                    const auto timeseriesFields =
+                        getShardedTimeseriesFieldsIfLogicalOp(opCtx, cri, parsedInfoFromRequest);
+
                     const auto cmdObj =
-                        createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, boost::none);
+                        createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
                     const auto requests = buildVersionedRequests(
                         opCtx,
                         nss,

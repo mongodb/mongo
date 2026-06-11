@@ -1233,6 +1233,35 @@ export function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, s
 }
 
 /**
+ * Runs an explain command, retrying on transient NamespaceNotSharded errors that can
+ * surface during explain for timeseries collections due to a known server bug. Non-transient errors fail immediately.
+ *
+ * @param {Object} dbOrColl - A DB or collection object with a runCommand method.
+ * @param {Object} explainCmd - The full explain command object,
+ *     e.g. {explain: {delete: collName, deletes: [...]}, verbosity: "queryPlanner"}.
+ * @returns {Object} The successful explain result.
+ */
+export function runExplainWithRoutingRetry(dbOrColl, explainCmd) {
+    let result;
+    assert.soon(
+        () => {
+            result = dbOrColl.runCommand(explainCmd);
+            if (result.ok === 1) {
+                return true;
+            }
+            // TODO SERVER-114324: NamespaceNotSharded on explain for timeseries is a known
+            // server bug. Remove this retry once SERVER-114324 is fixed.
+            if (result.code === ErrorCodes.NamespaceNotSharded) {
+                return false;
+            }
+            assert(false, "Explain failed with unexpected error", {result});
+        },
+        () => `Explain command failed after retries: ${tojson(result)}`,
+    );
+    return result;
+}
+
+/**
  * Get the 'planCacheKey' from 'explain'.
  */
 export function getPlanCacheKeyFromExplain(explain) {

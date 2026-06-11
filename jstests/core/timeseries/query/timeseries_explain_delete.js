@@ -11,7 +11,13 @@
 
 import {isViewlessTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {
+    getExecutionStages,
+    getPlanStage,
+    getPlanStages,
+    getWinningPlanFromExplain,
+    runExplainWithRoutingRetry,
+} from "jstests/libs/query/analyze_plan.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -30,6 +36,74 @@ const docs = [
 const closedBucketFilter = {
     "control.closed": {$not: {$eq: true}},
 };
+
+// In sharded clusters, the explain contains per-shard plans, so getPlanStages may return multiple
+// matching stages (one per shard). Each shard's plan has the same structure, so we validate the
+// first one. This helper finds the expected stage and returns it.
+function getDeletePlanStage(explain, expectedDeleteStageName) {
+    const winningPlan = getWinningPlanFromExplain(explain);
+    const deleteStages = getPlanStages(winningPlan, expectedDeleteStageName);
+    assert.gt(deleteStages.length, 0, `${expectedDeleteStageName} stage not found in the plan: ${tojson(explain)}`);
+    return deleteStages[0];
+}
+
+function verifyQueryPlannerOutput(
+    explain,
+    {expectedDeleteStageName, expectedOpType, expectedBucketFilter, expectedResidualFilter, expectedUsedIndexName},
+) {
+    const deleteStage = getDeletePlanStage(explain, expectedDeleteStageName);
+
+    if (expectedDeleteStageName === "TS_MODIFY") {
+        assert.eq(expectedOpType, deleteStage.opType, `TS_MODIFY opType is wrong: ${tojson(deleteStage)}`);
+        assert.eq(
+            expectedBucketFilter,
+            deleteStage.bucketFilter,
+            `TS_MODIFY bucketFilter is wrong: ${tojson(deleteStage)}`,
+        );
+        assert.eq(
+            expectedResidualFilter,
+            deleteStage.residualFilter,
+            `TS_MODIFY residualFilter is wrong: ${tojson(deleteStage)}`,
+        );
+    } else {
+        const collScanStage = getPlanStage(deleteStage, "COLLSCAN");
+        assert.neq(null, collScanStage, `COLLSCAN stage not found in the plan: ${tojson(explain)}`);
+        assert.eq(expectedBucketFilter, collScanStage.filter, `COLLSCAN filter is wrong: ${tojson(collScanStage)}`);
+    }
+
+    if (expectedUsedIndexName) {
+        const ixscanStage = getPlanStage(deleteStage, "IXSCAN");
+        assert.neq(null, ixscanStage, `IXSCAN stage not found in plan: ${tojson(explain)}`);
+        assert.eq(expectedUsedIndexName, ixscanStage.indexName, `Wrong index used: ${tojson(ixscanStage)}`);
+    }
+}
+
+// In sharded clusters, execution stats contain per-shard results. Validate each stage name and
+// sum metrics across shards.
+function verifyExecutionStatsOutput(explain, {expectedDeleteStageName, expectedNumDeleted, expectedNumUnpacked}) {
+    const execStages = getExecutionStages(explain);
+    assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
+
+    let totalDeleted = 0;
+    let totalUnpacked = 0;
+    for (const stage of execStages) {
+        assert.eq(
+            expectedDeleteStageName,
+            stage.stage,
+            `Expected ${expectedDeleteStageName} stage in executionStages: ${tojson(explain)}`,
+        );
+        if (expectedDeleteStageName === "TS_MODIFY") {
+            totalDeleted += stage.nMeasurementsDeleted;
+            totalUnpacked += stage.nBucketsUnpacked;
+        } else {
+            totalDeleted += stage.nWouldDelete;
+        }
+    }
+    assert.eq(expectedNumDeleted, totalDeleted, `Got wrong total deleted count: ${tojson(execStages)}`);
+    if (expectedNumUnpacked !== null) {
+        assert.eq(expectedNumUnpacked, totalUnpacked, `Got wrong nBucketsUnpacked: ${tojson(execStages)}`);
+    }
+}
 
 function testDeleteExplain({
     singleDeleteOp,
@@ -51,90 +125,34 @@ function testDeleteExplain({
 
     let coll = testDB[collName];
 
-    // Creates an index same as the one in the hint so as to verify that the index hint is honored.
     if (singleDeleteOp.hasOwnProperty("hint")) {
         assert.commandWorked(coll.createIndex(singleDeleteOp.hint));
     }
 
     assert.commandWorked(coll.insert(docs));
 
-    // Verifies the TS_MODIFY stage in the plan.
     const innerDeleteCommand = {delete: coll.getName(), deletes: [singleDeleteOp]};
-    const deleteExplainPlanCommand = {explain: innerDeleteCommand, verbosity: "queryPlanner"};
-
-    let explain;
-    // Accepting to eventually get the expected results since in a scenario where we have more than 1 mongos, the
-    // one in charge may have stale routing information and we're ok to wait for it to refresh.
-    assert.soon(
-        () => {
-            explain = testDB.runCommand(deleteExplainPlanCommand);
-            return explain.ok;
-        },
-        () => `Expected success in running explain ${tojson(explain)}`,
-    );
-
-    let winningPlan = explain.queryPlanner.winningPlan.hasOwnProperty("shards")
-        ? explain.queryPlanner.winningPlan.shards[0].winningPlan
-        : explain.queryPlanner.winningPlan;
-    const deleteStage = getPlanStage(winningPlan, expectedDeleteStageName);
-    assert.neq(null, deleteStage, `${expectedDeleteStageName} stage not found in the plan: ${tojson(explain)}`);
-    if (expectedDeleteStageName === "TS_MODIFY") {
-        assert.eq(expectedOpType, deleteStage.opType, `TS_MODIFY opType is wrong: ${tojson(deleteStage)}`);
-        assert.eq(
-            expectedBucketFilter,
-            deleteStage.bucketFilter,
-            `TS_MODIFY bucketFilter is wrong: ${tojson(deleteStage)}`,
-        );
-        assert.eq(
-            expectedResidualFilter,
-            deleteStage.residualFilter,
-            `TS_MODIFY residualFilter is wrong: ${tojson(deleteStage)}`,
-        );
-    } else {
-        const collScanStage = getPlanStage(winningPlan, "COLLSCAN");
-        assert.neq(null, collScanStage, `COLLSCAN stage not found in the plan: ${tojson(explain)}`);
-        assert.eq(expectedBucketFilter, collScanStage.filter, `COLLSCAN filter is wrong: ${tojson(collScanStage)}`);
-    }
-
-    if (expectedUsedIndexName) {
-        const ixscanStage = getPlanStage(winningPlan, "IXSCAN");
-        assert.eq(expectedUsedIndexName, ixscanStage.indexName, `Wrong index used: ${tojson(ixscanStage)}`);
-    }
-
-    // Verifies the TS_MODIFY stage in the execution stats.
-    const deleteExplainStatsCommand = {explain: innerDeleteCommand, verbosity: "executionStats"};
-    assert.soon(
-        () => {
-            explain = testDB.runCommand(deleteExplainStatsCommand);
-            return explain.ok;
-        },
-        () => `Expected success in running explain ${tojson(explain)}`,
-    );
-    const execStages = getExecutionStages(explain);
-    assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
-    assert.eq(
+    const expectations = {
         expectedDeleteStageName,
-        execStages[0].stage,
-        `TS_MODIFY stage not found in executionStages: ${tojson(explain)}`,
-    );
-    if (expectedDeleteStageName === "TS_MODIFY") {
-        assert.eq(
-            expectedNumDeleted,
-            execStages.reduce((accumulator, current) => accumulator + current.nMeasurementsDeleted, 0),
-            `Got wrong nMeasurementsDeleted: ${tojson(explain)}`,
-        );
-        assert.eq(
-            expectedNumUnpacked,
-            execStages.reduce((accumulator, current) => accumulator + current.nBucketsUnpacked, 0),
-            `Got wrong nBucketsUnpacked: ${tojson(explain)}`,
-        );
-    } else {
-        assert.eq(
-            expectedNumDeleted,
-            execStages.reduce((accumulator, current) => accumulator + current.nWouldDelete, 0),
-            `Got wrong nWouldDelete: ${tojson(explain)}`,
-        );
-    }
+        expectedOpType,
+        expectedBucketFilter,
+        expectedResidualFilter,
+        expectedNumDeleted,
+        expectedNumUnpacked,
+        expectedUsedIndexName,
+    };
+
+    const queryPlannerExplain = runExplainWithRoutingRetry(testDB, {
+        explain: innerDeleteCommand,
+        verbosity: "queryPlanner",
+    });
+    verifyQueryPlannerOutput(queryPlannerExplain, expectations);
+
+    const executionStatsExplain = runExplainWithRoutingRetry(testDB, {
+        explain: innerDeleteCommand,
+        verbosity: "executionStats",
+    });
+    verifyExecutionStatsOutput(executionStatsExplain, expectations);
 
     assert.sameMembers(docs, coll.find().toArray(), "Explain command must not touch documents in the collection");
 }
@@ -260,12 +278,6 @@ function testDeleteExplain({
 })();
 
 (function testDeleteOneWithBucketFilterAndIndexHint() {
-    if (!isViewlessTimeseriesOnlySuite(db) && FixtureHelpers.isMongos(db)) {
-        // TODO SERVER-114442 re-enable this test case once hint on explain is properly handle for
-        // timeseries collections
-        jsTest.log("Skipping test case that uses an hint on timeseries collectin in sharded cluster");
-        return;
-    }
     testDeleteExplain({
         singleDeleteOp: {
             // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so

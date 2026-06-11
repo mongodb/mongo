@@ -151,6 +151,12 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     if (!hasBatchSizeZero && res.ok && !(res.hasOwnProperty("writeErrors") && res.writeErrors.length > 0)) {
         // Only run the test if the original command works. Some tests assert on commands failing,
         // so we should simply bubble these commands through without any additional checks.
+        const innerCmd = getInnerCommand(cmdObj);
+        // update is supported by the query shape has stability tests but not PQS
+        const commandName = getCommandName(innerCmd);
+        if (!(QuerySettingsUtils.isSupportedCommand(commandName) || commandName === "update")) {
+            return res;
+        }
         OverrideHelpers.withPreOverrideRunCommand(() => {
             if (isMultiShardedClusterFixture) {
                 const mongosConnArr = getAllMongosConnections(conn);
@@ -163,12 +169,6 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 const secondClusterMongos = mongosConnArr[1];
                 retryOnRetryableError(() => clientFunction.apply(secondClusterMongos, makeFuncArgs(cmdObj)), 50);
                 FixtureHelpers.awaitReplication(secondClusterMongos.getDB("admin"));
-            }
-            const innerCmd = getInnerCommand(cmdObj);
-            // update is supported by the query shape has stability tests but not PQS
-            const commandName = getCommandName(innerCmd);
-            if (!(QuerySettingsUtils.isSupportedCommand(commandName) || commandName === "update")) {
-                return;
             }
             // Wrap command into explain, if it's not explain yet.
             const explainCmd = getExplainCommand(innerCmd);

@@ -60,6 +60,7 @@ selector:
     - requires_2_or_more_shards
     - requires_sharding
     - multiversion_incompatible
+    - backport_required_multiversion
     - requires_2_or_more_shards
   roots:
     - jstests/change_streams/**/*.js
