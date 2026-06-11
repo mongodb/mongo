@@ -16,7 +16,6 @@ selector:
     - jstests/core/query/plan_cache/*.js
     - jstests/core/query/explain/explain_plan_cache.js
     - jstests/core/query/partial_index_logical.js
-    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
     - jstests/core/index/index_filter_commands.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     # Tests that assert on op counters

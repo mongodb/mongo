@@ -114,10 +114,6 @@ selector:
     - jstests/core/query/plan_cache/introspect_hidden_index_plan_cache_entries.js
     - jstests/core/query/partial_index_logical.js
     - jstests/core/query/plan_cache/**/*.js
-    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
-    - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
-    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
-    - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

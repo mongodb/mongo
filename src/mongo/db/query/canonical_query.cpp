@@ -35,7 +35,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
@@ -230,24 +229,9 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _isSearchQuery = isSearchQuery;
     _aggWithNonEmptyPipeline = aggWithNonEmptyPipeline;
 
-    // Perform SBE auto-parameterization if there is not already a reason not to.
     _disablePlanCache = internalQueryDisablePlanCache.load() ||
         _expCtx->getPlanCache() == ExpressionContext::PlanCacheOptions::kDisablePlanCache;
     _maxMatchExpressionParams = loadMaxMatchExpressionParams();
-    if (expCtx->getSbeCompatibility() != SbeCompatibility::notCompatible &&
-        shouldParameterizeSbe(_primaryMatchExpression.get())) {
-        // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of caching
-        // a parameterized plan. Here we add parameter markers to the appropriate match expression
-        // leaf nodes unless it has too many predicates. If it did not actually get parameterized,
-        // we mark the query as uncacheable for SBE to avoid plan cache flooding.
-        bool parameterized;
-        _inputParamIdToExpressionMap = parameterizeMatchExpression(
-            _primaryMatchExpression.get(), _maxMatchExpressionParams, 0, &parameterized);
-        if (!parameterized) {
-            // Avoid plan cache flooding by not fully parameterized plans.
-            setUncacheableSbe();
-        }
-    }
     // The tree must always be valid after normalization.
     dassert(parsed_find_command::validateAndGetAvailableMetadata(_primaryMatchExpression.get(),
                                                                  *_findCommand)
@@ -403,26 +387,6 @@ void CanonicalQuery::setCqPipeline(std::vector<boost::intrusive_ptr<DocumentSour
                                    bool containsEntirePipeline) {
     _cqPipeline = std::move(cqPipeline);
     _containsEntirePipeline = containsEntirePipeline;
-
-    // Find $match stages that weren't pushed down to find, but will be pushed to SBE. These
-    // need to be parameterized separately from the find layer filters.
-    for (auto& docSource : _cqPipeline) {
-        auto matchStage = dynamic_cast<DocumentSourceMatch*>(docSource.get());
-        if (matchStage) {
-            MatchExpression* matchExpr = matchStage->getMatchExpression();
-            if (shouldParameterizeSbe(matchExpr)) {
-                bool parameterized;
-                std::vector<const MatchExpression*> newParams = parameterizeMatchExpression(
-                    matchExpr, getMaxMatchExpressionParams(), numParams(), &parameterized);
-                if (parameterized) {
-                    addMatchParams(newParams);
-                } else {
-                    // Avoid plan cache flooding by not fully parameterized plans.
-                    setUncacheableSbe();
-                }
-            }
-        }
-    }
 }
 
 void CanonicalQuery::clearCqPipeline() {
@@ -442,15 +406,4 @@ void CanonicalQuery::removeSuffixFromCqPipeline(size_t sourcesToRemove) {
     _containsEntirePipeline = false;
 }
 
-bool CanonicalQuery::shouldParameterizeSbe(MatchExpression* matchExpr) const {
-    if (_disablePlanCache || _isUncacheableSbe || !feature_flags::gFeatureFlagSbeFull.isEnabled() ||
-        QueryPlannerCommon::hasNode(matchExpr, MatchExpression::TEXT)) {
-        return false;
-    }
-    return true;
-}
-
-bool CanonicalQuery::shouldParameterizeLimitSkip() const {
-    return !_disablePlanCache && !_isUncacheableSbe;
-}
 }  // namespace mongo

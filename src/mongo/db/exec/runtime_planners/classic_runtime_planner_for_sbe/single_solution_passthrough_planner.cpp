@@ -55,16 +55,6 @@ SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPlanner::makeExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     LOGV2_DEBUG(8523405, 5, "Using SBE single solution planner");
-    if (!_isFromPlanCache && useSbePlanCache()) {
-        // Create a pinned plan cache entry.
-        tassert(8779800, "expected 'solution' not to be null", _solution);
-        plan_cache_util::updateSbePlanCacheWithPinnedEntry(opCtx(),
-                                                           collections(),
-                                                           *cq(),
-                                                           *_solution,
-                                                           *_sbePlanAndData.first,
-                                                           _sbePlanAndData.second);
-    }
     return prepareSbePlanExecutor(std::move(canonicalQuery),
                                   std::move(_solution),
                                   std::move(_sbePlanAndData),

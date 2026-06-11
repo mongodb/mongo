@@ -53,7 +53,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/logic/tribool.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -241,18 +240,6 @@ public:
         return _sbeCompatible;
     }
 
-    void setUsingSbePlanCache(bool usingSbePlanCache) {
-        _usingSbePlanCache = usingSbePlanCache;
-    }
-
-    // setUsingSbePlanCache() must be invoked before this function.
-    bool isUsingSbePlanCache() const {
-        tassert(9421201,
-                "_usingSbePlanCache should be initialized",
-                !boost::indeterminate(_usingSbePlanCache));
-        return static_cast<bool>(_usingSbePlanCache);
-    }
-
     bool isParameterized() const {
         return !_inputParamIdToExpressionMap.empty();
     }
@@ -322,33 +309,6 @@ public:
     bool isCountLike() const {
         return _isCountLike;
     }
-
-    /**
-     * Called to indicate the query execution plan should not be cached for SBE. See comments on the
-     * '_isUncacheableSbe' member for more details.
-     */
-    void setUncacheableSbe() {
-        _isUncacheableSbe = true;
-    }
-
-    /**
-     * Check if the query execution plan should not be cached for SBE. See comments on the
-     * '_isUncacheableSbe' member for more details.
-     */
-    bool isUncacheableSbe() const {
-        return _isUncacheableSbe;
-    }
-
-    /**
-     * Tests whether a 'matchExpr' from this query should be parameterized for the SBE plan cache.
-     */
-    bool shouldParameterizeSbe(MatchExpression* matchExpr) const;
-
-    /**
-     * Tests if limit and skip amounts from find command request should be parameterized for the SBE
-     * plan cache.
-     */
-    bool shouldParameterizeLimitSkip() const;
 
     /**
      * Add parameters for match expressions that were pushed down via '_cqPipeline'.
@@ -443,12 +403,6 @@ private:
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;
 
-    // Indicate whether this query will be cached using the SBE plan cache.
-    // Use a tribool because this value is uninitialized for a large part of the life of a
-    // CanonicalQuery. If this value is not boost::indeterminate, that means it has been not set.
-    // We chose to use a tribool instead of optional<bool> to avoid confusion of operator bool.
-    boost::tribool _usingSbePlanCache = boost::indeterminate;
-
     // True if this query must produce a RecordId output in addition to the BSON objects that
     // constitute the result set of the query. Any generated query solution must not discard record
     // ids, even if the optimizer detects that they are not going to be consumed downstream.
@@ -473,11 +427,6 @@ private:
     // the index scan.
     bool _isCountLike = false;
 
-    // If true, indicates that we should not cache this plan in the SBE plan cache. This gets set to
-    // true if a MatchExpression was not parameterized because it contains a large number of
-    // predicates (usally > 512). This flag can be reused for additional do-not-cache conditions in
-    // the future.
-    bool _isUncacheableSbe = false;
 
     bool _isSearchQuery = false;
 

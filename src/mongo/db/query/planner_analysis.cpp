@@ -1431,16 +1431,10 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
                                               : 0;
     if (canUseSimpleSort(*solnRoot, query)) {
         sortNode = std::make_unique<SortNodeSimple>(
-            std::move(solnRoot),
-            sortObj,
-            sortLimit,
-            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
+            std::move(solnRoot), sortObj, sortLimit, LimitSkipParameterization::Disabled);
     } else {
         sortNode = std::make_unique<SortNodeDefault>(
-            std::move(solnRoot),
-            sortObj,
-            sortLimit,
-            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
+            std::move(solnRoot), sortObj, sortLimit, LimitSkipParameterization::Disabled);
     }
     sortNode->addSortKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kSortKey];
     solnRoot = std::move(sortNode);
@@ -1527,9 +1521,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     if (findCommand.getSkip()) {
         auto skip = std::make_unique<SkipNode>(
-            std::move(solnRoot),
-            *findCommand.getSkip(),
-            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
+            std::move(solnRoot), *findCommand.getSkip(), LimitSkipParameterization::Disabled);
         solnRoot = std::move(skip);
     }
 
@@ -1565,9 +1557,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     // handled inside SORT.
     if (!hasSortStage && findCommand.getLimit()) {
         auto limit = std::make_unique<LimitNode>(
-            std::move(solnRoot),
-            *findCommand.getLimit(),
-            LimitSkipParameterization{query.shouldParameterizeLimitSkip()});
+            std::move(solnRoot), *findCommand.getLimit(), LimitSkipParameterization::Disabled);
         solnRoot = std::move(limit);
     }
 

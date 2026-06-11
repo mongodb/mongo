@@ -67,7 +67,7 @@ switch (engine) {
         break;
     }
     case "sbe": {
-        assert.eq(getWinningPlanFromExplain(explain, true /*isSBEPlan*/).stages, planCacheEntry.cachedPlan.stages);
+        assert.eq(getWinningPlanFromExplain(explain, false /*isSBEPlan*/).stage, planCacheEntry.cachedPlan.stage);
         break;
     }
     default: {

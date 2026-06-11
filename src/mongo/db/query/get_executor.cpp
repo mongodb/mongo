@@ -803,13 +803,11 @@ public:
         const MultipleCollectionAccessor& collections,
         CanonicalQuery* cq,
         PlanYieldPolicy::YieldPolicy policy,
-        std::unique_ptr<QueryPlannerParams> plannerParams,
-        bool useSbePlanCache)
+        std::unique_ptr<QueryPlannerParams> plannerParams)
         : PrepareExecutionHelper<CacheKey,
                                  RuntimePlanningResult,
                                  classic_runtime_planner_for_sbe::PlannerDataForSBE>(
-              opCtx, collections, policy, cq, std::move(plannerParams)),
-          _useSbePlanCache{useSbePlanCache} {}
+              opCtx, collections, policy, cq, std::move(plannerParams)) {}
 
 protected:
     crp_sbe::PlannerDataForSBE makePlannerData() override {
@@ -825,7 +823,7 @@ protected:
             _cachedPlanHash,
             PlanYieldPolicySBE::make(
                 this->_opCtx, this->_yieldPolicy, this->_collections, this->_cq->nss()),
-            _useSbePlanCache};
+        };
     }
 
     bool usingClassic() final {
@@ -883,81 +881,8 @@ protected:
         }
     }
 
-    const bool _useSbePlanCache;
-
     // If there is a matching cache entry, this is the hash of that plan.
     boost::optional<size_t> _cachedPlanHash;
-};
-
-/**
- * Helper for SBE with classic runtime planning and SBE plan cache.
- */
-class SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper final
-    : public SbeWithClassicRuntimePlanningPrepareExecutionHelperBase<
-          sbe::PlanCacheKey,
-          SbeWithClassicRuntimePlanningResult> {
-public:
-    SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper(
-        OperationContext* opCtx,
-        const MultipleCollectionAccessor& collections,
-        CanonicalQuery* cq,
-        PlanYieldPolicy::YieldPolicy policy,
-        std::unique_ptr<QueryPlannerParams> plannerParams)
-        : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{
-              opCtx, collections, cq, policy, std::move(plannerParams), true /*useSbePlanCache*/} {}
-
-private:
-    sbe::PlanCacheKey buildPlanCacheKey() const override {
-        return plan_cache_key_factory::make(*_cq, _collections);
-    }
-
-    std::unique_ptr<SbeWithClassicRuntimePlanningResult> tryToBuildCachedPlanFromSbeCache(
-        const sbe::PlanCacheKey& sbeCacheKey) {
-        auto&& planCache = sbe::getPlanCache(_opCtx);
-
-        auto cacheEntry = planCache.getCacheEntryIfActive(sbeCacheKey);
-        if (!cacheEntry) {
-            planCacheCounters.incrementSbeMissesCounter();
-            return nullptr;
-        }
-        planCacheCounters.incrementSbeHitsCounter();
-
-        auto result = releaseResult();
-        const auto cachedSolutionHash = cacheEntry->cachedPlan->solutionHash;
-        result->runtimePlanner = crp_sbe::makePlannerForSbeCacheEntry(
-            makePlannerData(), std::move(cacheEntry), cachedSolutionHash);
-        return result;
-    }
-
-    /**
-     * Helper for getting the plan hash from the SBE cache.
-     */
-    boost::optional<size_t> getPlanHashFromSbeCache(const sbe::PlanCacheKey& key) {
-        auto&& planCache = sbe::getPlanCache(_opCtx);
-        if (auto cacheEntry = planCache.getCacheEntryIfActive(key); cacheEntry) {
-            return cacheEntry->cachedPlan->solutionHash;
-        }
-        return boost::none;
-    }
-
-    std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildCachedPlan(
-        const sbe::PlanCacheKey& key) final {
-        if (shouldCacheQuery(*_cq)) {
-            return tryToBuildCachedPlanFromSbeCache(key);
-        }
-
-        planCacheCounters.incrementSbeSkippedCounter();
-        return nullptr;
-    }
-
-    boost::optional<size_t> getCachedPlanHash(const sbe::PlanCacheKey& key) final {
-        if (_cachedPlanHash) {
-            return _cachedPlanHash;
-        }
-
-        _cachedPlanHash = getPlanHashFromSbeCache(key);
-        return _cachedPlanHash;
-    }
 };
 
 /**
@@ -974,12 +899,8 @@ public:
         CanonicalQuery* cq,
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<QueryPlannerParams> plannerParams)
-        : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{opCtx,
-                                                                  collections,
-                                                                  cq,
-                                                                  policy,
-                                                                  std::move(plannerParams),
-                                                                  false /*useSbePlanCache*/} {}
+        : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{
+              opCtx, collections, cq, policy, std::move(plannerParams)} {}
 
 private:
     PlanCacheKey buildPlanCacheKey() const override {
@@ -1100,26 +1021,6 @@ std::unique_ptr<PlannerInterface> getClassicPlannerForSbe(
     auto planningResult = uassertStatusOK(helper.prepare());
     setOpDebugPlanCacheInfo(opCtx, planningResult->planCacheInfo());
     return std::move(planningResult->runtimePlanner);
-}
-
-bool shouldUseSbePlanCache(const QueryPlannerParams& params) {
-    // The logic in this funtion depends on the fact that we clear the SBE plan cache on index
-    // creation.
-
-    // SBE feature flag guards SBE plan cache use. Check this first to avoid doing potentially
-    // expensive checks unnecessarily.
-    if (!feature_flags::gFeatureFlagSbeFull.isEnabled()) {
-        return false;
-    }
-
-    // SBE plan cache does not support partial indexes.
-    // TODO SERVER-94392: Remove this restriction once they are supported.
-    for (const auto& idx : params.mainCollectionInfo.indexes) {
-        if (idx.filterExpr) {
-            return false;
-        }
-    }
-    return true;
 }
 }  // namespace
 
@@ -1251,30 +1152,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
             plannerParams->setTargetSbeStageBuilder(*canonicalQuery, collections);
 
-            if (shouldUseSbePlanCache(*plannerParams)) {
-                canonicalQuery->setUsingSbePlanCache(true);
-                return getClassicPlannerForSbe<
-                    SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper>(
-                    opCtx,
-                    collections,
-                    canonicalQuery.get(),
-                    yieldPolicy,
-                    std::move(plannerParams));
-            } else {
-                canonicalQuery->setUsingSbePlanCache(false);
-                return getClassicPlannerForSbe<
-                    SbeWithClassicRuntimePlanningAndClassicCachePrepareExecutionHelper>(
-                    opCtx,
-                    collections,
-                    canonicalQuery.get(),
-                    yieldPolicy,
-                    std::move(plannerParams));
-            }
+            return getClassicPlannerForSbe<
+                SbeWithClassicRuntimePlanningAndClassicCachePrepareExecutionHelper>(
+                opCtx, collections, canonicalQuery.get(), yieldPolicy, std::move(plannerParams));
         }
-
-        // This codepath will use the classic runtime planner with classic PlanStages, so will not
-        // use the SBE plan cache.
-        canonicalQuery->setUsingSbePlanCache(false);
 
         // Default to using the classic executor with the classic runtime planner.
         return getClassicPlanner(opCtx,

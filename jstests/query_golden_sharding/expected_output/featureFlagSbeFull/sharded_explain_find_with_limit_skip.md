@@ -625,14 +625,9 @@ Execution Engine: sbe
 						"inputStage" : {
 							"inputStage" : {
 								"inputStage" : {
-									"inputStage" : {
-										"isEOF" : 0,
-										"nReturned" : 5,
-										"stage" : "ixseek"
-									},
 									"isEOF" : 0,
 									"nReturned" : 5,
-									"stage" : "cfilter"
+									"stage" : "ixseek"
 								},
 								"isEOF" : 0,
 								"nReturned" : 5,
@@ -699,14 +694,9 @@ Execution Engine: sbe
 						"inputStage" : {
 							"inputStage" : {
 								"inputStage" : {
-									"inputStage" : {
-										"isEOF" : 1,
-										"nReturned" : 9,
-										"stage" : "ixseek"
-									},
 									"isEOF" : 1,
 									"nReturned" : 9,
-									"stage" : "cfilter"
+									"stage" : "ixseek"
 								},
 								"isEOF" : 1,
 								"nReturned" : 9,
@@ -776,14 +766,9 @@ Execution Engine: sbe
 							"inputStage" : {
 								"inputStage" : {
 									"inputStage" : {
-										"inputStage" : {
-											"isEOF" : 1,
-											"nReturned" : 9,
-											"stage" : "ixseek"
-										},
 										"isEOF" : 1,
 										"nReturned" : 9,
-										"stage" : "cfilter"
+										"stage" : "ixseek"
 									},
 									"isEOF" : 1,
 									"nReturned" : 9,

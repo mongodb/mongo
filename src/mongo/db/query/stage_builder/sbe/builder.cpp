@@ -335,10 +335,6 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
     }
 
-    if (preparingFromSbeCache && cq.shouldParameterizeLimitSkip()) {
-        input_params::bindLimitSkipInputSlots(cq, data, env.runtimeEnv);
-    }
-
     prepareSearchQueryParameters(data, cq);
 }  // prepareSlotBasedExecutableTree
 

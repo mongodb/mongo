@@ -51,7 +51,6 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
@@ -640,18 +639,10 @@ Explain::PlannerContext Explain::makePlannerContext(const PlanExecutor& exec,
     boost::optional<uint32_t> planCacheShapeHash;
 
     if (auto* cq = exec.getCanonicalQuery(); mainCollExists && cq) {
-        if (cq->isSbeCompatible() && cq->isUsingSbePlanCache() &&
-            feature_flags::gFeatureFlagSbeFull.isEnabled()) {
-            const auto planCacheKeyInfo =
-                plan_cache_key_factory::make(*exec.getCanonicalQuery(), collections);
-            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
-            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
-        } else {
-            const auto planCacheKeyInfo = plan_cache_key_factory::make<PlanCacheKey>(
-                *exec.getCanonicalQuery(), collections.getMainCollectionAcquisition());
-            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
-            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
-        }
+        const auto planCacheKeyInfo = plan_cache_key_factory::make<PlanCacheKey>(
+            *exec.getCanonicalQuery(), collections.getMainCollectionAcquisition());
+        planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
+        planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
     }
 
     // If there exists a matching index filter, set 'indexFilterSet' to false if query settings

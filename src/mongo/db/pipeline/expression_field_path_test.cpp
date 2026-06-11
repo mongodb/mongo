@@ -204,35 +204,6 @@ TEST(FieldPath, NoOptimizationOnVariableWithMissingValue) {
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
 }
 
-TEST(FieldPath, NoOptimizationOnCertainVariablesUnderSbeFull) {
-    RAIIServerParameterControllerForTest sbe("featureFlagSbeFull", true);
-
-    auto expCtx = ExpressionContextForTest{};
-
-    {
-        auto expr = ExpressionFieldPath::parse(&expCtx, "$$NOW", expCtx.variablesParseState);
-        ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
-
-        auto optimizedExpr = expr->optimize();
-        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
-    }
-    {
-        auto expr =
-            ExpressionFieldPath::parse(&expCtx, "$$CLUSTER_TIME", expCtx.variablesParseState);
-        ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
-
-        auto optimizedExpr = expr->optimize();
-        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
-    }
-    {
-        auto expr = ExpressionFieldPath::parse(&expCtx, "$$USER_ROLES", expCtx.variablesParseState);
-        ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
-
-        auto optimizedExpr = expr->optimize();
-        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(optimizedExpr.get()));
-    }
-}
-
 TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue) {
     auto expCtx = ExpressionContextForTest{};
     auto varId = expCtx.variablesParseState.defineVariable("userVar");

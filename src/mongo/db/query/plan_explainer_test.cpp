@@ -193,6 +193,21 @@ protected:
         return fmt::format("{}", printer);
     }
 
+    void checkPipelinePlanExplainDiagnostics(PlanExecutor* exec, bool sbeEnabled) {
+        auto explainDiagnostics = printExplainDiagnostics(exec);
+        ASSERT_STRING_CONTAINS(explainDiagnostics, "IXSCAN");
+        if (sbeEnabled) {
+            ASSERT_STRING_CONTAINS(explainDiagnostics, "slotBasedPlan");
+        } else {
+            ASSERT_STRING_OMITS(explainDiagnostics, "slotBasedPlan");
+        }
+        ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+        ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
+        ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
+        ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: ");
+        ASSERT_STRING_OMITS(explainDiagnostics, "nReturned: 0");
+    }
+
     boost::intrusive_ptr<ExpressionContext> expCtx;
 };
 
@@ -429,15 +444,7 @@ TEST_F(PlanExplainerTest, ClassicPipelinePlanExplainDiagnostics) {
         std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
                     fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
     auto exec = buildAggExecAndIter(stages);
-
-    auto explainDiagnostics = printExplainDiagnostics(exec.get());
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "IXSCAN");
-    ASSERT_STRING_OMITS(explainDiagnostics, "slotBasedPlan");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: ");
-    ASSERT_STRING_OMITS(explainDiagnostics, "nReturned: 0");
+    checkPipelinePlanExplainDiagnostics(exec.get(), false);
 }
 
 TEST_F(PlanExplainerTest, SBEPipelinePlanExplainDiagnostics) {
@@ -447,14 +454,7 @@ TEST_F(PlanExplainerTest, SBEPipelinePlanExplainDiagnostics) {
         std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
                     fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
     auto exec = buildAggExecAndIter(stages);
-
-    auto explainDiagnostics = printExplainDiagnostics(exec.get());
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "IXSCAN");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "slotBasedPlan");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "numTested: 1");
+    checkPipelinePlanExplainDiagnostics(exec.get(), true);
 }
 
 // Helper function to make a collection scan node.

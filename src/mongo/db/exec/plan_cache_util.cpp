@@ -113,8 +113,7 @@ std::pair<std::unique_ptr<PlanExplainer>, std::unique_ptr<PlanExplainer>> getCla
 }
 
 bool shouldCacheBasedOnQueryAndPlan(const CanonicalQuery& query, const QuerySolution* winningPlan) {
-    if (!query.isUncacheableSbe() && shouldCacheQuery(query) &&
-        winningPlan->isEligibleForPlanCache()) {
+    if (shouldCacheQuery(query) && winningPlan->isEligibleForPlanCache()) {
         if (!winningPlan->cacheData) {
             logNotCachingNoData(winningPlan->toString());
             return false;
@@ -233,8 +232,7 @@ void updateSbePlanCacheWithPinnedEntry(OperationContext* opCtx,
                                        const sbe::PlanStage& root,
                                        stage_builder::PlanStageData stageData) {
     const CollectionPtr& collection = collections.getMainCollection();
-    if (collection && !query.isUncacheableSbe() && shouldCacheQuery(query) &&
-        solution.isEligibleForPlanCache()) {
+    if (collection && shouldCacheQuery(query) && solution.isEligibleForPlanCache()) {
         sbe::PlanCacheKey key = plan_cache_key_factory::make(query, collections);
         // Store a copy of the root and corresponding data, as well as the hash of the QuerySolution
         // that led to this cache entry.

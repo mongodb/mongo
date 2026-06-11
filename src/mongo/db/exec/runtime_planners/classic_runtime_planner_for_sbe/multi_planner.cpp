@@ -154,7 +154,7 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
 
     // If classic plan cache is enabled, write to it. We need to do this before we extend the
     // QSN tree with the agg pipeline, since the agg portion does not get cached in classic.
-    if (_shouldWriteToPlanCache && !useSbePlanCache()) {
+    if (_shouldWriteToPlanCache) {
         plan_cache_util::updateClassicPlanCacheFromClassicCandidates(
             opCtx(),
             collections().getMainCollectionAcquisition(),
@@ -183,14 +183,6 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
     }
 
     _sbePlanAndData = prepareSbePlanAndData(*solnToCache, std::move(_replanReason));
-    if (_shouldWriteToPlanCache && useSbePlanCache()) {
-        plan_cache_util::updateSbePlanCacheWithPlanCacheDecisionMetrics(opCtx(),
-                                                                        collections(),
-                                                                        queryToCache,
-                                                                        *planCacheDecisionMetrics,
-                                                                        *_sbePlanAndData,
-                                                                        solnToCache);
-    }
 }
 
 }  // namespace mongo::classic_runtime_planner_for_sbe

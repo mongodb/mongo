@@ -217,13 +217,12 @@ export function checkSbeFullFeatureFlagEnabled(theDB) {
 }
 
 /**
- * Check if the SBE plan cache is enabled.
- * If the `featureFlagGetExecutorDeferredEngineChoice` is enabled, return false since the SBE cache
- * is not implemented yet.
- * TODO SERVER-119773 enable SBE plan cache in new get executor.
+ * Check if the SBE plan cache is enabled. The SBE plan cache is currently not in use;
+ * queries always use the classic plan cache.
+ * TODO SERVER-128637
  */
-export function sbePlanCacheEnabled(theDB) {
-    return checkSbeFullFeatureFlagEnabled(theDB) && !isDeferredGetExecutorEnabled(theDB);
+export function sbePlanCacheEnabled(_theDB) {
+    return false;
 }
 
 /**

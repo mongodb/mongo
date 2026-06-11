@@ -547,22 +547,6 @@ TEST(CanonicalQueryTest, InvalidSortOrdersFailToCanonicalize) {
     assertInvalidSortOrder(fromjson("{'': -1}"));
 }
 
-TEST(CanonicalQueryTest, DoNotParameterizeTextExpressions) {
-    // We never parameterize unless SBE is fully enabled.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
 
-    auto cq =
-        canonicalize("{$text: {$search: \"Hello World!\"}}",
-                     MatchExpressionParser::kDefaultSpecialFeatures | MatchExpressionParser::kText);
-    ASSERT_FALSE(cq->isParameterized());
-}
-
-TEST(CanonicalQueryTest, DoParameterizeRegularExpressions) {
-    // SBE must be enabled in order to generate SBE plan cache keys.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
-
-    auto cq = canonicalize("{a: 1, b: {$lt: 5}}");
-    ASSERT_TRUE(cq->isParameterized());
-}
 }  // namespace
 }  // namespace mongo

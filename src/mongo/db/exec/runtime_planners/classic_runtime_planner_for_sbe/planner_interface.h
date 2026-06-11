@@ -59,8 +59,7 @@ struct PlannerDataForSBE final : public PlannerData {
         std::shared_ptr<QueryPlannerParams> plannerParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         boost::optional<size_t> cachedPlanHash,
-        std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
-        bool useSbePlanCache)
+        std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
         : PlannerData(opCtx,
                       cq,
                       std::move(workingSet),
@@ -68,14 +67,12 @@ struct PlannerDataForSBE final : public PlannerData {
                       std::move(plannerParams),
                       yieldPolicy,
                       cachedPlanHash),
-          sbeYieldPolicy(std::move(sbeYieldPolicy)),
-          useSbePlanCache(useSbePlanCache) {}
+          sbeYieldPolicy(std::move(sbeYieldPolicy)) {}
 
     PlannerDataForSBE(PlannerData plannerData,
                       const MultipleCollectionAccessor& collections,
                       std::shared_ptr<QueryPlannerParams> plannerParams,
-                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
-                      bool useSbePlanCache)
+                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
         : PlannerDataForSBE(plannerData.opCtx,
                             plannerData.cq,
                             std::move(plannerData.workingSet),
@@ -83,18 +80,9 @@ struct PlannerDataForSBE final : public PlannerData {
                             std::move(plannerParams),
                             plannerData.yieldPolicy,
                             plannerData.cachedPlanHash,
-                            std::move(sbeYieldPolicy),
-                            useSbePlanCache) {}
+                            std::move(sbeYieldPolicy)) {}
 
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
-
-    // If true, runtime planners will use the SBE plan cache rather than the classic plan cache.
-    const bool useSbePlanCache;
-
-    // Used to determine whether a replanned plan is the same as the plan that has already been
-    // cached. Slightly different from PlannerData::cachedPlanHash because that member can only be
-    // set if there is a solution in the cache as well, but plans in the SBE plan cache only store
-    // the PlanStage root and the solution hash, not the solution itself.
     boost::optional<size_t> cachedPlanSolutionHash = boost::none;
 };
 
@@ -159,8 +147,6 @@ protected:
         return _plannerData.cachedPlanHash;
     }
 
-    // See comments in PlannerDataForSBE about why this is necessary and distinct from
-    // cachedPlanHash.
     boost::optional<size_t> cachedPlanSolutionHash() const {
         return _plannerData.cachedPlanSolutionHash;
     }
@@ -185,9 +171,6 @@ protected:
         return std::move(_plannerData);
     }
 
-    bool useSbePlanCache() const {
-        return _plannerData.useSbePlanCache;
-    }
 
 private:
     PlannerDataForSBE _plannerData;

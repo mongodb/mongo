@@ -121,8 +121,7 @@ std::unique_ptr<PlannerInterface> buildCachedPlan(
                                                    // To be shared between all instances of this
                                                    // type and the prepare helper creating them.
                                                    plannerParams,
-                                                   std::move(sbeYieldPolicy),
-                                                   false),
+                                                   std::move(sbeYieldPolicy)),
                                                std::move(querySolution),
                                                cachedSolution->cachedPlan->solutionHash,
                                                cachedSolution->decisionReads());
@@ -376,7 +375,6 @@ PlanRankingResult planRanking(OperationContext* opCtx,
         return std::make_unique<EngineSelectionPlanner>(
             std::move(innerPlanner), opCtx, canonicalQuery.get(), pipeline, collections);
     };
-    canonicalQuery->setUsingSbePlanCache(false);
     return retryMakePlanner(std::move(paramsForSingleCollectionQuery),
                             makeQueryPlannerParams,
                             makePlannerHelper,

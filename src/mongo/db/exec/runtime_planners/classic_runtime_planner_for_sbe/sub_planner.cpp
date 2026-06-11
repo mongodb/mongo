@@ -59,15 +59,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     auto sbePlanAndData = prepareSbePlanAndData(*_solution);
 
-    if (useSbePlanCache()) {
-        plan_cache_util::updateSbePlanCacheWithPinnedEntry(opCtx(),
-                                                           collections(),
-                                                           *cq(),
-                                                           *_solution,
-                                                           *sbePlanAndData.first.get(),
-                                                           sbePlanAndData.second);
-    }
-
     return prepareSbePlanExecutor(std::move(canonicalQuery),
                                   std::move(_solution),
                                   std::move(sbePlanAndData),
@@ -76,49 +67,34 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
                                   nullptr /*classicRuntimePlannerStage*/);
 }
 SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
-    if (useSbePlanCache()) {
-        // When using the SBE plan cache, pass no-op callbacks to the 'SubplanStage'. We take care
-        // of writing the complete composite plan to the SBE plan cache ourselves.
-        return SubplanStage::PlanSelectionCallbacks{
-            .onPickPlanForBranch =
-                [this](const CanonicalQuery&,
-                       MultiPlanStage& mps,
-                       std::unique_ptr<plan_ranker::PlanRankingDecision>,
-                       std::vector<plan_ranker::CandidatePlan>&) { ++_numPerBranchMultiplans; },
-            .onPickPlanWholeQuery = plan_cache_util::NoopPlanCacheWriter{},
-        };
-    } else {
-        // This callback is invoked on a per $or branch basis. The callback is constructed in the
-        // "sometimes cache" mode. We currently do not support cached plan replanning for rooted $or
-        // queries. Therefore, we must be more conservative about putting a potentially bad plan
-        // into the cache in the subplan path.
-        //
-        // TODO SERVER-18777: Support replanning for rooted $or queries.
-        plan_cache_util::ConditionalClassicPlanCacheWriter perBranchWriter{
-            plan_cache_util::CacheMode::SometimesCache,
-            opCtx(),
-            collections().getMainCollectionPtrOrAcquisition()};
+    // This callback is invoked on a per $or branch basis. The callback is constructed in the
+    // "sometimes cache" mode. We currently do not support cached plan replanning for rooted $or
+    // queries. Therefore, we must be more conservative about putting a potentially bad plan
+    // into the cache in the subplan path.
+    //
+    // TODO SERVER-18777: Support replanning for rooted $or queries.
+    plan_cache_util::ConditionalClassicPlanCacheWriter perBranchWriter{
+        plan_cache_util::CacheMode::SometimesCache,
+        opCtx(),
+        collections().getMainCollectionPtrOrAcquisition()};
 
-        // Wrap the conditional classic plan cache writer function object so that we can count the
-        // number of times that multi-planning gets invoked for an $or branch.
-        auto perBranchCallback = [this, capturedPerBranchWriter = std::move(perBranchWriter)](
-                                     const CanonicalQuery& cq,
-                                     MultiPlanStage& mps,
-                                     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-                                     std::vector<plan_ranker::CandidatePlan>& candidates) {
-            ++_numPerBranchMultiplans;
-            capturedPerBranchWriter(cq, mps, std::move(ranking), candidates);
-        };
+    // Wrap the conditional classic plan cache writer function object so that we can count the
+    // number of times that multi-planning gets invoked for an $or branch.
+    auto perBranchCallback = [this, capturedPerBranchWriter = std::move(perBranchWriter)](
+                                 const CanonicalQuery& cq,
+                                 MultiPlanStage& mps,
+                                 std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+                                 std::vector<plan_ranker::CandidatePlan>& candidates) {
+        ++_numPerBranchMultiplans;
+        capturedPerBranchWriter(cq, mps, std::move(ranking), candidates);
+    };
 
-        // The query will run in SBE but we are using the classic plan cache. Use callbacks to write
-        // a classic plan cache entry for each branch.
-        return SubplanStage::PlanSelectionCallbacks{
-            .onPickPlanForBranch = std::move(perBranchCallback),
-            .onPickPlanWholeQuery =
-                plan_cache_util::ClassicPlanCacheWriter{
-                    opCtx(), collections().getMainCollectionPtrOrAcquisition()},
-        };
-    }
+    return SubplanStage::PlanSelectionCallbacks{
+        .onPickPlanForBranch = std::move(perBranchCallback),
+        .onPickPlanWholeQuery =
+            plan_cache_util::ClassicPlanCacheWriter{
+                opCtx(), collections().getMainCollectionPtrOrAcquisition()},
+    };
 }
 
 }  // namespace mongo::classic_runtime_planner_for_sbe

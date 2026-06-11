@@ -750,35 +750,6 @@ void encodeKeyForPipelineStage(DocumentSource* docSource,
     }
 }
 
-/**
- * Approximate the number of documents to be processed into a small, medium or large category. Best
- * plans for limit: 10 and limit: 1000 may be different. This allows us to cache different plans for
- * different cases without unbounded growth of plan cache for each skip and limit value.
- */
-char getLimitSkipCategory(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          boost::optional<int64_t> skip,
-                          boost::optional<int64_t> limit) {
-    if (limit.value_or(0) == 1 && !skip) {
-        return '1';
-    }
-
-    size_t limitSkipSum;
-    bool hasOverflowed = overflow::add(static_cast<size_t>(skip.value_or(0)),
-                                       static_cast<size_t>(limit.value_or(0)),
-                                       &limitSkipSum);
-    if (hasOverflowed) {
-        return 'l';
-    }
-    size_t planEvaluationMaxResults =
-        expCtx->getQueryKnobConfiguration().getPlanEvaluationMaxResultsForOp();
-    if (limitSkipSum < planEvaluationMaxResults) {
-        return 's';
-    } else if (limitSkipSum < 10 * planEvaluationMaxResults) {
-        return 'm';
-    } else {
-        return 'l';
-    }
-}
 
 void encodeLimitSkip(const CanonicalQuery& cq, BufBuilder* bufBuilder) {
     boost::optional<int64_t> skip = cq.getFindCommandRequest().getSkip();
@@ -786,16 +757,9 @@ void encodeLimitSkip(const CanonicalQuery& cq, BufBuilder* bufBuilder) {
     if (!limit && !skip) {
         return;
     }
-    if (cq.shouldParameterizeLimitSkip()) {
-        bufBuilder->appendChar('p');
-        bufBuilder->appendChar(skip ? 1 : 0);
-        bufBuilder->appendChar(limit ? 1 : 0);
-        bufBuilder->appendChar(getLimitSkipCategory(cq.getExpCtx(), skip, limit));
-    } else {
-        bufBuilder->appendChar('c');
-        bufBuilder->appendNum(skip.value_or(0));
-        bufBuilder->appendNum(limit.value_or(0));
-    }
+    bufBuilder->appendChar('c');
+    bufBuilder->appendNum(skip.value_or(0));
+    bufBuilder->appendNum(limit.value_or(0));
 }
 
 void encodeFindCommandRequest(const CanonicalQuery& cq, BufBuilder* bufBuilder) {
