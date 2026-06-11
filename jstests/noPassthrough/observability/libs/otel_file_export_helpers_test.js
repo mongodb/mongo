@@ -455,13 +455,39 @@ describe("extractPrometheusMetricIntValue", function () {
         assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "network.connections_processed"), 77);
     });
 
-    it("matches metrics with different unit suffixes", function () {
+    it("matches metrics with a single unit suffix", function () {
         assert.eq(
             extractPrometheusMetricIntValue(
                 /*metricsText=*/ "request_duration_seconds{} 15 123456\n",
                 /*metricName=*/ "request.duration",
             ),
             15,
+        );
+    });
+
+    it("matches metrics with both a unit suffix and a _total type suffix", function () {
+        // The OTel Prometheus exporter appends _total for counter metrics  AND _<unit> when the name does not already
+        // contains the unit, producing two suffix groups.
+        assert.eq(
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ "request_duration_seconds_total{} 88 123456\n",
+                /*metricName=*/ "request.duration",
+            ),
+            88,
+        );
+    });
+
+    it("matches serverStatus-style metrics with multiple word segments and a _total suffix", function () {
+        // serverStatus.connections.totalCreated → serverStatus_connections_totalCreated_total
+        // has two suffix groups after the base name (_totalCreated and _total) when split naively,
+        // but only _total is the appended type suffix; the full Prometheus name requires matching
+        // all trailing _word groups with (?:_[a-zA-Z]+)+.
+        assert.eq(
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ 'serverStatus_connections_totalCreated_total{otel_scope_name="mongodb"} 5 123456\n',
+                /*metricName=*/ "serverStatus.connections.totalCreated",
+            ),
+            5,
         );
     });
 

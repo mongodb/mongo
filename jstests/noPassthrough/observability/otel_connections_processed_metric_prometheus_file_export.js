@@ -41,7 +41,7 @@ function getConnectionsMetricValue(metricsDir, metricsFileName, afterDate) {
         1000,
     );
 
-    return extractPrometheusMetricIntValue(metricsText, "network.connections_processed");
+    return extractPrometheusMetricIntValue(metricsText, "serverStatus.network.numRequests");
 }
 
 /**
@@ -72,8 +72,8 @@ function runConnectionsTest(mongod, metricsDir, metricsFileName) {
             // made and background processes that may be creating connections.
             return getConnectionsMetricValue(metricsDir, metricsFileName, testCaseStartDate) >= expectedTotal;
         },
-        `mongod network.connections_processed counter should have recorded at least ` +
-            `${newConnections} new connections (initial: ${initialValue}, expected total: ${expectedTotal})`,
+        `mongod serverStatus.network.numRequests counter should have recorded at least ` +
+            `${newConnections} new requests (initial: ${initialValue}, expected total: ${expectedTotal})`,
         30000,
         300,
     );

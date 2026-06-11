@@ -70,7 +70,7 @@ TEST(OtelMetricNameValidation, AcceptsSnakeCaseSegments) {
 }
 
 TEST(OtelMetricNameValidation, AcceptsRegistryMetricNameSamples) {
-    ASSERT_OK(validateOtelMetricName(MetricNames::kOpenConnections.getName()));
+    ASSERT_OK(validateOtelMetricName(MetricNames::kConnectionsCurrent.getName()));
     ASSERT_OK(validateOtelMetricName(MetricNames::kTest1.getName()));
     ASSERT_OK(validateOtelMetricName(MetricNames::kPrometheusFileExporterWrites.getName()));
 }

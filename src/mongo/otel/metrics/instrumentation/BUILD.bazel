@@ -120,10 +120,35 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "connections_metrics",
+    srcs = ["connections_metrics.cpp"],
+    hdrs = ["connections_metrics.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/transport:transport_layer",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "connections_metrics_test",
+    srcs = ["connections_metrics_test.cpp"],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":connections_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/transport:transport_layer",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
     name = "metrics_installer",
     srcs = ["metrics_installer.cpp"],
     hdrs = ["metrics_installer.h"],
     deps = [
+        ":connections_metrics",
         ":disk_metrics",
         ":global_lock_metrics",
         ":index_build_metrics",

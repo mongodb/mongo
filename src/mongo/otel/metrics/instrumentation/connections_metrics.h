@@ -27,22 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
+#pragma once
 
-#include "mongo/otel/metrics/instrumentation/connections_metrics.h"
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/global_lock_metrics.h"
-#include "mongo/otel/metrics/instrumentation/index_build_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
+#include "mongo/db/service_context.h"
+#include "mongo/transport/asio/asio_session_manager.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
 
 namespace mongo {
 
-void installOtelMetrics(ServiceContext* svcCtx) {
-    installSystemMountOtelMetrics(svcCtx);
-    installDiskOtelMetrics(svcCtx);
-    installGlobalLockOtelMetrics(svcCtx);
-    installIndexBuildOtelMetrics(svcCtx);
-    installConnectionsOtelMetrics(svcCtx);
-}
+/**
+ * Owns the OpenTelemetry instruments that track ingress connection state
+ * (current, available, totalCreated, rejected, active), matching the fields
+ * reported by serverStatus.connections. Each call to `update` sets the latest
+ * values from a ConnectionsStatsSnapshot.
+ */
+class ConnectionsMetrics {
+public:
+    ConnectionsMetrics();
+    ~ConnectionsMetrics();
+
+    void update(const transport::ConnectionsStatsSnapshot& snap);
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> _impl;
+};
+
+/**
+ * Registers OpenTelemetry gauges for ingress connection state and starts a
+ * periodic job (1 Hz) that samples the AsioSessionManager and pushes the
+ * latest values. Intended to be called once at startup from mongod_main.
+ */
+MONGO_MOD_PUBLIC void installConnectionsOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

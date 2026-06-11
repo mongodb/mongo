@@ -199,12 +199,13 @@ export function getHistogramCount(metricsDir, metricName, attrKey, attrValue) {
  * @returns {number} The integer value of the metric. Returns null if the metric is not found.
  */
 export function extractPrometheusMetricIntValue(metricsText, metricName) {
-    // Match lines like: network_connections_processed{} <value>
+    // Match lines like: network_connections_processed_total{} <value>
     // `.` gets replaced with `_` when switching to Prometheus format.
-    // There is also a unit suffix which we need to skip, and there may be a scope label.
+    // The OTel Prometheus exporter appends a unit suffix and/or a `_total` type suffix; use
+    // `(?:_[a-zA-Z]+)+` to skip one or more such groups before the label set.
     const leadingWhitespaceRe = "(?:^|\\s)+";
     const metricNameRe = metricName.replace(/\./g, "_");
-    const unitSuffixRe = "_[a-zA-Z]+";
+    const unitSuffixRe = "(?:_[a-zA-Z]+)+";
     const scopeRe = '\\{(?:\\w+\\="\\w+")?\\}';
     const valueRe = "\\s+(\\d+)";
 

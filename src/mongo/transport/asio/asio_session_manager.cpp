@@ -31,11 +31,14 @@
 
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
+
+#include <algorithm>
 
 namespace mongo::transport {
 namespace {
@@ -119,6 +122,45 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
         bob->append("priority", _priorityPortConnections.get());
     }
+}
+
+ConnectionsStatsSnapshot AsioSessionManager::getConnectionsStatsSnapshot() const {
+    auto sessionCount = static_cast<int64_t>(numOpenSessions());
+    auto queued = _sessionEstablishmentRateLimiter.queued();
+
+    // Each field is derived from independent atomic loads with no lock spanning the group,
+    // so a concurrent change between reads can produce a transient negative value (e.g.
+    // `queued` advancing past `sessionCount` between the two loads, or a completion landing
+    // between the `total` and `completed` reads inside getActiveOperations()). Clamp to zero
+    // so we never publish obviously invalid data to OTel consumers.
+    auto clamp = [](int64_t v) {
+        return std::max<int64_t>(0, v);
+    };
+
+    return {
+        .current = clamp(sessionCount - queued),
+        .available = clamp(static_cast<int64_t>(maxOpenSessions()) - sessionCount),
+        .totalCreated = static_cast<int64_t>(numCreatedSessions()),
+        .rejected = static_cast<int64_t>(numRejectedSessions()) +
+            _sessionEstablishmentRateLimiter.rejected(),
+        .active = clamp(static_cast<int64_t>(getActiveOperations()) - queued),
+    };
+}
+
+ConnectionsStatsSnapshot collectConnectionsStatsSnapshot(ServiceContext* svcCtx) {
+    auto* tlm = svcCtx->getTransportLayerManager();
+    if (!tlm)
+        return {};
+    ConnectionsStatsSnapshot snap;
+    int asioSeen = 0;
+    tlm->forEach([&](TransportLayer* tl) {
+        // AsioSesionManager is the only manager currently used in production.
+        if (auto* sm = dynamic_cast<AsioSessionManager*>(tl->getSessionManager())) {
+            dassert(++asioSeen == 1, "Multiple AsioSessionManagers found");
+            snap = sm->getConnectionsStatsSnapshot();
+        }
+    });
+    return snap;
 }
 
 void AsioSessionManager::incrementLBConnections() {

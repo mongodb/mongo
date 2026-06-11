@@ -36,7 +36,7 @@ function getConnectionsMetricValue(metricsDir, afterDate) {
         1000,
     );
 
-    return metrics["network.connections_processed"]?.value ?? 0;
+    return metrics["serverStatus.network.numRequests"]?.value ?? 0;
 }
 
 /**
@@ -66,8 +66,8 @@ function verifyConnectionsProcessedMetric(metricsDir, host, componentName) {
             // processes that may be creating connections.
             return getConnectionsMetricValue(metricsDir, testCaseStartDate) >= expectedTotal;
         },
-        `${componentName} network.connections_processed counter should have recorded at least ${newConnections} ` +
-            `new connections (initial: ${initialValue}, expected total: ${expectedTotal})`,
+        `${componentName} serverStatus.network.numRequests counter should have recorded at least ${newConnections} ` +
+            `new requests (initial: ${initialValue}, expected total: ${expectedTotal})`,
         30000,
         // Keep it short between retries so we are less likely to be reading a file at the same time as the metrics are
         // being written.

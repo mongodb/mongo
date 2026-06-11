@@ -127,12 +127,18 @@ public:
         MetricNameMaker::make("metrics.prometheus_file_exporter.write_duration");
     static constexpr MetricName kPrometheusFileExporterWriteSize =
         MetricNameMaker::make("metrics.prometheus_file_exporter.write_size");
-    static constexpr MetricName kConnectionsProcessed =
-        MetricNameMaker::make("network.connections_processed");
     static constexpr MetricName kIngressTLSHandshakeLatency =
         MetricNameMaker::make("network.ingress_tls_handshake_latency");
-    static constexpr MetricName kOpenConnections =
-        MetricNameMaker::make("network.open_ingress_connections");
+    static constexpr MetricName kConnectionsCurrent =
+        MetricNameMaker::make("serverStatus.connections.current");
+    static constexpr MetricName kConnectionsAvailable =
+        MetricNameMaker::make("serverStatus.connections.available");
+    static constexpr MetricName kConnectionsTotalCreated =
+        MetricNameMaker::make("serverStatus.connections.totalCreated");
+    static constexpr MetricName kConnectionsRejected =
+        MetricNameMaker::make("serverStatus.connections.rejected");
+    static constexpr MetricName kConnectionsActive =
+        MetricNameMaker::make("serverStatus.connections.active");
 
     // Query Execution Team Metrics
     static constexpr MetricName kChangeStreamCursorsTotalOpened =
