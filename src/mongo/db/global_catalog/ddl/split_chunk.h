@@ -59,14 +59,14 @@ class ScopedSplitMergeChunk;
  * it as scopedSplitMergeChunk to prove exclusive ownership. The lock must remain live for the
  * duration of the call.
  */
-Status splitChunk(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const BSONObj& keyPatternObj,
-                  const ChunkRange& chunkRange,
-                  std::vector<BSONObj>&& splitPoints,
-                  const std::string& shardName,
-                  const OID& expectedCollectionEpoch,
-                  const boost::optional<Timestamp>& expectedCollectionTimestamp,
-                  const ScopedSplitMergeChunk& scopedSplitMergeChunk);
+Status splitChunk_nonAuth(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& keyPatternObj,
+                          const ChunkRange& chunkRange,
+                          std::vector<BSONObj>&& splitPoints,
+                          const std::string& shardName,
+                          const OID& expectedCollectionEpoch,
+                          const boost::optional<Timestamp>& expectedCollectionTimestamp,
+                          const ScopedSplitMergeChunk& scopedSplitMergeChunk);
 
 }  // namespace mongo

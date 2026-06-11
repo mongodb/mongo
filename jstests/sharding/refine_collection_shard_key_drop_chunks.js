@@ -28,6 +28,37 @@ const newKeyDoc = {
 };
 
 const isAuthoritativeMetadata = FeatureFlagUtil.isEnabled(st.s.getDB("admin"), "featureFlagAuthoritativeShardsDDL");
+const kShardCatalogCollectionsNs = isAuthoritativeMetadata ? kAuthoritativeCollectionsNs : kCachedCollectionsNs;
+
+// Returns the persisted collection metadata entry for 'kNsName' from the shard catalog, reading
+// from the authoritative or the cached collection depending on the feature flag.
+function getCollEntry() {
+    return shard.getCollection(kShardCatalogCollectionsNs).findOne({_id: kNsName});
+}
+
+// Asserts that the chunks persisted on the shard match 'expectedChunks', an array of
+// {min, max} boundaries sorted ascending. Reads from the authoritative shard catalog
+// (config.shard.catalog.chunks, filtered by collection uuid, with boundaries in 'min'/'max') or
+// from the routing table cache (config.cache.chunks.<ns>, where '_id' holds the min) depending on
+// the feature flag.
+function assertChunks(expectedChunks) {
+    let chunkArr;
+    let minFieldName;
+    if (isAuthoritativeMetadata) {
+        const uuid = getCollEntry().uuid;
+        chunkArr = shard.getCollection(kAuthoritativeChunksNs).find({uuid: uuid}).sort({min: 1}).toArray();
+        minFieldName = "min";
+    } else {
+        chunkArr = shard.getCollection(kCacheChunksNs).find({}).sort({_id: 1}).toArray();
+        minFieldName = "_id";
+    }
+
+    assert.eq(expectedChunks.length, chunkArr.length, {chunkArr});
+    expectedChunks.forEach((expected, i) => {
+        assert.eq(expected.min, chunkArr[i][minFieldName], {chunkArr});
+        assert.eq(expected.max, chunkArr[i].max, {chunkArr});
+    });
+}
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: oldKeyDoc}));
@@ -41,50 +72,39 @@ assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
 assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 0, b: 0}}));
 assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5, b: 5}}));
 
-// Flush the routing table cache and verify that 'config.cache.chunks.db.foo' is as expected
-// before refineCollectionShardKey.
-// TODO (SERVER-125785): with isAuthoritativeMetadata = true and authoritative split, this
-// _flushRoutingTableCacheUpdates can be removed and check
-// kAuthoritativeCollectionsNs/kCacheChunksNs instead of kCachedCollectionsNs/kCacheChunksNs.
-assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: kNsName}));
+if (!isAuthoritativeMetadata) {
+    // Flush the routing table cache and verify that 'config.cache.chunks.db.foo' is as expected
+    // before refineCollectionShardKey.
+    assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: kNsName}));
+}
 
-let collEntry = shard.getCollection(kCachedCollectionsNs).findOne({_id: kNsName});
-let chunkArr = shard.getCollection(kCacheChunksNs).find({}).sort({min: 1}).toArray();
-assert.eq(3, chunkArr.length);
-assert.eq({a: MinKey, b: MinKey}, chunkArr[0]._id);
-assert.eq({a: 0, b: 0}, chunkArr[0].max);
-assert.eq({a: 0, b: 0}, chunkArr[1]._id);
-assert.eq({a: 5, b: 5}, chunkArr[1].max);
-assert.eq({a: 5, b: 5}, chunkArr[2]._id);
-assert.eq({a: MaxKey, b: MaxKey}, chunkArr[2].max);
+let collEntry = getCollEntry();
+assertChunks([
+    {min: {a: MinKey, b: MinKey}, max: {a: 0, b: 0}},
+    {min: {a: 0, b: 0}, max: {a: 5, b: 5}},
+    {min: {a: 5, b: 5}, max: {a: MaxKey, b: MaxKey}},
+]);
 
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
 
-// refineCollectionShardKey doesn't block for each shard to refresh, so wait until the cached
-// information is fully up to date.
-assert.soon(() => {
-    const kCollectionsNs = isAuthoritativeMetadata ? kAuthoritativeCollectionsNs : kCachedCollectionsNs;
-    let newCollEntry = shard.getCollection(kCollectionsNs).findOne({_id: kNsName});
-    return newCollEntry.epoch != collEntry.epoch && !newCollEntry.refreshing;
-});
-
-// Verify that the chunks collection is as expected after refineCollectionShardKey.
-let minFieldName;
 if (isAuthoritativeMetadata) {
-    const uuid = shard.getCollection(kAuthoritativeCollectionsNs).findOne({_id: kNsName}).uuid;
-    chunkArr = shard.getCollection(kAuthoritativeChunksNs).find({uuid: uuid}).sort({min: 1}).toArray();
-    minFieldName = "min";
+    let newCollEntry = getCollEntry();
+    assert.neq(newCollEntry.lastmodEpoch, collEntry.lastmodEpoch);
+    assert.neq(newCollEntry.timestamp, collEntry.timestamp);
 } else {
-    chunkArr = shard.getCollection(kCacheChunksNs).find({}).sort({min: 1}).toArray();
-    minFieldName = "_id";
+    // refineCollectionShardKey doesn't block for each shard to refresh, so wait until the cached
+    // information is fully up to date.
+    assert.soon(() => {
+        let newCollEntry = getCollEntry();
+        return newCollEntry.epoch != collEntry.epoch && !newCollEntry.refreshing;
+    });
 }
 
-assert.eq(3, chunkArr.length);
-assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, chunkArr[0][minFieldName]);
-assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, chunkArr[0].max);
-assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, chunkArr[1][minFieldName]);
-assert.eq({a: 5, b: 5, c: MinKey, d: MinKey}, chunkArr[1].max);
-assert.eq({a: 5, b: 5, c: MinKey, d: MinKey}, chunkArr[2][minFieldName]);
-assert.eq({a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}, chunkArr[2].max);
+// Verify that the chunks collection is as expected after refineCollectionShardKey.
+assertChunks([
+    {min: {a: MinKey, b: MinKey, c: MinKey, d: MinKey}, max: {a: 0, b: 0, c: MinKey, d: MinKey}},
+    {min: {a: 0, b: 0, c: MinKey, d: MinKey}, max: {a: 5, b: 5, c: MinKey, d: MinKey}},
+    {min: {a: 5, b: 5, c: MinKey, d: MinKey}, max: {a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}},
+]);
 
 st.stop();

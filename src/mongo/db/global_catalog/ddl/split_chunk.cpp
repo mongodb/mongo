@@ -150,15 +150,15 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
 
 }  // namespace
 
-Status splitChunk(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const BSONObj& keyPatternObj,
-                  const ChunkRange& chunkRange,
-                  std::vector<BSONObj>&& splitPoints,
-                  const std::string& shardName,
-                  const OID& expectedCollectionEpoch,
-                  const boost::optional<Timestamp>& expectedCollectionTimestamp,
-                  const ScopedSplitMergeChunk&) {
+Status splitChunk_nonAuth(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& keyPatternObj,
+                          const ChunkRange& chunkRange,
+                          std::vector<BSONObj>&& splitPoints,
+                          const std::string& shardName,
+                          const OID& expectedCollectionEpoch,
+                          const boost::optional<Timestamp>& expectedCollectionTimestamp,
+                          const ScopedSplitMergeChunk&) {
     // If the shard key is hashed, then we must make sure that the split points are of supported
     // data types.
     const auto hashedField = ShardKeyPattern::extractHashedField(keyPatternObj);
@@ -181,8 +181,6 @@ Status splitChunk(OperationContext* opCtx,
     // durable shard catalog and keep the CSR pinned to the pre-split version.
     // This must be done before starting the operation to ensure the CSR is left as
     // kNonAuthoritative in case of an unexpected failure.
-    // TODO (SERVER-125785) The clearFilteringMetadata_nonAuthoritative should go away once
-    // splitChunk becomes authoritative.
     {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
         scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);

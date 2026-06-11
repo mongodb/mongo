@@ -176,7 +176,7 @@ public:
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
                     opCtx, nss, chunkRange));
 
-            uassertStatusOK(splitChunk(
+            uassertStatusOK(splitChunk_nonAuth(
                 opCtx,
                 nss,
                 req.getKeyPattern(),
