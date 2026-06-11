@@ -121,6 +121,9 @@ filters:
   - "s2":
     approvers:
       - 10gen/query-integration
+  - "s2n":
+    approvers:
+      - 10gen/server-security
   - "SafeInt":
     approvers:
       - 10gen/server-programmability

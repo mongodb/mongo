@@ -3467,6 +3467,59 @@
           "value": "false"
         }
       ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/aws/s2n-tls@{{VERSION}}",
+      "supplier": {
+        "name": "Amazon Web Services",
+        "url": [
+          "https://amazon.com/aws"
+        ]
+      },
+      "author": "Amazon Web Services",
+      "group": "aws",
+      "name": "s2n-tls TLS library",
+      "version": "{{VERSION}}",
+      "description": "s2n-tls is a C99 implementation of the TLS/SSL protocols that is designed to be simple, small, fast, and with security as a priority.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.",
+      "cpe": "cpe:2.3:a:amazon:s2n-tls:{{VERSION}}:*:*:*:*:*:*:*",
+      "purl": "pkg:github/aws/s2n-tls@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/aws/s2n-tls.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/s2n"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/s2n/scripts/import.sh"
+        },
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Security"
+        }
+      ]
     }
   ],
   "dependencies": [
@@ -3515,6 +3568,7 @@
         "pkg:github/apache/iceberg-cpp@{{VERSION}}",
         "pkg:github/arximboldi/immer@{{VERSION}}",
         "pkg:github/aws/aws-sdk-cpp@{{VERSION}}",
+        "pkg:github/aws/s2n-tls@{{VERSION}}",
         "pkg:github/azure/azure-sdk-for-cpp@azure-storage-blobs_{{VERSION}}",
         "pkg:github/boostorg/boost@boost-{{VERSION}}",
         "pkg:github/c-ares/c-ares@{{VERSION}}",

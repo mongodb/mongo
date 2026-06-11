@@ -1,0 +1,119 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# s2n only advertises build support on Linux and Mac arm64 and x86.
+# For now, we only support building it on Linux.
+COMPATIBLE_TARGETS = select({
+    "//bazel/config:linux_aarch64": [],
+    "//bazel/config:linux_x86_64": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+mongo_cc_library(
+    name = "s2n-tls",
+    srcs = glob([
+        "dist/crypto/*.c",
+        "dist/error/*.c",
+        "dist/stuffer/*.c",
+        "dist/tls/*.c",
+        "dist/tls/**/*.c",
+        "dist/utils/*.c",
+    ]),
+    hdrs = glob([
+        "dist/api/*.h",
+        "dist/api/unstable/*.h",
+        "dist/crypto/*.h",
+        "dist/error/*.h",
+        "dist/stuffer/*.h",
+        "dist/tls/*.h",
+        "dist/tls/**/*.h",
+        "dist/utils/*.h",
+    ]),
+    copts = [
+        "-Wno-error",
+        "-pedantic",
+        "-std=gnu99",
+        "-Wcast-align",
+        "-Wchar-subscripts",
+        "-Wcomment",
+        "-Wformat-security",
+        "-Wimplicit",
+        "-Wshadow",
+        "-Wsign-compare",
+        "-Wuninitialized",
+        "-Wunused",
+        "-Wwrite-strings",
+        "-Wa,--noexecstack",
+        "-Wno-deprecated-declarations",
+        "-Wno-missing-braces",
+        "-Wno-strict-prototypes",
+        "-Wno-unknown-pragmas",
+        "-DS2N_EXPORTS",
+        "-include utils/s2n_prelude.h",
+        "-Wno-macro-redefined",
+        "-Wp,-w",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    includes = [
+        "dist",
+        "dist/api",
+    ],
+    # Libs I think it needs: dl Threads::Threads rt
+    linkopts = [
+        "-ldl",
+        "-lpthread",
+        # "-lThreads::Threads",
+        "-lcrypto",
+        "-lrt",
+    ],
+    local_defines = [
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "PLATFORM_LINUX",
+        "S2N_ATOMIC_SUPPORTED",
+        "S2N_BUILD_RELEASE",
+        "S2N_CLOEXEC_SUPPORTED",
+        "S2N_CLOEXEC_XOPEN_SUPPORTED",
+        "S2N_CLONE_SUPPORTED",
+        "S2N_DIAGNOSTICS_POP_SUPPORTED",
+        "S2N_DIAGNOSTICS_PUSH_SUPPORTED",
+        "S2N_EXECINFO_AVAILABLE",
+        "S2N_FALL_THROUGH_SUPPORTED",
+        "S2N_FEATURES_AVAILABLE",
+        "S2N_LIBCRYPTO_SUPPORTS_EVP_RC4",
+        "S2N_LINUX_SENDFILE",
+        "S2N_MADVISE_SUPPORTED",
+        "S2N_STACKTRACE",
+        "s2n_EXPORTS",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": [
+            "S2N_CPUID_AVAILABLE",
+            "S2N_KTLS_SUPPORTED",
+        ],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = COMPATIBLE_TARGETS,
+)
+
+mongo_cc_unit_test(
+    name = "s2n_initialization_test",
+    srcs = [
+        "test/initialization_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    target_compatible_with = ["@platforms//:incompatible"],  # TODO SERVER-128798 re-enable
+    deps = [
+        ":s2n-tls",
+    ],
+)
