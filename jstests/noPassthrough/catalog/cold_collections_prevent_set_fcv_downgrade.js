@@ -9,6 +9,9 @@
  * 4. Validates that the FCV downgrade fails with CannotDowngrade error
  *
  * TODO (SERVER-122670) Remove this test once the feature flag is removed.
+ * @tags: [
+ *     featureFlagCreateSupportsStorageTierOptions,
+ *   ]
  */
 
 import "jstests/multiVersion/libs/verify_versions.js";

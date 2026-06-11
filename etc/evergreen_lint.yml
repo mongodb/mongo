@@ -142,6 +142,7 @@ rules:
           - requires_replicated_fast_count_recovery
           - incompatible_disaggregated_storage
           - incompatible_disaggregated_storage_tsan
+          - incompatible_disaggregated_storage_no_feature_flag
           - requires_compile_variant
           - requires_large_host
           - requires_large_host_aubsan
