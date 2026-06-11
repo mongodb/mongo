@@ -104,6 +104,23 @@ public:
         _quiesceCancellationSource.cancel();
     }
 
+    /**
+     * Returns the cancellation token for the donor documentsToCopy fetch, creating the source on
+     * the first call. Must be called before cancelDocumentFetch.
+     */
+    CancellationToken createDocumentFetchToken() {
+        if (!_fetchCancellationSource) {
+            _fetchCancellationSource.emplace(_abortToken);
+        }
+        return _fetchCancellationSource->token();
+    }
+
+    void cancelDocumentFetch() {
+        if (_fetchCancellationSource) {
+            _fetchCancellationSource->cancel();
+        }
+    }
+
     boost::optional<Status> getAbortReason() const;
 
     const CancellationToken& getStepdownToken() {
@@ -144,6 +161,10 @@ private:
     // A source created by inheriting from the stepdown token.
     // Provides the means to cancel the quiesce period.
     CancellationSource _quiesceCancellationSource;
+
+    // A source created by inheriting from the abort token.
+    // Provides the means to cancel the background documentsToCopy fetch once cloning is done.
+    boost::optional<CancellationSource> _fetchCancellationSource;
 };
 
 class ReshardingCoordinator final
@@ -387,11 +408,31 @@ private:
     void _startCommitMonitor(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
+     * Waits for all background futures to halt on cleanup.
+     */
+    ExecutorFuture<void> _drainBackgroundFutures(Status outerStatus);
+
+    /**
+     * Launches donor validation work:
+     *   1. Starts change-stream monitors on all donor shards.
+     *   2. Fires off the documentsToCopy fetch from donors.
+     */
+    void _launchDonorValidations(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                 std::shared_ptr<otel::TelemetryContext> telemetryCtx);
+
+    /**
      * If verification is enabled, fetches the number of documents to clone from all donor shards
      * involved in resharding and persists the value for each donor shard in the coordinator state
      * document.
      */
     ExecutorFuture<void> _fetchAndPersistNumDocumentsToCloneFromDonors(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Waits for documentsToCopy fetch to complete, then verifies the cloned document count. Skips
+     * verification if the fetch times out or fails.
+     */
+    ExecutorFuture<void> _verifyClonedCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
@@ -717,6 +758,8 @@ private:
     boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _donorDeltaFuture;
     std::shared_ptr<ReshardingRecipientPostCloningDeltaCollector> _recipientDeltaCollector;
     boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _recipientDeltaFuture;
+
+    boost::optional<SharedSemiFuture<void>> _fetchNumDocumentsToCopyFuture;
 
     std::shared_ptr<ReshardingCoordinatorExternalState> _reshardingCoordinatorExternalState;
 

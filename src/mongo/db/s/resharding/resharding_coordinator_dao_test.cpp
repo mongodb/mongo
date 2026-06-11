@@ -263,10 +263,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsToCopy) {
                     << 200)});
 }
 
-DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
-             UpdateNumberOfDocsToCopyPhasePreviousStateInvariant,
-             "invariant") {
-
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsToCopyPhaseNotCloningThrows) {
     std::map<ShardId, int64_t> shardToNumDocsCopied;
 
     ShardId shard1("shard1");
@@ -275,10 +272,10 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
     shardToNumDocsCopied.emplace(shard1, 100);
     shardToNumDocsCopied.emplace(shard2, 200);
 
-    runPhaseTransitionTest(PhaseTransitionTestCase{
-        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
-            _dao->updateNumberOfDocsToCopy(_opCtx, shardToNumDocsCopied);
-        }});
+    _state->document.setState(CoordinatorStateEnum::kApplying);
+    ASSERT_THROWS_CODE(_dao->updateNumberOfDocsToCopy(_opCtx, shardToNumDocsCopied),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsCopiedFinal) {

@@ -834,6 +834,109 @@ TEST_F(ReshardingCoordinatorServiceCriticalSectionWithBlockingDeltaTest,
                        ErrorCodes::ReshardingCriticalSectionTimeout);
 }
 
+class ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest
+    : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {.documentsToCopy = documentsToCopy,
+                .documentsDelta = documentsDelta,
+                .blockInGetDocumentsToCopy = true};
+    }
+};
+
+TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
+       VerificationSkippedWhenFetchDocumentsToCopyTimesOut) {
+    // Set the timeout to 0 so the timer fires immediately while fetch is blocked.
+    RAIIServerParameterControllerForTest fetchTimeout{"reshardingFetchDocumentsToCopyTimeoutSecs",
+                                                      0};
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   makeDefaultReshardingOptions());
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonateWithAssert(opCtx);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+
+    ASSERT_EQ(externalState()->getVerifyClonedCollectionCallCount(), 0);
+    auto coordinatorDoc = getCoordinatorDoc(opCtx);
+    for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
+        ASSERT_FALSE(donorShard.getDocumentsToCopy().has_value());
+    }
+
+    stepDown(opCtx);
+    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
+       FetchCancelledWhenCoordinatorAbortsDuringCloning) {
+    // When the coordinator aborts during kCloning, the in-flight (blocked) fetch must not write
+    // to the coordinator doc.
+    PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                      CoordinatorStateEnum::kAborting};
+    auto opCtx = operationContext();
+
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   makeDefaultReshardingOptions());
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonateWithAssert(opCtx);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    // Abort while the fetch is in-progress and blocked by the fixture.
+    coordinator->abort({resharding::kUserAbortReason, resharding::AbortType::kAbortSkipQuiesce});
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+
+    auto coordinatorDoc = getCoordinatorDoc(opCtx);
+    for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
+        ASSERT_FALSE(donorShard.getDocumentsToCopy().has_value());
+    }
+
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
+                       DBException,
+                       ErrorCodes::ReshardCollectionAborted);
+    checkCoordinatorDocumentRemoved(opCtx);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, VerificationRunsWhenFetchDocumentsToCopySucceeds) {
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   makeDefaultReshardingOptions());
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonateWithAssert(opCtx);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+
+    ASSERT_EQ(externalState()->getVerifyClonedCollectionCallCount(), 1);
+    auto coordinatorDoc = getCoordinatorDoc(opCtx);
+    for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
+        ASSERT_TRUE(donorShard.getDocumentsToCopy().has_value());
+    }
+
+    stepDown(opCtx);
+    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
     runReshardingToCompletion();
 }
@@ -1728,8 +1831,10 @@ TEST_F(ReshardingCoordinatorServiceTest,
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringCloning) {
+    RAIIServerParameterControllerForTest noCloneNoRefreshFeatureFlagController(
+        "featureFlagReshardingCloneNoRefresh", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kCloning,
-                                        kGetDocumentsToCopyFromDonors);
+                                        kTellAllRecipientsToRefresh);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringApplying) {
@@ -1801,13 +1906,10 @@ protected:
     const ErrorCodes::Error getDocumentsToCopyErrorCode{9858108};
 };
 
-TEST_F(ReshardingCoordinatorServiceFailGetDocumentsToCopy, AbortIfPerformVerification) {
-    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
-                                                      CoordinatorStateEnum::kCloning,
-                                                      CoordinatorStateEnum::kAborting};
-
-    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
-
+TEST_F(ReshardingCoordinatorServiceFailGetDocumentsToCopy,
+       SilentlyIgnoreErrorsIfPerformVerification) {
+    // Fetch errors are silently swallowed: the coordinator should skip cloned-collection
+    // verification and continue to kApplying rather than aborting.
     auto opCtx = operationContext();
 
     auto reshardingOptions = makeDefaultReshardingOptions();
@@ -1819,21 +1921,19 @@ TEST_F(ReshardingCoordinatorServiceFailGetDocumentsToCopy, AbortIfPerformVerific
                                                    _oldShardKey,
                                                    reshardingOptions);
 
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
-
     makeDonorsReadyToDonateWithAssert(opCtx);
 
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    makeRecipientsFinishedCloningWithAssert(opCtx);
 
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
 
-    ASSERT_THROWS_CODE(
-        coordinator->getCompletionFuture().get(opCtx), DBException, getDocumentsToCopyErrorCode);
+    // Verification was skipped because the fetch failed.
+    ASSERT_EQ(externalState()->getVerifyClonedCollectionCallCount(), 0);
+
+    stepDown(opCtx);
+    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(

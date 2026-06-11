@@ -86,14 +86,15 @@ public:
         boost::optional<ErrorCodes::Error> getDocumentsDeltaErrorCode;
         boost::optional<ErrorCodes::Error> verifyClonedErrorCode;
         boost::optional<ErrorCodes::Error> verifyFinalErrorCode;
+        bool blockInGetDocumentsToCopy = false;
         bool blockInGetDocumentsDelta = false;
     };
 
     enum class ExternalFunction {
         kTellAllDonorsToRefresh,
+        kTellAllRecipientsToRefresh,
         kEstablishAllDonorsAsParticipants,
         kEstablishAllRecipientsAsParticipants,
-        kGetDocumentsToCopyFromDonors,
         kGetDocumentsDeltaFromDonors,
     };
 
@@ -162,6 +163,7 @@ public:
                                     const std::vector<RecipientShardEntry>& recipientShards,
                                     const std::shared_ptr<executor::TaskExecutor>& executor,
                                     CancellationToken token) override {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kTellAllRecipientsToRefresh);
         resharding::sendFlushReshardingStateChangeToShards(
             opCtx,
             nssToRefresh,
@@ -208,9 +210,15 @@ public:
         const NamespaceString&,
         const Timestamp&,
         const std::map<ShardId, ShardVersion>& shardVersions) override {
-        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetDocumentsToCopyFromDonors);
         if (_options.getDocumentsToCopyErrorCode) {
             uasserted(*_options.getDocumentsToCopyErrorCode, "Failing call to getDocumentsToCopy.");
+        }
+
+        if (_options.blockInGetDocumentsToCopy) {
+            std::unique_lock lk(_mutex);
+            opCtx->waitForConditionOrInterrupt(_blockInGetDocumentsToCopyCV, lk, [this] {
+                return !_doKeepBlockingInGetDocumentsToCopy;
+            });
         }
 
         std::map<ShardId, int64_t> docsToCopy;
@@ -276,6 +284,11 @@ public:
         if (_options.verifyClonedErrorCode) {
             uasserted(*_options.verifyClonedErrorCode, "Failing cloned collection verification");
         }
+        _verifyClonedCollectionCallCount.fetch_add(1);
+    }
+
+    int getVerifyClonedCollectionCallCount() const {
+        return _verifyClonedCollectionCallCount.load();
     }
 
     void verifyFinalCollection(OperationContext*, const ReshardingCoordinatorDocument&) override {
@@ -331,6 +344,12 @@ public:
         _errorFunction = std::make_tuple(phase, func);
     }
 
+    void unblockGetDocumentsToCopy() {
+        std::lock_guard lk(_mutex);
+        _doKeepBlockingInGetDocumentsToCopy = false;
+        _blockInGetDocumentsToCopyCV.notify_all();
+    }
+
     void unblockGetDocumentsDelta() {
         std::lock_guard lk(_mutex);
         _doKeepBlockingInGetDocumentsDelta = false;
@@ -345,7 +364,11 @@ private:
     boost::optional<std::tuple<CoordinatorStateEnum, ExternalFunction>> _errorFunction =
         boost::none;
 
+    std::atomic<int> _verifyClonedCollectionCallCount{0};
+
     std::mutex _mutex;
+    stdx::condition_variable _blockInGetDocumentsToCopyCV;
+    bool _doKeepBlockingInGetDocumentsToCopy = true;
     stdx::condition_variable _blockInGetDocumentsDeltaCV;
     bool _doKeepBlockingInGetDocumentsDelta = true;
 
@@ -547,6 +570,7 @@ public:
 
     void tearDown() override {
         globalFailPointRegistry().disableAllFailpoints();
+        externalState()->unblockGetDocumentsToCopy();
         externalState()->unblockGetDocumentsDelta();
         TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();

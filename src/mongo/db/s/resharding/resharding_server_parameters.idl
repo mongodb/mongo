@@ -512,6 +512,20 @@ server_parameters:
             gte: 0
         redact: false
 
+    reshardingFetchDocumentsToCopyTimeoutSecs:
+        description: >-
+            Timeout in seconds to wait for the documentsToCopy fetch to complete after
+            cloning finishes before skipping cloning verification. If the fetch does not
+            complete within this period, cloning verification is skipped for this operation.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingFetchDocumentsToCopyTimeoutSecs
+        default:
+            expr: 30
+        validator:
+            gte: 0
+        redact: false
+
     reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
         description: >-
             Controls whether a resharding donor should abort in-progress unprepared transactions
