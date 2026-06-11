@@ -132,6 +132,12 @@ auto& bulkKeysGeneratedCounter = otel::metrics::MetricsService::instance().creat
 
 constexpr int64_t indexBuildMetadataKey = 1;
 
+// One past the build's highest record key: metadata at indexBuildMetadataKey, plus up to 64 index
+// records.
+//
+// TODO (SERVER-126257): Remove once index build side writes cannot be torn.
+constexpr int64_t tearableSideWriteAbortKey = indexBuildMetadataKey + 64 + 1;
+
 size_t getEachIndexBuildMaxMemoryUsageBytes(boost::optional<size_t> maxMemoryUsageBytes,
                                             size_t numIndexSpecs) {
     if (numIndexSpecs == 0) {
@@ -1720,6 +1726,13 @@ void MultiIndexBlock::_writeAllStateToContainer(OperationContext* opCtx) const {
                 "collectionUUID"_attr = _collectionUUID,
                 "numIndexes"_attr = _indexes.size(),
                 "details"_attr = metadataObj);
+}
+
+void MultiIndexBlock::writeTearableSideWriteAbortRecord(OperationContext* opCtx) const {
+    if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
+        return;
+    }
+    _upsertIntoContainer(opCtx, tearableSideWriteAbortKey, BSON("tearableSideWriteAbort" << true));
 }
 
 IndexBuildMetadata MultiIndexBlock::_buildIndexBuildMetadata() const {

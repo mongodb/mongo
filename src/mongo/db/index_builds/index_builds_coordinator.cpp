@@ -699,6 +699,14 @@ void IndexBuildsCoordinator::set(ServiceContext* serviceContext,
     invariant(!indexBuildsCoordinator);
 
     indexBuildsCoordinator = std::move(ibc);
+
+    // Register the side-write redo hook so it is present whenever an IndexBuildsCoordinator is
+    // installed.
+    setOnTearableSideWriteRedoHook(
+        serviceContext, [](OperationContext* opCtx, const UUID& collectionUUID) {
+            IndexBuildsCoordinator::get(opCtx)->writeTearableSideWriteAbortRecordForCollection(
+                opCtx, collectionUUID);
+        });
 }
 
 IndexBuildsCoordinator* IndexBuildsCoordinator::get(ServiceContext* serviceContext) {
@@ -2541,6 +2549,16 @@ void IndexBuildsCoordinator::waitUntilAnIndexBuildFinishes(OperationContext* opC
 void IndexBuildsCoordinator::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {
     _indexBuildsManager.appendBuildInfo(buildUUID, builder);
     activeIndexBuilds.appendBuildInfo(buildUUID, builder);
+}
+
+void IndexBuildsCoordinator::writeTearableSideWriteAbortRecordForCollection(
+    OperationContext* opCtx, const UUID& collectionUUID) {
+    for (auto&& [buildUUID, entry] :
+         index_builds::primary_driven::registry(opCtx->getServiceContext()).all()) {
+        if (entry.collectionUUID == collectionUUID) {
+            _indexBuildsManager.writeTearableSideWriteAbortRecord(opCtx, buildUUID);
+        }
+    }
 }
 
 void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,

@@ -211,6 +211,11 @@ public:
     void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
 
     /**
+     * TODO (SERVER-126257): Remove once index build side writes cannot be torn.
+     */
+    void writeTearableSideWriteAbortRecord(OperationContext* opCtx, const UUID& buildUUID);
+
+    /**
      * Checks via invariant that the manager has no index builds presently.
      */
     void verifyNoIndexBuilds_forTestOnly();

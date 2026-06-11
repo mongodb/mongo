@@ -451,6 +451,15 @@ void IndexBuildsManager::setIsResumable(const UUID& buildUUID, bool isResumable)
     builder.getValue()->setIsResumable(isResumable);
 }
 
+void IndexBuildsManager::writeTearableSideWriteAbortRecord(OperationContext* opCtx,
+                                                           const UUID& buildUUID) {
+    auto builder = _getBuilder(buildUUID);
+    if (!builder.isOK()) {
+        return;
+    }
+    builder.getValue()->writeTearableSideWriteAbortRecord(opCtx);
+}
+
 bool IndexBuildsManager::isBackgroundBuilding(const UUID& buildUUID) {
     auto builder = invariant(_getBuilder(buildUUID));
     return builder->isBackgroundBuilding();

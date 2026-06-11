@@ -9,6 +9,18 @@ exports_files(
     ]),
 )
 
+# TODO (SERVER-126257): Remove this target once index build side writes cannot be torn.
+mongo_cc_library(
+    name = "tearable_side_write_redo_state",
+    srcs = [
+        "tearable_side_write_redo_state.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_library(
     name = "primary_driven_index_builds",
     srcs = [

@@ -45,8 +45,12 @@
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
+// TODO (SERVER-126257): Remove once index build side writes cannot be torn.
+#include "mongo/util/uuid.h"
 
 #include <cstdint>
+// TODO (SERVER-126257): Remove once index build side writes cannot be torn.
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -228,4 +232,13 @@ private:
     mutable std::mutex _multikeyPathMutex;
     boost::optional<MultikeyPaths> _multikeyPaths;
 };
+
+// Hook invoked when a primary-driven index build  is redoing a write that produced a "tearable side
+// write" (a write whose oplog representation spans multiple applyOps entries).
+//
+// TODO (SERVER-126257): Remove once index build side writes cannot be torn.
+using OnTearableSideWriteRedoFn =
+    std::function<void(OperationContext*, const UUID& collectionUUID)>;
+void setOnTearableSideWriteRedoHook(ServiceContext* svcCtx, OnTearableSideWriteRedoFn hook);
+const OnTearableSideWriteRedoFn& getOnTearableSideWriteRedoHook(ServiceContext* svcCtx);
 }  // namespace MONGO_MOD_PUBLIC mongo

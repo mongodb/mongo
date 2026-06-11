@@ -456,6 +456,14 @@ public:
     void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
 
     /**
+     * Writes an abort sentinel for every active primary-driven index build on the given collection.
+     *
+     * TODO (SERVER-126257): Remove once index build side writes cannot be torn.
+     */
+    void writeTearableSideWriteAbortRecordForCollection(OperationContext* opCtx,
+                                                        const UUID& collectionUUID);
+
+    /**
      * Registers kill index build action with the input DiskSpaceMonitor.
      */
     void registerKillIndexBuildAction(DiskSpaceMonitor& diskMonitor);
