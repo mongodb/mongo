@@ -111,8 +111,8 @@ result = testDB.runCommand({
 });
 assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
 
-// Tests that the 'fromRouter' option cannot be specified by external client with 'apiStrict' set to
-// true.
+// Tests that the 'fromRouter' option cannot be specified by an external client at all - the
+// BadValue check fires before the APIStrictError check.
 result = testDB.runCommand({
     aggregate: collName,
     pipeline: [{$project: {_id: 0}}],
@@ -122,7 +122,7 @@ result = testDB.runCommand({
     apiStrict: true,
     fromRouter: true,
 });
-assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(result, ErrorCodes.BadValue);
 
 // Tests that the 'fromRouter' option should not fail by internal client with 'apiStrict' set to
 // true.

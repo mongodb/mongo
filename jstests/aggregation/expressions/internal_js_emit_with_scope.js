@@ -5,6 +5,7 @@
 // Must also set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.
 // @tags: [
 //   assumes_against_mongod_not_mongos,
+//   assumes_read_preference_unchanged,
 //   requires_scripting,
 //   requires_fcv_81,
 // ]
@@ -49,7 +50,25 @@ let pipeline = [
 
 assert.commandWorked(coll.insert({text: "wood chuck could chuck wood"}));
 
-let results = coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
+const internalConn = new Mongo(db.getMongo().host);
+assert.commandWorked(
+    internalConn.getDB("admin").runCommand({
+        hello: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+    }),
+);
+const internalDB = internalConn.getDB(db.getName());
+const internalColl = internalDB[coll.getName()];
+
+let results = internalColl
+    .aggregate(pipeline, {
+        cursor: {},
+        runtimeConstants: constants,
+        fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
+    })
+    .toArray();
 assert(
     resultsEq(
         results,
@@ -74,7 +93,15 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function () {
     }
 };
 
-results = coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
+results = internalColl
+    .aggregate(pipeline, {
+        cursor: {},
+        runtimeConstants: constants,
+        fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
+    })
+    .toArray();
 assert(
     resultsEq(
         results,
@@ -101,7 +128,15 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function () {
 };
 /* eslint-enable */
 
-results = coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
+results = internalColl
+    .aggregate(pipeline, {
+        cursor: {},
+        runtimeConstants: constants,
+        fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
+    })
+    .toArray();
 assert(
     resultsEq(
         results,
@@ -121,7 +156,15 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function () {
         emit(word, 1);
     }
 };
-results = coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromRouter: true}).toArray();
+results = internalColl
+    .aggregate(pipeline, {
+        cursor: {},
+        runtimeConstants: constants,
+        fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
+    })
+    .toArray();
 assert(
     resultsEq(
         results,
@@ -141,12 +184,14 @@ assert(
 //
 constants.jsScope = "you cant do this";
 assert.commandFailedWithCode(
-    db.runCommand({
+    internalDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline,
         cursor: {},
         runtimeConstants: constants,
         fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
     }),
     ErrorCodes.TypeMismatch,
 );

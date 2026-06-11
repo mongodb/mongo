@@ -63,6 +63,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <numeric>
 #include <utility>
 #include <variant>
 
@@ -277,8 +278,14 @@ int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants)
 
     // $$USER_ROLES
     if (const auto& userRoles = constants.getUserRoles(); userRoles.has_value()) {
-        size += LegacyRuntimeConstants::kUserRolesFieldName.size() + userRoles->objsize() +
-            kPerElementOverhead;
+        size += LegacyRuntimeConstants::kUserRolesFieldName.size() + kPerElementOverhead +
+            std::accumulate(userRoles->begin(),
+                            userRoles->end(),
+                            BSONObj::kMinBSONLength,
+                            [](int acc, const BSONObj& role) {
+                                return acc + role.objsize() +
+                                    kWriteCommandBSONArrayPerElementOverheadBytes;
+                            });
     }
     return size;
 }

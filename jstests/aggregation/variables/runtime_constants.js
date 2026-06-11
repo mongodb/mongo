@@ -1,6 +1,7 @@
 /*
  * Tests the behavior of runtime constants $$IS_MR and $$JS_SCOPE.
  * @tags: [
+ *   assumes_read_preference_unchanged,
  *   requires_fcv_81,
  * ]
  */
@@ -44,14 +45,24 @@ if (!FixtureHelpers.isMongos(db)) {
         }),
         463840,
     );
-    // RuntimeConstants is allowed when 'fromRouter' is true.
+    // RuntimeConstants is allowed when 'fromRouter' is true, but only from an internal client.
+    const internalConn = new Mongo(db.getMongo().host);
     assert.commandWorked(
-        db.runCommand({
+        internalConn.getDB("admin").runCommand({
+            hello: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
+    const internalDB = internalConn.getDB(db.getName());
+    assert.commandWorked(
+        internalDB.runCommand({
             aggregate: coll.getName(),
             pipeline: [{$project: {_id: 0}}],
             cursor: {},
             runtimeConstants: rtc,
             fromRouter: true,
+            readConcern: {},
+            writeConcern: {},
         }),
     );
 }
