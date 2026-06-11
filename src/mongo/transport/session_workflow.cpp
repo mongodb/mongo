@@ -79,6 +79,7 @@
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -422,11 +423,17 @@ class SessionWorkflow::Impl {
 public:
     class WorkItem;
 
-    Impl(SessionWorkflow* workflow, ServiceContext::UniqueClient client)
+    Impl(SessionWorkflow* workflow, ServiceContext::UniqueClient uniqueClient)
         : _workflow{workflow},
-          _serviceContext{client->getServiceContext()},
-          _sep{client->getService()->getServiceEntryPoint()},
-          _clientStrand{ClientStrand::make(std::move(client))} {}
+          _serviceContext{uniqueClient->getServiceContext()},
+          _sep{uniqueClient->getService()->getServiceEntryPoint()},
+          _clientStrand{ClientStrand::make(std::move(uniqueClient))} {
+        invariant(session()->isIngress());
+
+        // Can't assume all sessions should be treated as preauth on creation. In particular, if
+        // auth is disabled, then no session should be treated as preauth.
+        session()->setPreauthIngress(isPreAuth(client()));
+    }
 
     Client* client() const {
         return _clientStrand->getClientPointer();
@@ -533,9 +540,6 @@ private:
         // latency.
         _yieldPointReached();
         _iterationFrame->metrics.yieldedBeforeReceive();
-        ON_BLOCK_EXIT(
-            [&, old = session()->getRestrictedMode()] { session()->setRestrictedMode(old); });
-        session()->setRestrictedMode(isPreAuth(client()));
         return _receiveRequest();
     }
 
@@ -626,6 +630,7 @@ public:
                   _in, &cid, gPreAuthMaximumMessageSizeBytes.loadRelaxed()))
             : uassertStatusOK(compressorMgr().decompressMessage(_in, &cid));
         _compressorId = cid;
+        MessageHooks::onMessageReceived(*_swf->session(), _in);
     }
 
     Message compressResponse(Message msg) {
@@ -688,6 +693,7 @@ std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::_receive
             return session()->sourceMessage();
         }());
         invariant(!msg.empty());
+        MessageHooks::onMessageReceived(*session(), msg);
         return std::make_unique<WorkItem>(this, std::move(msg));
     } catch (const DBException& ex) {
         auto remote = session()->remote();
@@ -803,7 +809,11 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
     // Pass sourced Message to handler to generate response.
     _work->initOperation();
 
-    return _sep->handleRequest(_work->opCtx(), _work->in());
+    return _sep->handleRequest(_work->opCtx(), _work->in()).tapAll([this](auto&&) {
+        // Handling the request may have changed whether the session is authenticated, so update
+        // it here. We can go back to "preauth" after a logout.
+        session()->setPreauthIngress(isPreAuth(client()));
+    });
 }
 
 void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
@@ -837,6 +847,8 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     toSink.header().setResponseToMsgId(work.in().header().getId());
     if (!isTLS() && OpMsg::isFlagSet(work.in(), OpMsg::kChecksumPresent))
         OpMsg::appendChecksum(&toSink);
+
+    MessageHooks::onReplyReady(*session(), _work->in(), toSink);
 
     // If the incoming message has the exhaust flag set, then bypass the normal RPC
     // behavior. Sink the response to the network, but also synthesize a new

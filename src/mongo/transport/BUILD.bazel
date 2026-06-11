@@ -42,6 +42,24 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "message_filter_hooks",
+    srcs = select({
+        "//bazel/config:build_enterprise_linux_enabled": [],
+        "//conditions:default": [
+            "message_filter_hooks.cpp",
+        ],
+    }),
+    deps = select({
+        "//bazel/config:build_enterprise_linux_enabled": [
+            "//src/mongo/db/modules/enterprise/src/mfp:message_filter_hooks_enterprise",
+        ],
+        "//conditions:default": [
+            "//src/mongo:base",
+        ],
+    }),
+)
+
+mongo_cc_library(
     name = "ingress_handshake_metrics",
     srcs = [
         "//src/mongo/transport:ingress_handshake_metrics.cpp",
@@ -139,6 +157,7 @@ mongo_cc_library(
         "//src/mongo/rpc:message",
         "//src/mongo/transport:ingress_handshake_metrics",
         "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:message_filter_hooks",
         "//src/mongo/transport:service_executor",
         "//src/mongo/transport:session_manager_common_idl",
         "//src/mongo/transport:transport_layer_common",

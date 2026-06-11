@@ -178,6 +178,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/s:mongos_server_parameters",
+        "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:fail_point",
     ],
 )
