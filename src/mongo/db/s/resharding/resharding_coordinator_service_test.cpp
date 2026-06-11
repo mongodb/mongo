@@ -122,6 +122,11 @@ public:
         meta.setPerformVerification(reshardingOptions.performVerification);
         meta.setStartTime(getServiceContext()->getFastClockSource()->now());
 
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        meta.setForwardableOpMetadata(std::move(fom));
+
         std::vector<DonorShardEntry> donorShards;
         std::transform(reshardingOptions.donorShardIds.begin(),
                        reshardingOptions.donorShardIds.end(),

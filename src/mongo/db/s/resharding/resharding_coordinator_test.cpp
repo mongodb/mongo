@@ -197,6 +197,12 @@ protected:
         boost::optional<Timestamp> fetchTimestamp = boost::none) {
         CommonReshardingMetadata meta(
             _reshardingUUID, _originalNss, UUID::gen(), _tempNss, _newShardKey.toBSON());
+
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        meta.setForwardableOpMetadata(std::move(fom));
+
         if (useUserUUID) {
             meta.setUserReshardingUUID(_reshardingUUID);
         }

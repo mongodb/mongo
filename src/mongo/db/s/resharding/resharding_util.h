@@ -652,7 +652,7 @@ CancelableOperationContext makeReshardingOperationContext(
 
 /**
  * Extracts the VersionContext from an optional ForwardableOperationMetadata, falling back to
- * "no Operation FCV" when it is absent.
+ * "version context with FCV v8.0" when it is absent.
  *
  * NOTE: The returned VersionContext is tied to the lifetime of the resharding coordinator.
  * Using it after the resharding coordinator has finished is incorrect, as it won't serialize with

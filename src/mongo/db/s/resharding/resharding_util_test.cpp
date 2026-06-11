@@ -970,8 +970,12 @@ TEST_F(MakeReshardingOperationContextTest,
     ForwardableOperationMetadata fom;
     ASSERT_FALSE(fom.getVersionContext().has_value());
 
+    // TODO SERVER-103014: Empty VersionContexts should be disallowed after v9.0.
     auto vCtx = getVersionContextOrDefault(boost::optional<ForwardableOperationMetadata>(fom));
-    ASSERT_FALSE(vCtx.hasOperationFCV());
+    ASSERT_TRUE(vCtx.hasOperationFCV());
+    // Note: getOperationFCV can only be called with Passkey that is available to friend class
+    // of VersionContext, so we can't assert the exact value of the FCV here.
+    // Instead, we just assert that it is set to some value.
 }
 
 }  // namespace

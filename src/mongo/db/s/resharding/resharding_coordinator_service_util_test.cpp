@@ -66,9 +66,20 @@ public:
         NamespaceString::createNamespaceString_forTest("db.system.resharding");
     const BSONObj kShardKey = BSON("x" << 1);
 
-    CommonReshardingMetadata makeMetadata(const UUID& reshardingUUID = UUID::gen()) {
-        return CommonReshardingMetadata(
+    CommonReshardingMetadata makeMetadata(
+        const UUID& reshardingUUID = UUID::gen(),
+        const boost::optional<VersionContext>& versionContext = boost::none) {
+        CommonReshardingMetadata commonReshardingMetadata(
             reshardingUUID, kSourceNss, UUID::gen(), kTempNss, kShardKey);
+
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            versionContext
+                ? *versionContext
+                : VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        commonReshardingMetadata.setForwardableOpMetadata(std::move(fom));
+
+        return commonReshardingMetadata;
     }
 
     ReshardingCoordinatorDocument makeTempNssTestCoordinatorDoc() {
@@ -76,6 +87,7 @@ public:
         auto commonReshardingMetadata = makeMetadata();
         commonReshardingMetadata.setStartTime(Date_t::now());
         commonReshardingMetadata.setPerformVerification(true);
+
         coordinatorDoc.setCommonReshardingMetadata(std::move(commonReshardingMetadata));
 
         coordinatorDoc.setApproxBytesToCopy(1024);
@@ -398,16 +410,14 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        SkipReshardingFieldsWritesForCoordinatorHonorsPinnedLastLTSVersionContext) {
     ReshardingCoordinatorDocument coordinatorDoc;
-    auto metadata = makeMetadata();
-    metadata.setStartTime(Date_t::now());
-
-    ForwardableOperationMetadata fom;
     // (Generic FCV reference): pin the operation to last-LTS so the InitNoRefresh feature flag,
     // which is gated on the latest FCV, evaluates to false and the legacy write path is
     // selected -- regardless of the global flag value.
-    fom.setVersionContext(
+    auto metadata = makeMetadata(
+        UUID::gen(),
         VersionContext{ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}});
-    metadata.setForwardableOpMetadata(std::move(fom));
+    metadata.setStartTime(Date_t::now());
+
     coordinatorDoc.setCommonReshardingMetadata(std::move(metadata));
     coordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
 

@@ -70,11 +70,19 @@ public:
         }
 
         ReshardingCoordinatorDocument doc;
-        doc.setCommonReshardingMetadata({UUID::gen(),
-                                         NamespaceString::createNamespaceString_forTest("db.coll"),
-                                         UUID::gen(),
-                                         NamespaceString::createNamespaceString_forTest("db.tmp"),
-                                         BSON("x" << 1)});
+        CommonReshardingMetadata commonMetadata{
+            UUID::gen(),
+            NamespaceString::createNamespaceString_forTest("db.coll"),
+            UUID::gen(),
+            NamespaceString::createNamespaceString_forTest("db.tmp"),
+            BSON("x" << 1)};
+
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
+
+        doc.setCommonReshardingMetadata(std::move(commonMetadata));
         doc.setState(state);
         doc.setRecipientShards(std::move(recipientShards));
         return doc;

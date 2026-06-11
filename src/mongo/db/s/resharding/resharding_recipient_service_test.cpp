@@ -845,6 +845,11 @@ public:
             newShardKeyPattern());
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
+
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         doc.setSkipCloningAndApplying(testOptions.skipCloningAndApplying);
         doc.setSkipCloning(testOptions.skipCloning);

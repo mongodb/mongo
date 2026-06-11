@@ -885,11 +885,17 @@ CancelableOperationContext makeReshardingOperationContext(
 VersionContext getVersionContextOrDefault(
     const boost::optional<ForwardableOperationMetadata>& fom) {
     // TODO(SERVER-99655): Simplify when 9.0 is last LTS and we always have a FOM with
-    // VersionContext.
+    // VersionContext. Remove kDefaultVersionContext and assert VersionContext::hasOperationFCV.
+
+    // Empty VersionContext means use current value of globalFCV. The only time we expect
+    // versionContext to be empty in resharding code is when FCV is in v8.0. So we must
+    // override the default behavior by providing a default VersionContext.
+    const auto kDefaultVersionContext =
+        VersionContext(multiversion::FeatureCompatibilityVersion::kVersion_8_0);
     if (fom) {
-        return fom->getVersionContext().value_or(VersionContext());
+        return fom->getVersionContext().value_or(kDefaultVersionContext);
     }
-    return VersionContext();
+    return kDefaultVersionContext;
 }
 
 }  // namespace resharding

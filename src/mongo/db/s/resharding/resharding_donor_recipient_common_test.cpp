@@ -203,6 +203,11 @@ protected:
         auto commonMetadata = CommonReshardingMetadata(
             UUID::gen(), sourceNss, sourceUUID, tempReshardingNss, reshardingKey);
 
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
+
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         return doc;
     }
@@ -220,6 +225,11 @@ protected:
         auto sourceUUID = UUID::gen();
         auto commonMetadata = CommonReshardingMetadata(
             UUID::gen(), sourceNss, sourceUUID, kTemporaryReshardingNss, kReshardingKeyPattern);
+
+        ForwardableOperationMetadata fom;
+        fom.setVersionContext(
+            VersionContext{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()});
+        commonMetadata.setForwardableOpMetadata(std::move(fom));
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
 
@@ -571,37 +581,30 @@ public:
             resharding::processReshardingFieldsForCollection(
                 opCtx, kTemporaryReshardingNss, temporaryCollMetadata, reshardingFields);
 
-            auto driveCloneNoRefresh =
-                resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabledAndIgnoreFCVUnsafe();
-            if (driveCloneNoRefresh) {
+            bool noChunksToCopy = shardThatChunkExistsOn != kThisShard.getShardId();
+            while (true) {
                 auto recipientDoc = getPersistedRecipientDocument(opCtx, kReshardingUUID);
-                ASSERT(!recipientDoc.getCloneTimestamp());
-            } else {
-                bool noChunksToCopy = shardThatChunkExistsOn != kThisShard.getShardId();
-                while (true) {
-                    auto recipientDoc = getPersistedRecipientDocument(opCtx, kReshardingUUID);
-                    fieldsValidator->validate(recipientDoc);
-                    if (!recipientDoc.getCloneTimestamp()) {
-                        opCtx->sleepFor(Milliseconds{10});
-                        continue;
-                    }
-                    auto metrics = recipientDoc.getMetrics();
-                    ASSERT_EQ(*metrics->getApproxBytesToCopy(),
-                              noChunksToCopy ? 0 : _approxBytesToCopy);
-                    ASSERT_EQ(*metrics->getApproxDocumentsToCopy(),
-                              noChunksToCopy ? 0 : _approxDocumentsToCopy);
-                    break;
+                fieldsValidator->validate(recipientDoc);
+                if (!recipientDoc.getCloneTimestamp()) {
+                    opCtx->sleepFor(Milliseconds{10});
+                    continue;
                 }
-                // Schedule a dummy response to the find command against config.shards from the
-                // shard registry to avoid a hang.
-                onCommand([&](const executor::RemoteCommandRequest& request) {
-                    ASSERT_EQ(request.dbname, DatabaseName::kConfig);
-                    auto firstElement = request.cmdObj.firstElement();
-                    ASSERT_EQ(firstElement.fieldNameStringData(), "find");
-                    ASSERT_EQ(firstElement.str(), "shards");
-                    return BSONObj();
-                });
+                auto metrics = recipientDoc.getMetrics();
+                ASSERT_EQ(*metrics->getApproxBytesToCopy(),
+                          noChunksToCopy ? 0 : _approxBytesToCopy);
+                ASSERT_EQ(*metrics->getApproxDocumentsToCopy(),
+                          noChunksToCopy ? 0 : _approxDocumentsToCopy);
+                break;
             }
+            // Schedule a dummy response to the find command against config.shards from the
+            // shard registry to avoid a hang.
+            onCommand([&](const executor::RemoteCommandRequest& request) {
+                ASSERT_EQ(request.dbname, DatabaseName::kConfig);
+                auto firstElement = request.cmdObj.firstElement();
+                ASSERT_EQ(firstElement.fieldNameStringData(), "find");
+                ASSERT_EQ(firstElement.str(), "shards");
+                return BSONObj();
+            });
         } else {
             ASSERT(recipientStateMachine == boost::none);
         }
