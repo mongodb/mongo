@@ -56,7 +56,7 @@ QuerySettingsKnobOverrides QuerySettingsKnobOverrides::fromBSON(const BSONObj& o
 
         const auto& entry = reg.entry(*id);
         try {
-            overrides._entries.emplace_back(Entry{*id, entry.knob.fromBSON(elem)});
+            overrides._entries.emplace_back(Entry{*id, entry.fromBSON(elem)});
         } catch (const DBException& ex) {
             uasserted(12194501,
                       str::stream() << "failed to parse query knob " << elem.fieldNameStringData()
@@ -77,7 +77,7 @@ BSONObj QuerySettingsKnobOverrides::toBSON() const {
                 "DeleteQueryKnobOverride must not survive past simplification",
                 !std::holds_alternative<DeleteQueryKnobOverride>(val));
         const auto& entry = reg.entry(id);
-        entry.knob.toBSON(bob, entry.wireName, val);
+        entry.toBSON(bob, entry.wireName, val);
     }
     return bob.obj();
 }

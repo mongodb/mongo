@@ -29,23 +29,23 @@
 
 #pragma once
 
+#include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
 
 #include <cstddef>
+#include <memory>
 #include <span>
+#include <type_traits>
 #include <vector>
 
 #include <boost/optional.hpp>
 
 namespace mongo {
-
-namespace detail {
-class QueryKnobRegistryBuilder;
-}  // namespace detail
 
 /**
  * Process-wide registry of query knobs. Built once at startup and immutable
@@ -55,8 +55,52 @@ class QueryKnobRegistryBuilder;
 class QueryKnobRegistry {
 public:
     struct Entry {
-        QueryKnobBase& knob;
-        ServerParameter& param;
+        using ReadGlobalFn = std::function<QueryKnobValue()>;
+        using FromBSONFn = QueryKnobValue (*)(const BSONElement&);
+        using ToBSONFn = void (*)(BSONObjBuilder&, StringData, const QueryKnobValue&);
+
+        template <auto& global, typename T>
+        requires AtomicLoadable<decltype(global)>
+        static Entry create(QueryKnob<T> knob, StringData name) {
+            using SPT = IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime,
+                                                      std::remove_cvref_t<decltype(global)>>;
+            return create<SPT>(knob, name);
+        }
+
+        template <typename SPT, typename T>
+        requires std::derived_from<SPT, ServerParameter>
+        static Entry create(QueryKnob<T> knob, StringData name) {
+            auto* param =
+                dynamic_cast<SPT*>(ServerParameterSet::getNodeParameterSet()->getIfExists(name));
+            FromBSONFn fromBSON = detail::ConverterTraits<T>::fromBSON;
+            ToBSONFn toBSON = detail::ConverterTraits<T>::toBSON;
+            ReadGlobalFn readGlobal = nullptr;
+            if constexpr (EnumServerParameter<SPT>) {
+                readGlobal = [param]() -> QueryKnobValue {
+                    return static_cast<int>(param->_data.get());
+                };
+            } else {
+                readGlobal = [param]() -> QueryKnobValue {
+                    return param->getValue(boost::none /* tenantId */);
+                };
+            }
+            return Entry(knob.id, param, fromBSON, toBSON, readGlobal);
+        }
+
+        explicit Entry(QueryKnobId id,
+                       ServerParameter* param,
+                       FromBSONFn fromBSONFn,
+                       ToBSONFn toBSONFn,
+                       ReadGlobalFn readGlobalFn);
+
+        QueryKnobId id;
+        ServerParameter* param = nullptr;
+
+        // Global-value reader and serializers, baked from ConverterTraits<T> at registration.
+        FromBSONFn fromBSON = nullptr;
+        ToBSONFn toBSON = nullptr;
+        ReadGlobalFn readGlobal = nullptr;
+
         // Non-owning, points into `param`'s annotation BSON (static lifetime).
         StringData wireName;
         bool pqsSettable;
@@ -64,15 +108,14 @@ public:
         boost::optional<multiversion::FeatureCompatibilityVersion> minFcv;
     };
 
-    QueryKnobRegistry() = default;
+    QueryKnobRegistry(std::vector<Entry> entries = {});
 
     static const QueryKnobRegistry& instance();
 
     /**
-     * Installs `reg` as the process instance and writes a dense index back into each entry's
-     * QueryKnobBase descriptor. Call once at startup; invariants on a second call.
+     * Initiallizes the process instance. Call once at startup; invariants on a second call.
      */
-    static void init(QueryKnobRegistry reg);
+    static void init(std::vector<Entry> entries);
 
     /**
      * PQS-settable knobs only; boost::none for non-PQS or unknown name.
@@ -86,82 +129,51 @@ public:
     size_t knobsExposedToQuerySettingsCount() const;
 
 private:
-    friend class detail::QueryKnobRegistryBuilder;
-
-    explicit QueryKnobRegistry(std::vector<Entry> entries);
-
     static QueryKnobRegistry& _mutableInstance();
-
-    void _writeBackDescriptorIndexes();
 
     std::vector<Entry> _entries;
     StringMap<QueryKnobId> _wireNameIndex;
     size_t _knobsExposedToQuerySettingsCount = 0;
-    bool _initialized = false;
 };
 
 namespace detail {
+// Invariants if any ServerParameter has a query_knob annotation with a wire_name not found in
+// the registry. Catches IDL annotations added without a corresponding QueryKnob<T> declaration.
+void detectOrphanAnnotations(const std::vector<QueryKnobRegistry::Entry>& entries,
+                             const ServerParameterSet& params);
 
-/**
- * Builds a QueryKnobRegistry from QueryKnobDescriptorSet + ServerParameter
- * annotations. Exposed so tests can drive it directly; production code uses
- * QueryKnobRegistry::instance().
- */
-class QueryKnobRegistryBuilder {
-public:
-    /**
-     * Appends an entry. PQS entries are also indexed by wireName.
-     */
-    void addFromServerParameter(QueryKnobRegistry::Entry entry);
+// Returns the next dense QueryKnobId. Called at static-init time by DEFINE_QUERY_KNOBS.
+QueryKnobId allocateQueryKnobId();
 
-    /**
-     * Parses the `query_knob` annotation on `param` and dispatches to the Entry overload.
-     */
-    void addFromServerParameter(QueryKnobBase& knob, ServerParameter* param);
-
-    /**
-     * Parses `queryKnobAnnotation` (the `query_knob` sub-object) directly and dispatches to the
-     * Entry overload. Useful in tests that want to inject knob metadata without mutating the
-     * ServerParameter.
-     */
-    void addFromServerParameter(QueryKnobBase& knob,
-                                ServerParameter& param,
-                                const BSONObj& queryKnobAnnotation);
-
-    /**
-     * Invariants if a ServerParameter has a query_knob annotation with no matching QueryKnob<T>.
-     */
-    void detectOrphanAnnotations(const ServerParameterSet& params) const;
-
-    [[nodiscard]] QueryKnobRegistry build() &&;
-
-private:
-    std::vector<QueryKnobRegistry::Entry> _entries;
-};
-
+// Appends an entry to the global initializer context. Called by REGISTER_QUERY_KNOBS and
+// consumed by QueryKnobRegistryInit.
+void registerQueryKnob(QueryKnobRegistry::Entry&& entry);
 }  // namespace detail
 
 // clang-format off
 // See query_knob.h for the full X-macro framework documentation and usage.
 
-// Internal: defines the global QueryKnob variable for each EXPAND row (kExplicit skips
-// auto-registration; MONGO_DETAIL_INITIALIZE_QUERY_KNOBS handles registration instead).
-#define MONGO_DETAIL_DEFINE_QUERY_KNOB(var, name, global)           \
-    decltype(var) var{name, &readGlobalValue<global>,               \
-                      decltype(var)::RegistrationMode::kExplicit};
+// Internal: defines the global QueryKnob<T> handle for each EXPAND row, with a dense id
+// freshly allocated from the global QueryKnobInitializer.
+#define MONGO_DETAIL_DEFINE_QUERY_KNOB(var, name, global) \
+    decltype(var) var{detail::allocateQueryKnobId()};
 
-// Internal: registers one knob into QueryKnobDescriptorSet; called inside the initializer body.
+// Internal: registers one knob into the global QueryKnobInitializer; called inside the
+// initializer body.
 #define MONGO_DETAIL_INITIALIZE_QUERY_KNOB(var, name, global) \
-    QueryKnobDescriptorSet::get().add(var);
+    detail::registerQueryKnob(QueryKnobRegistry::Entry::create<global>(var, name));
 
-// Internal: emits a MONGO_INITIALIZER that runs before QueryKnobRegistryInit and registers all
-// knobs in EXPAND into QueryKnobDescriptorSet.
-#define MONGO_DETAIL_INITIALIZE_QUERY_KNOBS(group, EXPAND)                 \
-    namespace {                                                            \
-    MONGO_INITIALIZER_GENERAL(group##_init, (), ("QueryKnobRegistryInit")) \
-        (InitializerContext*) {                                            \
-            EXPAND(MONGO_DETAIL_INITIALIZE_QUERY_KNOB)                     \
-        }                                                                  \
+// Internal: emits a MONGO_INITIALIZER that runs after all ServerParameters have been
+// registered (so getIfExists() in MONGO_DETAIL_INITIALIZE_QUERY_KNOB sees them) and before
+// QueryKnobRegistryInit consumes the builder.
+#define MONGO_DETAIL_INITIALIZE_QUERY_KNOBS(group, EXPAND)                                  \
+    namespace {                                                                             \
+    MONGO_INITIALIZER_GENERAL(group##_init,                                                 \
+                              ("EndServerParameterRegistration"),                           \
+                              ("QueryKnobRegistryInit"))                                    \
+        (InitializerContext*) {                                                             \
+            EXPAND(MONGO_DETAIL_INITIALIZE_QUERY_KNOB)                                      \
+        }                                                                                   \
     } // namespace
 
 // Defines knob globals and registers them via a MONGO_INITIALIZER. Place in the group .cpp inside

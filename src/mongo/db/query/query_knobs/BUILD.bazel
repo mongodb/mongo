@@ -12,7 +12,6 @@ exports_files(
 mongo_cc_library(
     name = "query_knob",
     srcs = [
-        "query_knob.cpp",
         "query_knob_registry.cpp",
         "query_knob_snapshot.cpp",
     ],

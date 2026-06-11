@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_knobs/query_knob_registry.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
 #include "mongo/db/server_parameter.h"
@@ -36,34 +37,51 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 
+#include <memory>
 #include <tuple>
 
 namespace mongo {
 
-using detail::QueryKnobRegistryBuilder;
-
 namespace {
-
-// Linear scan for the entry whose `knob` refers to `target`. Returns knobCount()
-// on miss so callers can assert without risking an out-of-range `entry()` call.
-QueryKnobId findEntryIndex(const QueryKnobBase& target) {
-    const auto& reg = QueryKnobRegistry::instance();
-    for (size_t i = 0; i < reg.knobCount(); ++i) {
-        auto id = QueryKnobId(i);
-        if (&reg.entry(id).knob == &target) {
-            return id;
-        }
-    }
-    return QueryKnobId(reg.knobCount());
+const QueryKnobRegistry& registry() {
+    return QueryKnobRegistry::instance();
 }
 
-// The test IDL registers `testIntKnob` as a ServerParameter, which is convenient
-// to pass into Builder.addFromServerParameter() when the specific parameter identity doesn't matter
-// (invariant tests only exercise the builder's validation logic).
-ServerParameter& anyServerParameter() {
-    auto* sp = ServerParameterSet::getNodeParameterSet()->getIfExists("testIntKnob");
-    invariant(sp);
-    return *sp;
+struct QueryKnobAnnotationArgs {
+    boost::optional<StringData> wireName;
+    boost::optional<bool> pqsSettable;
+    boost::optional<StringData> minFcv;
+};
+BSONObj annotations(QueryKnobAnnotationArgs args) {
+    BSONObjBuilder builder;
+    BSONObjBuilder queryKnobBuilder(builder.subobjStart("query_knob"));
+    if (args.wireName) {
+        queryKnobBuilder.append("wire_name", *args.wireName);
+    }
+    if (args.pqsSettable) {
+        queryKnobBuilder.append("pqs_settable", *args.pqsSettable);
+    }
+    if (args.minFcv) {
+        BSONObjBuilder fcvBuilder(queryKnobBuilder.subobjStart("fcv"));
+        fcvBuilder.append("min", *args.minFcv);
+        fcvBuilder.doneFast();
+    }
+    queryKnobBuilder.doneFast();
+    return builder.obj();
+}
+
+template <typename T>
+auto createDummyServerParameter(StringData paramName, BSONObj annotations) {
+    using Storage = AtomicWord<T>;
+    using SPT = IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, Storage>;
+    static Storage atomic;
+    auto param = std::make_unique<SPT>(paramName, atomic);
+    param->setAnnotations(annotations);
+    return param;
+}
+
+QueryKnobRegistry::Entry createDummyKnobEntry(ServerParameter* sp, QueryKnobId id = {}) {
+    return QueryKnobRegistry::Entry(id, sp, nullptr, nullptr, nullptr);
 }
 
 // -----------------------------------------------------------------------------
@@ -71,34 +89,26 @@ ServerParameter& anyServerParameter() {
 // -----------------------------------------------------------------------------
 
 TEST(QueryKnobRegistryTest, PqsKnobIsFindableByWireName) {
-    const auto& reg = QueryKnobRegistry::instance();
-    auto id = reg.getKnobIdForName("testIntKnobWire"_sd);
+    auto id = registry().getKnobIdForName("testIntKnobWire"_sd);
     ASSERT_TRUE(id.has_value());
-    const auto& e = reg.entry(*id);
-    ASSERT_EQ(&e.knob, &test_knobs::testIntKnob);
-    ASSERT_TRUE(e.pqsSettable);
+    ASSERT_EQ(*id, test_knobs::testIntKnob.id);
+    const auto& entry = registry().entry(*id);
+    ASSERT_TRUE(entry.pqsSettable);
 }
 
 TEST(QueryKnobRegistryTest, NonPqsKnobInvisibleToLookupButCarriesWireName) {
-    const auto& reg = QueryKnobRegistry::instance();
-    ASSERT_FALSE(reg.getKnobIdForName("testLLKnobWire"_sd).has_value());
-
-    auto idx = findEntryIndex(test_knobs::testLLKnob);
-    ASSERT_LT(idx.value, reg.knobCount());
-    const auto& e = reg.entry(idx);
-    ASSERT_EQ(e.wireName, "testLLKnobWire"_sd);
-    ASSERT_FALSE(e.pqsSettable);
+    ASSERT_EQ(registry().getKnobIdForName("testDoubleKnobWire"_sd), boost::none);
+    const auto& entry = registry().entry(test_knobs::testDoubleKnob.id);
+    ASSERT_EQ(entry.wireName, "testDoubleKnobWire"_sd);
+    ASSERT_FALSE(entry.pqsSettable);
 }
 
 TEST(QueryKnobRegistryTest, PlainServerParameterNotRegistered) {
-    const auto& reg = QueryKnobRegistry::instance();
-    ASSERT_FALSE(reg.getKnobIdForName("testPlainParam"_sd).has_value());
-
+    ASSERT_FALSE(registry().getKnobIdForName("testPlainParam"_sd).has_value());
     auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("testPlainParam");
     ASSERT(plain);
-    for (size_t i = 0; i < reg.knobCount(); ++i) {
-        auto id = QueryKnobId(i);
-        ASSERT_NE(&reg.entry(id).param, plain);
+    for (auto&& entry : registry().entries()) {
+        ASSERT_NE(entry.param->name(), "testPlainParam");
     }
 }
 
@@ -111,26 +121,21 @@ TEST(QueryKnobRegistryTest, MinFcvRoundTrip) {
     ASSERT_EQ(*e.minFcv, multiversion::parseVersionForFeatureFlags("9.0"_sd));
 }
 
-TEST(QueryKnobRegistryTest, DenseIndicesWrittenBackToDescriptors) {
-    const auto& reg = QueryKnobRegistry::instance();
-    for (size_t i = 0; i < reg.knobCount(); ++i) {
+TEST(QueryKnobRegistryTest, DenseIndicesKnobs) {
+    for (size_t i = 0; i < registry().knobCount(); ++i) {
         auto id = QueryKnobId(i);
-        ASSERT_EQ(reg.entry(id).knob.id, id);
+        auto&& entry = registry().entry(id);
+        ASSERT_EQ(entry.id, id);
     }
 }
 
 TEST(QueryKnobRegistryTest, CountsReflectPqsSplitOverTestSubset) {
-    const auto& reg = QueryKnobRegistry::instance();
     size_t testTotal = 0;
     size_t testPqs = 0;
-    for (size_t i = 0; i < reg.knobCount(); ++i) {
-        auto id = QueryKnobId(i);
-        const auto& e = reg.entry(id);
-        if (e.wireName.starts_with("test"_sd)) {
-            ++testTotal;
-            if (e.pqsSettable) {
-                ++testPqs;
-            }
+    for (auto&& entry : registry().entries()) {
+        ++testTotal;
+        if (entry.pqsSettable) {
+            ++testPqs;
         }
     }
     ASSERT_EQ(testTotal, 5u);
@@ -142,10 +147,10 @@ TEST(QueryKnobRegistryTest, CountsReflectPqsSplitOverTestSubset) {
 // -----------------------------------------------------------------------------
 
 TEST(QueryKnobRegistryTest, EmptyBuilderBuildsEmptyRegistry) {
-    QueryKnobRegistryBuilder b;
-    QueryKnobRegistry reg = std::move(b).build();
+    QueryKnobRegistry reg;
     ASSERT_EQ(reg.knobCount(), 0u);
     ASSERT_EQ(reg.knobsExposedToQuerySettingsCount(), 0u);
+    ASSERT_EQ(reg.entries().size(), 0u);
 }
 
 // Death tests live in a separate suite because gtest forbids mixing TEST and
@@ -154,111 +159,125 @@ TEST(QueryKnobRegistryTest, EmptyBuilderBuildsEmptyRegistry) {
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  EntryGetterOutOfRangeTasserts,
                  "QueryKnobRegistry::entry.*out of range") {
-    const auto& reg = QueryKnobRegistry::instance();
-    auto id = QueryKnobId(reg.knobCount());
-    reg.entry(id);
+    auto outOfBoundsId = QueryKnobId(registry().knobCount());
+    registry().entry(outOfBoundsId);
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  DuplicateWireNameInvariant,
                  "duplicate wire name.*dup") {
-    QueryKnobRegistryBuilder b;
-    auto minFcv = multiversion::parseVersionForFeatureFlags("9.0"_sd);
-    b.addFromServerParameter({.knob = test_knobs::testIntKnob,
-                              .param = anyServerParameter(),
-                              .wireName = "dup"_sd,
-                              .pqsSettable = true,
-                              .minFcv = minFcv});
-    b.addFromServerParameter({.knob = test_knobs::testBoolKnob,
-                              .param = anyServerParameter(),
-                              .wireName = "dup"_sd,
-                              .pqsSettable = true,
-                              .minFcv = minFcv});
-    std::ignore = std::move(b).build();
+    auto paramA = createDummyServerParameter<bool>("dupParamA",
+                                                   annotations({
+                                                       .wireName = "dup"_sd,
+                                                       .pqsSettable = true,
+                                                       .minFcv = "9.0"_sd,
+                                                   }));
+    auto paramB = createDummyServerParameter<bool>("dupParamB",
+                                                   annotations({
+                                                       .wireName = "dup"_sd,
+                                                       .pqsSettable = true,
+                                                       .minFcv = "9.0"_sd,
+                                                   }));
+    QueryKnobRegistry registry{{
+        createDummyKnobEntry(paramA.get(), QueryKnobId(0)),
+        createDummyKnobEntry(paramB.get(), QueryKnobId(1)),
+    }};
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  EmptyWireNameInvariant,
                  "wire name must not be empty") {
-    QueryKnobRegistryBuilder b;
-    b.addFromServerParameter({.knob = test_knobs::testIntKnob,
-                              .param = anyServerParameter(),
-                              .wireName = ""_sd,
-                              .pqsSettable = true,
-                              .minFcv = multiversion::parseVersionForFeatureFlags("9.0"_sd)});
+    auto param = createDummyServerParameter<bool>("emptyWireNameParam",
+                                                  annotations({
+                                                      .wireName = ""_sd,
+                                                  }));
+    std::ignore = createDummyKnobEntry(param.get());
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  PqsWithoutMinFcvInvariant,
-                 "PQS knob.*foo.*requires minFcv") {
-    QueryKnobRegistryBuilder b;
-    b.addFromServerParameter({.knob = test_knobs::testIntKnob,
-                              .param = anyServerParameter(),
-                              .wireName = "foo"_sd,
-                              .pqsSettable = true,
-                              .minFcv = boost::none});
+                 "PQS knob.*pqsKnobWithNoFcv.*requires minFcv") {
+    auto param = createDummyServerParameter<bool>("pqsKnobWithNoFcv",
+                                                  annotations({
+                                                      .wireName = "foo"_sd,
+                                                      .pqsSettable = true,
+                                                  }));
+    std::ignore = createDummyKnobEntry(param.get());
+    QueryKnobRegistry::Entry{QueryKnobId(0), param.get(), nullptr, nullptr, nullptr};
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  MissingServerParameterInvariant,
-                 "no ServerParameter for QueryKnob.*testIntKnob") {
-    QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_knobs::testIntKnob, nullptr);
+                 "No server parameter found for query knob") {
+    std::ignore = createDummyKnobEntry(nullptr);
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  ServerParameterMissingAnnotationInvariant,
                  "missing the query_knob annotation") {
-    auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("testPlainParam");
-    QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_knobs::testIntKnob, plain);
+    auto param = createDummyServerParameter<bool>("noAnnotationKnob", BSONObj());
+    std::ignore = createDummyKnobEntry(param.get());
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  InvalidFcvMinInvariant,
-                 "fcv.min 'nope'.*testIntKnob.*not a valid FCV") {
-    QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_knobs::testIntKnob,
-                             anyServerParameter(),
-                             BSON("wire_name" << "foo"
-                                              << "fcv" << BSON("min" << "nope")));
+                 "fcv.min 'nope'.*foo.*not a valid FCV") {
+    auto param = createDummyServerParameter<bool>("pqsKnobWithNoFcv",
+                                                  annotations({
+                                                      .wireName = "foo"_sd,
+                                                      .pqsSettable = true,
+                                                      .minFcv = "nope"_sd,
+                                                  }));
+    std::ignore = createDummyKnobEntry(param.get());
 }
 
 // Ancient FCVs (e.g. 5.0) are no longer in the binary's FCV table, so
 // parseVersionForFeatureFlags rejects them and the invariant fires.
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  AncientFcvMinInvariant,
-                 "fcv.min '5.0'.*testIntKnob.*not a valid FCV") {
-    QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_knobs::testIntKnob,
-                             anyServerParameter(),
-                             BSON("wire_name" << "foo"
-                                              << "fcv" << BSON("min" << "5.0")));
+                 "fcv.min '5.0'.*foo.*not a valid FCV") {
+    auto param = createDummyServerParameter<bool>("oldFcvKnob",
+                                                  annotations({
+                                                      .wireName = "foo"_sd,
+                                                      .pqsSettable = true,
+                                                      .minFcv = "5.0"_sd,
+                                                  }));
+    std::ignore = createDummyKnobEntry(param.get());
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  OrphanAnnotationInvariant,
-                 "testPlainParam.*has a query_knob annotation but no matching QueryKnob") {
-    auto* params = ServerParameterSet::getNodeParameterSet();
-    auto* plain = params->getIfExists("testPlainParam");
-    // Turn `plain` into an orphan: annotated as a query knob but no QueryKnob<T>
-    // descriptor has ever been declared against its name.
-    plain->setAnnotations(BSON("query_knob" << BSON("wire_name" << "orphanWire")));
+                 "paramC.*has a query_knob annotation but no matching QueryKnob") {
+    auto paramA = createDummyServerParameter<bool>("paramA",
+                                                   annotations({
+                                                       .wireName = "paramA"_sd,
+                                                   }));
+    auto paramB = createDummyServerParameter<bool>("paramB",
+                                                   annotations({
+                                                       .wireName = "paramB"_sd,
+                                                   }));
+    auto paramC = createDummyServerParameter<bool>("paramC",
+                                                   annotations({
+                                                       .wireName = "paramC"_sd,
+                                                   }));
+    std::vector entries = {
+        createDummyKnobEntry(paramA.get(), QueryKnobId(0)),
+        createDummyKnobEntry(paramB.get(), QueryKnobId(1)),
+    };
 
-    QueryKnobRegistryBuilder b;
-    // Register all known-good test knobs so that only testPlainParam is
-    // orphaned when the detection runs.
-    b.addFromServerParameter(test_knobs::testIntKnob, params->getIfExists("testIntKnob"));
-    b.addFromServerParameter(test_knobs::testDoubleKnob, params->getIfExists("testDoubleKnob"));
-    b.addFromServerParameter(test_knobs::testBoolKnob, params->getIfExists("testBoolKnob"));
-    b.addFromServerParameter(test_knobs::testLLKnob, params->getIfExists("testLLKnob"));
-    b.addFromServerParameter(test_knobs::testEnumKnob, params->getIfExists("testEnumKnob"));
-    b.detectOrphanAnnotations(*params);
+    ServerParameterSet params;
+    params.add(std::move(paramA));
+    params.add(std::move(paramB));
+    params.add(std::move(paramC));
+    detail::detectOrphanAnnotations(entries, params);
 }
 
-// TODO SERVER-125395: add a death test for the C++/storage type mismatch case
-// once QueryKnobBase gains a ConverterTraits<T>-aware expected-alternative
-// check.
+DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
+                 MissmatchedServerParameterTypeInvariant,
+                 ".*No server parameter found.*") {
+    std::ignore =
+        QueryKnobRegistry::Entry::create<gTestBoolKnob>(QueryKnob<bool>(), kTestIntKnobName);
+}
 
 }  // namespace
 }  // namespace mongo

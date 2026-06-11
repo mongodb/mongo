@@ -31,171 +31,165 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_knobs/query_knob_test_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
-#include <algorithm>
-
 namespace mongo {
 namespace {
 
-QueryKnobBase* findByName(StringData name) {
-    auto& descriptors = QueryKnobDescriptorSet::get().knobs();
-    auto it = std::find_if(
-        descriptors.begin(), descriptors.end(), [&](auto* d) { return name == d->paramName; });
-    return it != descriptors.end() ? *it : nullptr;
+template <typename T>
+const QueryKnobRegistry::Entry& entryFor(const QueryKnob<T>& knob) {
+    return QueryKnobRegistry::instance().entry(knob.id);
 }
 
-TEST(QueryKnobTest, SyntheticKnobsSelfRegister) {
-    ASSERT_EQ(findByName("testIntKnob"_sd), &test_knobs::testIntKnob);
-    ASSERT_EQ(findByName("testDoubleKnob"_sd), &test_knobs::testDoubleKnob);
-    ASSERT_EQ(findByName("testBoolKnob"_sd), &test_knobs::testBoolKnob);
-    ASSERT_EQ(findByName("testLLKnob"_sd), &test_knobs::testLLKnob);
-    ASSERT_EQ(findByName("testEnumKnob"_sd), &test_knobs::testEnumKnob);
+TEST(QueryKnobTest, SyntheticKnobsRegisteredAgainstServerParameters) {
+    ASSERT_EQ(entryFor(test_knobs::testIntKnob).param->name(), "testIntKnob"_sd);
+    ASSERT_EQ(entryFor(test_knobs::testDoubleKnob).param->name(), "testDoubleKnob"_sd);
+    ASSERT_EQ(entryFor(test_knobs::testBoolKnob).param->name(), "testBoolKnob"_sd);
+    ASSERT_EQ(entryFor(test_knobs::testLLKnob).param->name(), "testLLKnob"_sd);
+    ASSERT_EQ(entryFor(test_knobs::testEnumKnob).param->name(), "testEnumKnob"_sd);
 }
 
 TEST(QueryKnobTest, ReadGlobalInt) {
-    auto val = test_knobs::testIntKnob.readGlobal();
+    auto val = entryFor(test_knobs::testIntKnob).readGlobal();
     ASSERT(std::holds_alternative<int>(val));
     ASSERT_EQ(std::get<int>(val), 42);
 }
 
 TEST(QueryKnobTest, ReadGlobalDouble) {
-    auto val = test_knobs::testDoubleKnob.readGlobal();
+    auto val = entryFor(test_knobs::testDoubleKnob).readGlobal();
     ASSERT(std::holds_alternative<double>(val));
     ASSERT_APPROX_EQUAL(std::get<double>(val), 3.14, 1e-9);
 }
 
 TEST(QueryKnobTest, ReadGlobalBool) {
-    auto val = test_knobs::testBoolKnob.readGlobal();
+    auto val = entryFor(test_knobs::testBoolKnob).readGlobal();
     ASSERT(std::holds_alternative<bool>(val));
     ASSERT_EQ(std::get<bool>(val), true);
 }
 
 TEST(QueryKnobTest, ReadGlobalLongLong) {
-    auto val = test_knobs::testLLKnob.readGlobal();
+    auto val = entryFor(test_knobs::testLLKnob).readGlobal();
     ASSERT(std::holds_alternative<long long>(val));
     ASSERT_EQ(std::get<long long>(val), 100LL);
 }
 
 TEST(QueryKnobTest, ReadGlobalSynchronizedEnum) {
-    auto val = test_knobs::testEnumKnob.readGlobal();
+    auto val = entryFor(test_knobs::testEnumKnob).readGlobal();
     ASSERT(std::holds_alternative<int>(val));
     ASSERT_EQ(std::get<int>(val), static_cast<int>(TestKnobModeEnum::kAlpha));
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesInt) {
     RAIIServerParameterControllerForTest controller("testIntKnob", 999);
-    auto val = test_knobs::testIntKnob.readGlobal();
+    auto val = entryFor(test_knobs::testIntKnob).readGlobal();
     ASSERT_EQ(std::get<int>(val), 999);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesDouble) {
     RAIIServerParameterControllerForTest controller("testDoubleKnob", 6.28);
-    auto val = test_knobs::testDoubleKnob.readGlobal();
+    auto val = entryFor(test_knobs::testDoubleKnob).readGlobal();
     ASSERT_APPROX_EQUAL(std::get<double>(val), 6.28, 1e-9);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesBool) {
     RAIIServerParameterControllerForTest controller("testBoolKnob", false);
-    auto val = test_knobs::testBoolKnob.readGlobal();
+    auto val = entryFor(test_knobs::testBoolKnob).readGlobal();
     ASSERT_EQ(std::get<bool>(val), false);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesLongLong) {
     RAIIServerParameterControllerForTest controller("testLLKnob", 9999LL);
-    auto val = test_knobs::testLLKnob.readGlobal();
+    auto val = entryFor(test_knobs::testLLKnob).readGlobal();
     ASSERT_EQ(std::get<long long>(val), 9999LL);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesSynchronizedEnum) {
     RAIIServerParameterControllerForTest controller("testEnumKnob", "beta");
-    auto val = test_knobs::testEnumKnob.readGlobal();
+    auto val = entryFor(test_knobs::testEnumKnob).readGlobal();
     ASSERT_EQ(std::get<int>(val), static_cast<int>(TestKnobModeEnum::kBeta));
 }
 
 TEST(QueryKnobTest, EnumKnobFromBSONRoundTrip) {
+    const auto& e = entryFor(test_knobs::testEnumKnob);
     auto enumAsInt = static_cast<int>(TestKnobModeEnum::kBeta);
     QueryKnobValue original{enumAsInt};
     BSONObjBuilder b;
-    test_knobs::testEnumKnob.toBSON(b, "v"_sd, original);
+    e.toBSON(b, "v"_sd, original);
     auto obj = b.obj();
     ASSERT_EQ(obj.firstElement().type(), BSONType::string);
-    auto roundTripped = test_knobs::testEnumKnob.fromBSON(obj.firstElement());
+    auto roundTripped = e.fromBSON(obj.firstElement());
     ASSERT_EQ(std::get<int>(roundTripped), enumAsInt);
 }
 
 TEST(QueryKnobTest, EnumKnobFromBSONString) {
-    auto val = test_knobs::testEnumKnob.fromBSON(BSON("v" << "beta").firstElement());
+    auto val = entryFor(test_knobs::testEnumKnob).fromBSON(BSON("v" << "beta").firstElement());
     ASSERT_EQ(std::get<int>(val), static_cast<int>(TestKnobModeEnum::kBeta));
 }
 
 TEST(QueryKnobTest, FromBSONInt) {
-    auto val = test_knobs::testIntKnob.fromBSON(BSON("x" << 99).firstElement());
+    auto val = entryFor(test_knobs::testIntKnob).fromBSON(BSON("x" << 99).firstElement());
     ASSERT_EQ(std::get<int>(val), 99);
 }
 
 TEST(QueryKnobTest, FromBSONDouble) {
-    auto val = test_knobs::testDoubleKnob.fromBSON(BSON("x" << 1.5).firstElement());
+    auto val = entryFor(test_knobs::testDoubleKnob).fromBSON(BSON("x" << 1.5).firstElement());
     ASSERT_APPROX_EQUAL(std::get<double>(val), 1.5, 1e-9);
 }
 
 TEST(QueryKnobTest, FromBSONBool) {
-    auto val = test_knobs::testBoolKnob.fromBSON(BSON("x" << true).firstElement());
+    auto val = entryFor(test_knobs::testBoolKnob).fromBSON(BSON("x" << true).firstElement());
     ASSERT_EQ(std::get<bool>(val), true);
 }
 
 TEST(QueryKnobTest, FromBSONLongLong) {
-    auto val = test_knobs::testLLKnob.fromBSON(BSON("x" << 50LL).firstElement());
+    auto val = entryFor(test_knobs::testLLKnob).fromBSON(BSON("x" << 50LL).firstElement());
     ASSERT_EQ(std::get<long long>(val), 50LL);
 }
 
 TEST(QueryKnobTest, ToBSONRoundTripInt) {
+    const auto& e = entryFor(test_knobs::testIntKnob);
     QueryKnobValue original{42};
     BSONObjBuilder b;
-    test_knobs::testIntKnob.toBSON(b, "v"_sd, original);
-    auto roundTripped = test_knobs::testIntKnob.fromBSON(b.obj().firstElement());
+    e.toBSON(b, "v"_sd, original);
+    auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_EQ(std::get<int>(roundTripped), 42);
 }
 
 TEST(QueryKnobTest, ToBSONRoundTripDouble) {
+    const auto& e = entryFor(test_knobs::testDoubleKnob);
     QueryKnobValue original{2.718};
     BSONObjBuilder b;
-    test_knobs::testDoubleKnob.toBSON(b, "v"_sd, original);
-    auto roundTripped = test_knobs::testDoubleKnob.fromBSON(b.obj().firstElement());
+    e.toBSON(b, "v"_sd, original);
+    auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_APPROX_EQUAL(std::get<double>(roundTripped), 2.718, 1e-9);
 }
 
 TEST(QueryKnobTest, ToBSONRoundTripBool) {
+    const auto& e = entryFor(test_knobs::testBoolKnob);
     QueryKnobValue original{false};
     BSONObjBuilder b;
-    test_knobs::testBoolKnob.toBSON(b, "v"_sd, original);
-    auto roundTripped = test_knobs::testBoolKnob.fromBSON(b.obj().firstElement());
+    e.toBSON(b, "v"_sd, original);
+    auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_EQ(std::get<bool>(roundTripped), false);
 }
 
 TEST(QueryKnobTest, ToBSONRoundTripLongLong) {
+    const auto& e = entryFor(test_knobs::testLLKnob);
     QueryKnobValue original{777LL};
     BSONObjBuilder b;
-    test_knobs::testLLKnob.toBSON(b, "v"_sd, original);
-    auto roundTripped = test_knobs::testLLKnob.fromBSON(b.obj().firstElement());
+    e.toBSON(b, "v"_sd, original);
+    auto roundTripped = e.fromBSON(b.obj().firstElement());
     ASSERT_EQ(std::get<long long>(roundTripped), 777LL);
 }
 
 TEST(QueryKnobTest, DeleteQueryKnobOverrideDefault) {
     QueryKnobValue v;
     ASSERT(std::holds_alternative<DeleteQueryKnobOverride>(v));
-}
-
-TEST(QueryKnobTest, ParamNameStoredCorrectly) {
-    ASSERT_EQ(test_knobs::testIntKnob.paramName, "testIntKnob"_sd);
-    ASSERT_EQ(test_knobs::testDoubleKnob.paramName, "testDoubleKnob"_sd);
-    ASSERT_EQ(test_knobs::testBoolKnob.paramName, "testBoolKnob"_sd);
-    ASSERT_EQ(test_knobs::testLLKnob.paramName, "testLLKnob"_sd);
-    ASSERT_EQ(test_knobs::testEnumKnob.paramName, "testEnumKnob"_sd);
 }
 
 }  // namespace

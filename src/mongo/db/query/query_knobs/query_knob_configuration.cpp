@@ -49,8 +49,7 @@ QueryKnobSnapshot makeQueryKnobSnapshot(const query_settings::QuerySettings& que
 
     // Load the global knob values.
     for (auto&& entry : registry.entries()) {
-        const auto& knob = entry.knob;
-        builder.set(knob.id, knob.readGlobal(), KnobSource::kDefault);
+        builder.set(entry.id, entry.readGlobal(), KnobSource::kDefault);
     }
 
     // Apply query settings overrides if needed.

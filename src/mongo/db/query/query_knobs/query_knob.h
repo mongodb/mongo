@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/util/assert_util.h"
 
 #include <concepts>
 #include <cstdint>
@@ -42,9 +41,6 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
-#include <vector>
-
-#include <fmt/format.h>
 
 namespace mongo {
 
@@ -55,8 +51,6 @@ struct DeleteQueryKnobOverride {
 
 // Enum-typed knobs are stored as int.
 using QueryKnobValue = std::variant<DeleteQueryKnobOverride, int, long long, double, bool>;
-
-using ReadGlobalFn = QueryKnobValue (*)(StringData);
 
 template <typename S>
 concept AtomicLoadable = requires(const S& s) {
@@ -69,95 +63,12 @@ concept EnumServerParameter = std::derived_from<S, ServerParameter> && requires(
 };
 
 /**
- * Concept-dispatched reader. Atomic globals are handled by the 'storage' NTTP which produces one
- * instantiation per global variable.
- */
-template <auto& storage>
-requires AtomicLoadable<std::remove_cvref_t<decltype(storage)>>
-QueryKnobValue readGlobalValue(StringData paramName) {
-    return QueryKnobValue{storage.load()};
-}
-
-/**
- * Enum knobs are handled by looking up the ServerParameter by its name and type. Enum values are
- * internally represented as ints.
- */
-template <typename SPT>
-requires EnumServerParameter<SPT>
-QueryKnobValue readGlobalValue(StringData paramName) {
-    try {
-        auto* sp = ServerParameterSet::getNodeParameterSet()->template get<SPT>(paramName);
-        return QueryKnobValue{static_cast<int>(sp->_data.get())};
-    } catch (const DBException&) {
-        tasserted(exceptionToStatus().withContext(
-            fmt::format("Failed to read query knob global '{}'", paramName)));
-    }
-}
-
-/**
  * Strong id type to identify query knobs. Defaults to 'kUninitialized'.
  */
 struct QueryKnobId {
     using value_t = std::uint16_t;
-    constexpr static auto kUninitialized = std::numeric_limits<value_t>::max();
-
     friend auto operator<=>(const QueryKnobId& lhs, const QueryKnobId& rhs) = default;
-
-    bool initialized() const {
-        return value != kUninitialized;
-    }
-
-    value_t value = kUninitialized;
-};
-
-/**
- * Type-erased descriptor for a single query knob. Typed QueryKnob<T> objects inherit from this.
- * Registration into QueryKnobDescriptorSet happens automatically at static init time unless
- * RegistrationMode::kExplicit is passed, in which case the caller is responsible for registering
- * the knob. The index field is left as a sentinel (~0) until QueryKnobRegistry assigns dense
- * indices during startup.
- *
- * Non-copyable to prevent object slicing when used through the base pointer.
- */
-class QueryKnobBase {
-public:
-    QueryKnobBase(StringData paramName, ReadGlobalFn readFn)
-        : paramName(paramName), _readFn(readFn) {}
-    virtual ~QueryKnobBase() = default;
-
-    QueryKnobBase(const QueryKnobBase&) = delete;
-    QueryKnobBase(QueryKnobBase&&) = delete;
-    QueryKnobBase& operator=(const QueryKnobBase&) = delete;
-    QueryKnobBase& operator=(QueryKnobBase&&) = delete;
-
-    virtual QueryKnobValue fromBSON(const BSONElement& elem) = 0;
-    virtual void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) = 0;
-
-    QueryKnobValue readGlobal() const {
-        return _readFn(paramName);
-    }
-
-    QueryKnobId id;
-    StringData paramName;
-
-private:
-    ReadGlobalFn _readFn;
-};
-
-/**
- * Compile-time collection of all QueryKnob descriptors. Populated during static
- * init, read-only thereafter. QueryKnobRegistry consumes this to build its index.
- */
-class QueryKnobDescriptorSet {
-public:
-    static QueryKnobDescriptorSet& get();
-
-    // Non-const knob: QueryKnobRegistry will later assign a dense index into each registered knob.
-    void add(QueryKnobBase& knob);
-    const std::vector<QueryKnobBase*>& knobs() const;
-
-private:
-    std::vector<QueryKnobBase*> _knobs;
+    value_t value;
 };
 
 namespace detail {
@@ -234,31 +145,12 @@ auto queryKnobValueType() -> std::remove_cvref_t<decltype(std::declval<SPT>()._d
 }  // namespace detail
 
 /**
- * Typed descriptor. With RegistrationMode::kAuto (the default), self-registers into
- * QueryKnobDescriptorSet at static init time. With RegistrationMode::kExplicit, construction does
- * not register the knob; the caller must invoke QueryKnobDescriptorSet::get().add(*this) manually.
- * fromBSON/toBSON auto-wired via ConverterTraits<T>.
+ * Typed handle for a query knob. T is a phantom type used to give callers like
+ * `QueryKnobConfiguration::get<T>(const QueryKnob<T>&)` compile-time type safety.
  */
 template <typename T>
-class QueryKnob final : public QueryKnobBase {
-public:
-    enum class RegistrationMode : bool { kAuto, kExplicit };
-    QueryKnob(StringData name,
-              ReadGlobalFn readFn,
-              RegistrationMode registrationMode = QueryKnob::RegistrationMode::kAuto)
-        : QueryKnobBase(name, readFn) {
-        if (registrationMode == RegistrationMode::kAuto) {
-            QueryKnobDescriptorSet::get().add(*this);
-        }
-    }
-
-    QueryKnobValue fromBSON(const BSONElement& elem) override {
-        return detail::ConverterTraits<T>::fromBSON(elem);
-    }
-
-    void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) override {
-        return detail::ConverterTraits<T>::toBSON(b, field, val);
-    }
+struct QueryKnob {
+    QueryKnobId id;
 };
 
 }  // namespace mongo
@@ -288,7 +180,7 @@ public:
 
 // Internal: emits one extern QueryKnob declaration per EXPAND row.
 #define MONGO_DETAIL_DECLARE_QUERY_KNOB(var, name, global) \
-    extern QueryKnob<decltype(detail::queryKnobValueType<global>())> var;
+    extern const QueryKnob<decltype(detail::queryKnobValueType<global>())> var;
 
 // Declares all knobs in EXPAND. Place in the group header inside the knob namespace.
 #define DECLARE_QUERY_KNOBS(group, EXPAND) \

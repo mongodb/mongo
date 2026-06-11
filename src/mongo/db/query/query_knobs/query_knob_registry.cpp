@@ -41,6 +41,12 @@
 
 namespace mongo {
 namespace {
+// Holds knob entries and the id counter accumulated during static init before QueryKnobRegistryInit
+// runs.
+struct QueryKnobInitializerContext {
+    QueryKnobId::value_t numKnobs = 0;
+    std::vector<QueryKnobRegistry::Entry> entries;
+} globalQueryKnobInitializerContext;
 
 boost::optional<multiversion::FeatureCompatibilityVersion> extractMinFcv(StringData paramName,
                                                                          const BSONObj& qk) {
@@ -71,9 +77,41 @@ boost::optional<multiversion::FeatureCompatibilityVersion> extractMinFcv(StringD
 
 }  // namespace
 
+QueryKnobRegistry::Entry::Entry(QueryKnobId id,
+                                ServerParameter* param,
+                                FromBSONFn fromBSONFn,
+                                ToBSONFn toBSONFn,
+                                ReadGlobalFn readGlobalFn)
+    : id(id), param(param), fromBSON(fromBSONFn), toBSON(toBSONFn), readGlobal(readGlobalFn) {
+    invariant(param, fmt::format("No server parameter found for query knob id {}", id.value));
+    const auto qk = param->annotations().getObjectField("query_knob");
+    invariant(!qk.isEmpty(),
+              str::stream() << "ServerParameter '" << param->name()
+                            << "' is missing the query_knob annotation");
+
+    wireName = qk.getStringField("wire_name");
+    invariant(!wireName.empty(),
+              str::stream() << "ServerParameter '" << param->name()
+                            << "': wire name must not be empty");
+
+    // TODO SERVER-125554: once a PQS knob's "minFcv" falls below the binary's supported
+    // range the annotation must be dropped, but this invariant then rejects the knob. Need
+    // a policy for PQS knobs whose "minFcv" is no longer supported.
+    minFcv = extractMinFcv(wireName, qk);
+
+    pqsSettable = qk.hasField("pqs_settable") && qk.getBoolField("pqs_settable");
+    invariant(!pqsSettable || minFcv.has_value(),
+              str::stream() << "PQS knob '" << param->name() << "' requires minFcv");
+}
+
 QueryKnobRegistry::QueryKnobRegistry(std::vector<Entry> entries) : _entries(std::move(entries)) {
+    std::sort(
+        _entries.begin(), _entries.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
     for (size_t i = 0; i < _entries.size(); ++i) {
         const auto& e = _entries[i];
+        invariant(e.id.value == i,
+                  str::stream() << "QueryKnobRegistry entry id " << e.id.value
+                                << " does not match its position " << i);
         if (e.pqsSettable) {
             auto [_, inserted] = _wireNameIndex.try_emplace(std::string{e.wireName}, i);
             invariant(inserted, str::stream() << "duplicate wire name '" << e.wireName << "'");
@@ -88,26 +126,16 @@ QueryKnobRegistry& QueryKnobRegistry::_mutableInstance() {
 }
 
 const QueryKnobRegistry& QueryKnobRegistry::instance() {
-    auto& inst = _mutableInstance();
-    invariant(inst._initialized,
+    auto&& inst = _mutableInstance();
+    invariant(!inst.entries().empty(),
               "QueryKnobRegistry::instance() called before QueryKnobRegistryInit");
     return inst;
 }
 
-void QueryKnobRegistry::init(QueryKnobRegistry reg) {
-    auto& inst = _mutableInstance();
-    invariant(!inst._initialized, "QueryKnobRegistry::init called twice");
-    inst = std::move(reg);
-    inst._writeBackDescriptorIndexes();
-    inst._initialized = true;
-}
-
-void QueryKnobRegistry::_writeBackDescriptorIndexes() {
-    for (size_t i = 0; i < _entries.size(); ++i) {
-        auto&& knob = _entries[i].knob;
-        invariant(!knob.id.initialized());
-        knob.id = QueryKnobId(i);
-    }
+void QueryKnobRegistry::init(std::vector<Entry> entries) {
+    auto&& inst = _mutableInstance();
+    invariant(inst.entries().empty(), "QueryKnobRegistry::init called twice");
+    inst = QueryKnobRegistry(std::move(entries));
 }
 
 boost::optional<QueryKnobId> QueryKnobRegistry::getKnobIdForName(StringData wireName) const {
@@ -139,49 +167,11 @@ size_t QueryKnobRegistry::knobsExposedToQuerySettingsCount() const {
 }
 
 namespace detail {
-
-void QueryKnobRegistryBuilder::addFromServerParameter(QueryKnobRegistry::Entry entry) {
-    invariant(!entry.wireName.empty(), "wire name must not be empty");
-    if (entry.pqsSettable) {
-        // TODO SERVER-125554: once a PQS knob's "minFcv" falls below the binary's supported
-        // range the annotation must be dropped, but this invariant then rejects the knob. Need
-        // a policy for PQS knobs whose "minFcv" is no longer supported.
-        invariant(entry.minFcv.has_value(),
-                  str::stream() << "PQS knob '" << entry.wireName << "' requires minFcv");
-    }
-    _entries.push_back(std::move(entry));
-}
-
-void QueryKnobRegistryBuilder::addFromServerParameter(QueryKnobBase& knob, ServerParameter* param) {
-    invariant(param,
-              str::stream() << "no ServerParameter for QueryKnob '" << knob.paramName << "'");
-    addFromServerParameter(knob, *param, param->annotations().getObjectField("query_knob"));
-}
-
-void QueryKnobRegistryBuilder::addFromServerParameter(QueryKnobBase& knob,
-                                                      ServerParameter& param,
-                                                      const BSONObj& queryKnobAnnotation) {
-    invariant(!queryKnobAnnotation.isEmpty(),
-              str::stream() << "ServerParameter '" << knob.paramName
-                            << "' is missing the query_knob annotation");
-    addFromServerParameter(QueryKnobRegistry::Entry{
-        .knob = knob,
-        .param = param,
-        .wireName = queryKnobAnnotation.getStringField("wire_name"),
-        .pqsSettable = queryKnobAnnotation.hasField("pqs_settable") &&
-            queryKnobAnnotation.getBoolField("pqs_settable"),
-        .minFcv = extractMinFcv(knob.paramName, queryKnobAnnotation),
-    });
-}
-
-QueryKnobRegistry QueryKnobRegistryBuilder::build() && {
-    return QueryKnobRegistry{std::move(_entries)};
-}
-
-void QueryKnobRegistryBuilder::detectOrphanAnnotations(const ServerParameterSet& params) const {
-    auto hasEntryFor = [this](StringData name) {
-        return std::any_of(_entries.begin(), _entries.end(), [name](const auto& e) {
-            return e.knob.paramName == name;
+void detectOrphanAnnotations(const std::vector<QueryKnobRegistry::Entry>& entries,
+                             const ServerParameterSet& params) {
+    auto hasEntryFor = [&](StringData name) {
+        return std::any_of(entries.begin(), entries.end(), [name](const auto& e) {
+            return e.param->name() == name;
         });
     };
     for (auto&& [name, sp] : params.getMap()) {
@@ -194,17 +184,23 @@ void QueryKnobRegistryBuilder::detectOrphanAnnotations(const ServerParameterSet&
     }
 }
 
-}  // namespace detail
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(QueryKnobRegistryInit, ("EndServerParameterRegistration"))
-(InitializerContext*) {
-    auto&& params = ServerParameterSet::getNodeParameterSet();
-    detail::QueryKnobRegistryBuilder builder;
-    for (auto* knob : QueryKnobDescriptorSet::get().knobs()) {
-        builder.addFromServerParameter(*knob, params->getIfExists(knob->paramName));
-    }
-    builder.detectOrphanAnnotations(*params);
-    QueryKnobRegistry::init(std::move(builder).build());
+QueryKnobId allocateQueryKnobId() {
+    return QueryKnobId(globalQueryKnobInitializerContext.numKnobs++);
 }
 
+void registerQueryKnob(QueryKnobRegistry::Entry&& entry) {
+    globalQueryKnobInitializerContext.entries.push_back(std::move(entry));
+}
+
+namespace {
+MONGO_INITIALIZER_WITH_PREREQUISITES(QueryKnobRegistryInit, ("EndServerParameterRegistration"))
+(InitializerContext*) {
+    QueryKnobRegistry registry{};
+    auto&& params = ServerParameterSet::getNodeParameterSet();
+    detectOrphanAnnotations(globalQueryKnobInitializerContext.entries, *params);
+    QueryKnobRegistry::init(std::move(globalQueryKnobInitializerContext.entries));
+}
+
+}  // namespace
+}  // namespace detail
 }  // namespace mongo
