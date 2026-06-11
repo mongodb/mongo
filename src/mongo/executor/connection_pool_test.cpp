@@ -30,6 +30,7 @@
 #include "mongo/executor/connection_pool.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/connection_pool_test_fixture.h"
 #include "mongo/unittest/log_test.h"
@@ -293,25 +294,102 @@ class ConnectionPoolCancellationTest : public ConnectionPoolTest {};
 class ConnectionPoolShutdownTest : public ConnectionPoolTest {};
 class ConnectionPoolMetricsTest : public ConnectionPoolTest {};
 
+// This fixture is for testing the DynamicLimitController, which is a controller that adjusts
+// the max connections and pending connections limits based on user-provided functions. Since the
+// controller doesn't have complex interactions with the pool, we can test it in a
+// separate fixture with more focused tests that don't require the full range of pool
+// operations to be tested.
+class DynamicLimitControllerTest : public ConnectionPoolTest {
+protected:
+    using ControllerPtr = std::shared_ptr<DynamicLimitController>;
+
+    std::tuple<std::shared_ptr<ConnectionPool>, ControllerPtr> makeDynamicController(
+        size_t min = 1,
+        size_t max = 10,
+        ConnectionPool::Options opts = {},
+        StringData name = "dynamic limit controller") {
+        return makeDynamicController(
+            [min] { return min; }, [max] { return max; }, std::move(opts), std::move(name));
+    }
+
+    std::tuple<std::shared_ptr<ConnectionPool>, ControllerPtr> makeDynamicController(
+        std::function<size_t()> minLoader,
+        std::function<size_t()> maxLoader,
+        ConnectionPool::Options opts = {},
+        StringData name = "dynamic limit controller") {
+        auto controller = std::make_shared<DynamicLimitController>(
+            std::move(minLoader), std::move(maxLoader), std::move(name));
+        auto pool = makePool(opts);
+        controller->init(pool.get());
+        return {std::move(pool), std::move(controller)};
+    }
+
+    ConnectionPool::ConnectionControls addHostAndUpdate(
+        const ControllerPtr& controller,
+        ConnectionPool::PoolId id,
+        const HostAndPort& host,
+        const ConnectionPool::PoolMetrics& metrics) {
+        controller->addHost(id, host);
+        controller->updateHost(id, metrics);
+        return controller->getControls(id);
+    }
+
+    ConnectionPool::ConnectionControls updateHostAndGetControls(
+        const ControllerPtr& controller,
+        ConnectionPool::PoolId id,
+        const ConnectionPool::PoolMetrics& metrics) {
+        controller->updateHost(id, metrics);
+        return controller->getControls(id);
+    }
+};
+
+template <typename Traits>
 class ConnectionPoolLimitControllerTest : public ConnectionPoolTest {
 protected:
-    /**
-     * Helper to set up a ConnectionPool with LimitController for testing internal behavior.
-     *
-     * Optionally pass ConnectionPool::Options to override default values. The controllerFactory
-     * cannot be overridden.
-     */
-    std::tuple<std::shared_ptr<ConnectionPool>,
-               std::shared_ptr<ConnectionPool::ControllerInterface>>
-    setupLimitController(ConnectionPool::Options opts = {}) {
-        auto controller = ConnectionPool::makeLimitController();
-        opts.controllerFactory = [=]() {
+    using ControllerPtr = std::shared_ptr<ConnectionPool::ControllerInterface>;
+
+    std::tuple<std::shared_ptr<ConnectionPool>, ControllerPtr> setupLimitController(
+        ConnectionPool::Options opts = {}) {
+        static_assert(std::is_convertible_v<decltype(Traits::makeLimitController(
+                                                std::declval<const ConnectionPool::Options&>())),
+                                            ControllerPtr>,
+                      "Traits::makeLimitController(const ConnectionPool::Options&) must return a "
+                      "shared_ptr<ConnectionPool::ControllerInterface>");
+
+        auto controller = Traits::makeLimitController(opts);
+        opts.controllerFactory = [controller]() {
             return controller;
         };
         auto pool = makePool(opts);
         return std::make_tuple(std::move(pool), std::move(controller));
     }
 };
+
+// The following traits and test suite are for testing the behavior of the ConnectionPool when using
+// different types of controllers. The tests themselves are defined in the
+// ConnectionPoolLimitControllerTest fixture, and the traits are used to instantiate the test suite
+// with different controller types. This allows us to run the same set of tests against both the
+// default LimitController and the DynamicLimitController without having to duplicate the test code.
+
+struct LimitControllerTrait {
+    static std::shared_ptr<ConnectionPool::ControllerInterface> makeLimitController(
+        const ConnectionPool::Options&) {
+        return ConnectionPool::makeLimitController();
+    }
+};
+
+struct DynamicLimitControllerTrait {
+    static std::shared_ptr<ConnectionPool::ControllerInterface> makeLimitController(
+        const ConnectionPool::Options& opts) {
+        return std::make_shared<DynamicLimitController>([min = opts.minConnections] { return min; },
+                                                        [max = opts.maxConnections] { return max; },
+                                                        "dynamic limit controller");
+    }
+};
+
+using ConnectionPoolLimitControllerTestTypes =
+    ::testing::Types<LimitControllerTrait, DynamicLimitControllerTrait>;
+TYPED_TEST_SUITE(ConnectionPoolLimitControllerTest, ConnectionPoolLimitControllerTestTypes);
 
 /**
  * Verify that a request is rejected immediately when the pending request queue is at capacity.
@@ -4301,11 +4379,11 @@ TEST_F(ConnectionPoolExpiryTest, HostGroupPoolExpiresAfterHostTimeout) {
         << "Secondary pool should have expired after hostTimeout";
 }
 
-TEST_F(ConnectionPoolLimitControllerTest, LimitControllerTargetConnectionsCalculation) {
+TYPED_TEST(ConnectionPoolLimitControllerTest, LimitControllerTargetConnectionsCalculation) {
     ConnectionPool::Options opts;
     opts.minConnections = 5;
     opts.maxConnections = 20;
-    auto [pool, controller] = setupLimitController(opts);
+    auto [pool, controller] = this->setupLimitController(opts);
     ConnectionPool::PoolMetrics metrics;
 
     controller->addHost(0, HostAndPort());
@@ -4335,8 +4413,8 @@ TEST_F(ConnectionPoolLimitControllerTest, LimitControllerTargetConnectionsCalcul
     ASSERT_EQ(controls.targetConnections, opts.maxConnections);
 }
 
-TEST_F(ConnectionPoolLimitControllerTest, LimitControllerCanShutdownFollowsExpiry) {
-    auto [pool, controller] = setupLimitController();
+TYPED_TEST(ConnectionPoolLimitControllerTest, LimitControllerCanShutdownFollowsExpiry) {
+    auto [pool, controller] = this->setupLimitController();
     ConnectionPool::PoolMetrics metrics;
 
     controller->addHost(0, HostAndPort());
@@ -4347,6 +4425,133 @@ TEST_F(ConnectionPoolLimitControllerTest, LimitControllerCanShutdownFollowsExpir
     metrics.isExpired = true;
     state = controller->updateHost(0, metrics);
     ASSERT_EQ(state.canShutdown, true);
+}
+
+// Test that verifies the host target connection calculation is updated when the controller's
+// dynamic loader functions return different values. This ensures that the controller is properly
+// calling the dynamic loader functions on each update and using their return values in the
+// target connection calculation.
+TEST_F(DynamicLimitControllerTest, DynamicLoaderValuesAreReflectedInTargetConnections) {
+    size_t minValue = 1;
+    size_t maxValue = 10;
+
+    auto [pool, controller] =
+        makeDynamicController([&] { return minValue; }, [&] { return maxValue; });
+
+    ConnectionPool::PoolMetrics metrics;
+    metrics.requests = 0;
+    metrics.active = 0;
+    metrics.leased = 0;
+
+    addHostAndUpdate(controller, 0, HostAndPort("localhost:27017"), metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections, minValue);
+
+    minValue = 5;
+    maxValue = 20;
+    updateHostAndGetControls(controller, 0, metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections, minValue);
+}
+
+// Verify that adding and removing a host from the controller does not cause any crashes.
+// This is a basic sanity test to ensure that the controller can handle dynamic changes
+// to the host list without issues.
+TEST_F(DynamicLimitControllerTest, AddAndRemoveHostTrackingDoesNotCrash) {
+    auto [pool, controller] = makeDynamicController(1, 2);
+    controller->addHost(0, HostAndPort("localhost:27017"));
+    controller->removeHost(0);
+
+    SUCCEED();
+}
+
+// Verify that the controller properly clamps the target connections to the min and max values
+// returned by the dynamic loader functions. This ensures that even if the dynamic loader
+// functions return values that would normally be outside the allowed range, the controller
+// still enforces the configured limits.
+TEST_F(DynamicLimitControllerTest, UpdateHostClampsDemandToMinAndMax) {
+    size_t minValue = 5;
+    size_t maxValue = 10;
+    auto [pool, controller] =
+        makeDynamicController([&] { return minValue; }, [&] { return maxValue; });
+
+    ConnectionPool::PoolMetrics metrics;
+    metrics.requests = 0;
+    metrics.active = 0;
+    metrics.leased = 0;
+    addHostAndUpdate(controller, 0, HostAndPort("localhost:27017"), metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections, minValue);
+
+    metrics.requests = 100;
+    updateHostAndGetControls(controller, 0, metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections, maxValue);
+}
+
+// Verify that the controller re-evaluates the dynamic loader functions on each updateHost() call,
+// and that changes to the values returned by those functions are reflected in the target connection
+// calculation. This ensures that the controller is not caching the results of the dynamic loader
+// functions and is properly using their return values on each update.
+TEST_F(DynamicLimitControllerTest, UpdateHostRechecksDynamicBoundsOnEachCall) {
+    size_t minValue = 5;
+    size_t maxValue = 10;
+    auto [pool, controller] =
+        makeDynamicController([&] { return minValue; }, [&] { return maxValue; });
+
+    ConnectionPool::PoolMetrics metrics;
+    metrics.requests = 100;
+    metrics.active = 0;
+    metrics.leased = 0;
+
+    addHostAndUpdate(controller, 0, HostAndPort("localhost:27017"), metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections, maxValue);
+
+    maxValue = 50;
+    metrics.requests = 20;
+    updateHostAndGetControls(controller, 0, metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections,
+              metrics.requests + metrics.active + metrics.leased);
+}
+
+// Verify that removing and re-adding a host causes the controller to reset any cached state for
+// that host, allowing it to properly re-calculate the target connections based on the current
+// metrics and dynamic loader values. This ensures that the controller can handle hosts being
+// removed and re-added without retaining stale state that would affect its calculations.
+TEST_F(DynamicLimitControllerTest, RemoveAndReAddHostAllowsFreshTargetCalculation) {
+    size_t minValue = 1;
+    size_t maxValue = 10;
+    auto [pool, controller] =
+        makeDynamicController([&] { return minValue; }, [&] { return maxValue; });
+
+    ConnectionPool::PoolMetrics metrics;
+    metrics.requests = 2;
+    metrics.active = 1;
+    metrics.leased = 0;
+
+    addHostAndUpdate(controller, 0, HostAndPort("localhost:27017"), metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections,
+              metrics.requests + metrics.active + metrics.leased);
+
+    controller->removeHost(0);
+    controller->addHost(0, HostAndPort("localhost:27017"));
+    updateHostAndGetControls(controller, 0, metrics);
+    ASSERT_EQ(controller->getControls(0).targetConnections,
+              metrics.requests + metrics.active + metrics.leased);
+}
+
+// Sanity test that verifies the controller's name() method returns the expected string.
+TEST_F(DynamicLimitControllerTest, NameReturnsConfiguredControllerName) {
+    auto [pool, controller] = makeDynamicController(1, 2);
+    ASSERT_EQ(controller->name(), "dynamic limit controller");
+}
+
+// Verify that the controller's getControls() method returns the maxConnecting value from the pool
+// options, rather than a hardcoded value. This ensures that the controller is properly using the
+// pool's configuration when determining the controls to return.
+TEST_F(DynamicLimitControllerTest, UsesPoolMaxConnectingInGetControls) {
+    ConnectionPool::Options opts;
+    opts.maxConnecting = 17;
+    auto [pool, controller] = makeDynamicController(1, 2, opts);
+    controller->addHost(0, HostAndPort("localhost:27017"));
+
+    ASSERT_EQ(controller->getControls(0).maxPendingConnections, opts.maxConnecting);
 }
 
 }  // namespace connection_pool_test_details
