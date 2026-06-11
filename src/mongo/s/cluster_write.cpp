@@ -50,7 +50,8 @@ void write(OperationContext* opCtx,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch) {
-    if (request.hasEncryptionInformation()) {
+    if (prepareForFLERewrite(opCtx,
+                             request.getWriteCommandRequestBase().getEncryptionInformation())) {
         FLEBatchResult result = processFLEBatch(opCtx, request, stats, response, targetEpoch);
         if (result == FLEBatchResult::kProcessed) {
             return;

@@ -166,12 +166,8 @@ public:
         // Start the query planning timer right after parsing.
         CurOp::get(opCtx)->beginQueryPlanningTimer();
 
-        if (shouldDoFLERewrite(request)) {
-            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                processFLECountD(opCtx, nss, &request);
-            }
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
+            processFLECountD(opCtx, nss, &request);
         }
 
         if (ctx->getView()) {
@@ -253,13 +249,9 @@ public:
         auto curOp = CurOp::get(opCtx);
         curOp->beginQueryPlanningTimer();
 
-        if (shouldDoFLERewrite(request)) {
+        if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
             LOGV2_DEBUG(7964102, 2, "Processing Queryable Encryption command", "cmd"_attr = cmdObj);
-            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                processFLECountD(opCtx, nss, &request);
-            }
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            processFLECountD(opCtx, nss, &request);
         }
         if (request.getMirrored().value_or(false)) {
             const auto& invocation = CommandInvocation::get(opCtx);

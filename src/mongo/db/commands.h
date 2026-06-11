@@ -70,11 +70,21 @@ extern const std::set<std::string> kApiVersions1;
 class AuthorizationContract;
 class Command;
 class CommandInvocation;
+class EncryptionInformation;
 class OperationContext;
 
 namespace mutablebson {
 class Document;
 }  // namespace mutablebson
+
+/**
+ * Whether or not the caller should rewrite the request for FLE. If this function returns false,
+ * no FLE rewriting is needed.
+ * A side effect of calling this function is that diagnostics can be disabled in the passed
+ * OperationContext.
+ */
+bool prepareForFLERewrite(OperationContext* opCtx,
+                          const boost::optional<EncryptionInformation>& encryptionInformation);
 
 /**
  * A simple set of type-erased hooks for pre and post command actions.

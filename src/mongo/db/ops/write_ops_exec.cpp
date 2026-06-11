@@ -356,9 +356,8 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 // second item determines if _safeContent_ array can be modified in an encrypted collection.
 std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
                                                   const write_ops::WriteCommandRequestBase& req) {
-    auto& encryptionInfo = req.getEncryptionInformation();
-    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo);
-    return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
+    return std::make_tuple(req.getBypassDocumentValidation(),
+                           getFleCrudProcessed(req.getEncryptionInformation()));
 }
 }  // namespace
 
@@ -466,18 +465,8 @@ bool handleError(OperationContext* opCtx,
     return !ordered;
 }
 
-bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo) {
-    if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
-        uassert(6666201,
-                "External users cannot have crudProcessed enabled",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal));
-
-        return true;
-    }
-    return false;
+bool getFleCrudProcessed(const boost::optional<EncryptionInformation>& encryptionInfo) {
+    return encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false);
 }
 
 /**

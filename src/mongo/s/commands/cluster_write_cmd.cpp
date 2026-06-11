@@ -616,7 +616,8 @@ void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
 
 
     std::unique_ptr<BatchedCommandRequest> req;
-    if (_batchedRequest.hasEncryptionInformation() &&
+    if (prepareForFLERewrite(
+            opCtx, _batchedRequest.getWriteCommandRequestBase().getEncryptionInformation()) &&
         (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Delete ||
          _batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update)) {
         req = processFLEBatchExplain(opCtx, _batchedRequest);

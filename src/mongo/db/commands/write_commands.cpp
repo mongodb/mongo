@@ -304,19 +304,12 @@ public:
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
             doTransactionValidationForWrites(opCtx, ns());
-            if (request().getEncryptionInformation().has_value()) {
-                {
-                    // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-                }
 
-                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    write_ops::InsertCommandReply insertReply;
-                    auto batch = processFLEInsert(opCtx, request(), &insertReply);
-                    if (batch == FLEBatchResult::kProcessed) {
-                        return insertReply;
-                    }
+            if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+                write_ops::InsertCommandReply insertReply;
+                auto batch = processFLEInsert(opCtx, request(), &insertReply);
+                if (batch == FLEBatchResult::kProcessed) {
+                    return insertReply;
                 }
             }
 
@@ -495,15 +488,8 @@ public:
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
-            if (request().getEncryptionInformation().has_value()) {
-                {
-                    // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-                }
-                if (!request().getEncryptionInformation().value().getCrudProcessed()) {
-                    return processFLEUpdate(opCtx, request());
-                }
+            if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+                return processFLEUpdate(opCtx, request());
             }
 
             if (isTimeseries(opCtx, request())) {
@@ -594,19 +580,12 @@ public:
 
             UpdateRequest updateRequest(request().getUpdates()[0]);
             updateRequest.setNamespaceString(request().getNamespace());
-            if (shouldDoFLERewrite(request())) {
-                {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-                }
-
-                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    updateRequest.setQuery(
-                        processFLEWriteExplainD(opCtx,
-                                                write_ops::collationOf(request().getUpdates()[0]),
-                                                request(),
-                                                updateRequest.getQuery()));
-                }
+            if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+                updateRequest.setQuery(
+                    processFLEWriteExplainD(opCtx,
+                                            write_ops::collationOf(request().getUpdates()[0]),
+                                            request(),
+                                            updateRequest.getQuery()));
             }
 
             updateRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
@@ -717,16 +696,8 @@ public:
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
 
-            if (request().getEncryptionInformation().has_value()) {
-                {
-                    // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-                }
-
-                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    return processFLEDelete(opCtx, request());
-                }
+            if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+                return processFLEDelete(opCtx, request());
             }
 
             if (isTimeseries(opCtx, request())) {
@@ -785,16 +756,9 @@ public:
 
             const auto& firstDelete = request().getDeletes()[0];
             BSONObj query = firstDelete.getQ();
-            if (shouldDoFLERewrite(request())) {
-                {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-                }
-
-                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    query = processFLEWriteExplainD(
-                        opCtx, write_ops::collationOf(firstDelete), request(), query);
-                }
+            if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+                query = processFLEWriteExplainD(
+                    opCtx, write_ops::collationOf(firstDelete), request(), query);
             }
             deleteRequest.setQuery(std::move(query));
 

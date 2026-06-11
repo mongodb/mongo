@@ -124,6 +124,30 @@ auto getCommandInvocationHooks =
 
 }  // namespace
 
+bool prepareForFLERewrite(OperationContext* opCtx,
+                          const boost::optional<EncryptionInformation>& encryptionInformation) {
+    // Check if request has encryption information set.
+    // Only if encryption information is set, we can do the actual FLE rewriting.
+    if (!encryptionInformation) {
+        return false;
+    }
+    // Make OperationContext forget about diagnostics, so it won't leak sensitive field
+    // information into them.
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
+    const auto processed = encryptionInformation->getCrudProcessed().value_or(false);
+    uassert(12783100,
+            "External users cannot have encryptionInformation.crudProcessed enabled",
+            !processed ||
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::internal));
+    // Prevent duplicate rewriting.
+    return !processed;
+}
+
 void CommandInvocationHooks::set(ServiceContext* serviceContext,
                                  std::unique_ptr<CommandInvocationHooks> hooks) {
     getCommandInvocationHooks(serviceContext) = std::move(hooks);

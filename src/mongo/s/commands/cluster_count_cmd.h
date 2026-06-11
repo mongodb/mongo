@@ -116,13 +116,8 @@ public:
         try {
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
 
-            if (shouldDoFLERewrite(countRequest)) {
-
-                if (!countRequest.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    processFLECountS(opCtx, nss, &countRequest);
-                }
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
+                processFLECountS(opCtx, nss, &countRequest);
             }
 
             // We only need to factor in the skip value when sending to the shards if we
@@ -235,11 +230,8 @@ public:
                 nss.isValid());
 
         // If the command has encryptionInformation, rewrite the query as necessary.
-        if (shouldDoFLERewrite(countRequest)) {
+        if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
             processFLECountS(opCtx, nss, &countRequest);
-
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
         BSONObj targetingQuery = countRequest.getQuery();

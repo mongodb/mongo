@@ -305,15 +305,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     curOp->beginQueryPlanningTimer();
 
     auto requestAndMsg = [&]() {
-        if (request().getEncryptionInformation()) {
-            {
-                stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-            }
-
-            if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                return processFLEFindAndModifyExplainMongod(opCtx, request());
-            }
+        if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
+            return processFLEFindAndModifyExplainMongod(opCtx, request());
         }
 
         return std::pair{request(), OpMsgRequest()};
@@ -388,14 +381,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     auto const curOp = CurOp::get(opCtx);
     curOp->beginQueryPlanningTimer();
 
-    if (req.getEncryptionInformation().has_value()) {
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-        }
-        if (!req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
-            return processFLEFindAndModify(opCtx, req);
-        }
+    if (prepareForFLERewrite(opCtx, req.getEncryptionInformation())) {
+        return processFLEFindAndModify(opCtx, req);
     }
 
     const NamespaceString& nsString = req.getNamespace();
@@ -406,8 +393,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     CmdFindAndModify::collectMetrics(req);
 
     auto disableDocumentValidation = req.getBypassDocumentValidation().value_or(false);
-    auto fleCrudProcessed =
-        write_ops_exec::getFleCrudProcessed(opCtx, req.getEncryptionInformation());
+    auto fleCrudProcessed = write_ops_exec::getFleCrudProcessed(req.getEncryptionInformation());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);
