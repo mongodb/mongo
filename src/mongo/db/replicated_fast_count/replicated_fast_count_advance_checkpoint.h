@@ -59,23 +59,28 @@ SizeCountCheckpointSnapshot materializeCheckpointSnapshot(OperationContext* opCt
                                                           Timestamp scanStartAfterTS);
 
 /**
- * Persists a materialized checkpoint snapshot.
+ * Persists a materialized checkpoint snapshot to the `sizeCountStore` and updates the valid-as-of
+ * timestamp in `timestampStore`.
+ *
+ * Returns the number of writes to the `sizeCountStore`.
  */
-void persistCheckpointSnapshot(OperationContext* opCtx,
-                               const SizeCountCheckpointSnapshot& checkpoint,
-                               SizeCountStore& sizeCountStore,
-                               SizeCountTimestampStore& timestampStore);
+size_t persistCheckpointSnapshot(OperationContext* opCtx,
+                                 const SizeCountCheckpointSnapshot& checkpoint,
+                                 SizeCountStore& sizeCountStore,
+                                 SizeCountTimestampStore& timestampStore);
 
 
 /**
  * Scans the oplog for size and count deltas since the last checkpoint, accumulates absolute totals
  * per collection, and persists the result to `sizeCountStore` and `timestampStore`.
  *
+ * Returns the number of writes to the `sizeCountStore`.
+ *
  * Guarantee: If new oplog entries were written since the last checkpoint, the `timestampStore`
  * advances its global valid-as-of timestamp, even in absence of oplog entries with size and count
  * deltas, to ensure forward progress through the oplog.
  */
-void advanceCheckpoint(OperationContext* opCtx,
-                       SizeCountStore& sizeCountStore,
-                       SizeCountTimestampStore& timestampStore);
+size_t advanceCheckpoint(OperationContext* opCtx,
+                         SizeCountStore& sizeCountStore,
+                         SizeCountTimestampStore& timestampStore);
 }  // namespace mongo::replicated_fast_count

@@ -104,16 +104,6 @@ auto& updateCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.updateCount",
                                                 .role = ClusterRole::None}});
 
-// The total time spent writing to the replicated fast count collection during flushing. This is
-// useful for determining the proportion of flush time spent writing (writeTimeMsTotalCounter /
-// flushTimeMsTotalCounter).
-auto& writeTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
-    MetricNames::kReplicatedFastCountWriteTimeMsTotal,
-    "Total time in milliseconds spent writing metadata to the replicated fast count collection",
-    MetricUnit::kMilliseconds,
-    {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.writeTime.total",
-                                                .role = ClusterRole::None}});
-
 // Gauge for the number of seconds between the most recently applied oplog entry and the most
 // recently persisted fastcount checkpoint. A large value indicates the fastcount checkpoint is
 // falling behind replication.
@@ -144,14 +134,6 @@ void ReplicatedFastCountMetrics::setIsRunning(bool running) {
     isRunningGauge.set(running ? 1 : 0);
 }
 
-void ReplicatedFastCountMetrics::recordFlush(Date_t startTime, size_t batchSize) {
-    const int64_t elapsedMs = (Date_t::now() - startTime).count();
-
-    flushSuccessCounter.add(1);
-    flushTimeMsTotalCounter.add(elapsedMs);
-    flushedDocsTotalCounter.add(static_cast<int64_t>(batchSize));
-}
-
 void ReplicatedFastCountMetrics::incrementFlushFailureCount() {
     flushFailureCounter.add(1);
 }
@@ -164,8 +146,12 @@ void ReplicatedFastCountMetrics::incrementUpdateCount() {
     updateCounter.add(1);
 }
 
-void ReplicatedFastCountMetrics::addWriteTimeMsTotal(int64_t ms) {
-    writeTimeMsTotalCounter.add(ms);
+void recordFlush(Date_t startTime, size_t batchSize) {
+    const int64_t elapsedMs = (Date_t::now() - startTime).count();
+
+    flushSuccessCounter.add(1);
+    flushTimeMsTotalCounter.add(elapsedMs);
+    flushedDocsTotalCounter.add(static_cast<int64_t>(batchSize));
 }
 
 void recordAppliedOpTime(const Timestamp& ts) {

@@ -225,7 +225,7 @@ TEST_P(SizeCountStoreTest, RemoveRemovesEntry) {
 
     {
         WriteUnitOfWork wuow{opCtx};
-        store.remove(opCtx, uuid);
+        EXPECT_EQ(store.remove(opCtx, uuid), 1);
         wuow.commit();
     }
 
@@ -240,7 +240,7 @@ TEST_P(SizeCountStoreTest, RemoveNonExistentEntryIsNoOp) {
     auto opCtx = operationContext();
     {
         WriteUnitOfWork wuow{opCtx};
-        store.remove(opCtx, uuid);
+        EXPECT_EQ(store.remove(opCtx, uuid), 0);
         wuow.commit();
     }
     EXPECT_FALSE(store.read(operationContext(), uuid).has_value());

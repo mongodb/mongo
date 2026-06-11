@@ -192,8 +192,6 @@ public:
         MetricNameMaker::make("replicated_fast_count.insert_count");
     static constexpr MetricName kReplicatedFastCountUpdateCount =
         MetricNameMaker::make("replicated_fast_count.update_count");
-    static constexpr MetricName kReplicatedFastCountWriteTimeMsTotal =
-        MetricNameMaker::make("replicated_fast_count.write_time.total");
     static constexpr MetricName kReplicatedFastCountCheckpointOplogEntriesProcessed =
         MetricNameMaker::make("replicated_fast_count.checkpoint.oplog_entries_processed");
     static constexpr MetricName kReplicatedFastCountCheckpointOplogEntriesSkipped =

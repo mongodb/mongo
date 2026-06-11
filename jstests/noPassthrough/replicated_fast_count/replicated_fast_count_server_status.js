@@ -58,11 +58,7 @@ describe("fast count server status metric", function () {
             assert.soon(
                 () => {
                     const metrics = getMetrics(this.db);
-                    return (
-                        metrics.flush.successCount >= 1 &&
-                        metrics.flushTime.total >= 500 &&
-                        metrics.writeTime.total >= 0
-                    );
+                    return metrics.flush.successCount >= 1 && metrics.flushTime.total >= 500;
                 },
                 () => `Expected flush time metrics after 500ms delay, got ${tojson(getMetrics(this.db))}`,
                 kServerStatusAssertTimeoutMs,

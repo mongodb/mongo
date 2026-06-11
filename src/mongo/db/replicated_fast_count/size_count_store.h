@@ -117,8 +117,10 @@ public:
 
     /**
      * Removes the entry for `uuid` from the store if one exists, otherwise does nothing.
+     *
+     * Returns the number of entries removed, either 0 or 1.
      */
-    virtual void remove(OperationContext* opCtx, UUID uuid) = 0;
+    virtual size_t remove(OperationContext* opCtx, UUID uuid) = 0;
 
     /**
      * For each entry in `deltas`, looks up the persisted size and count for that UUID in the
@@ -145,7 +147,7 @@ public:
     boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const override;
     void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-    void remove(OperationContext* opCtx, UUID uuid) override;
+    size_t remove(OperationContext* opCtx, UUID uuid) override;
     void readAndIncrementSizeCounts(OperationContext* opCtx,
                                     SizeCountDeltas& deltas) const override;
 
@@ -168,7 +170,7 @@ public:
     boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const override;
     void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
-    void remove(OperationContext* opCtx, UUID uuid) override;
+    size_t remove(OperationContext* opCtx, UUID uuid) override;
     void readAndIncrementSizeCounts(OperationContext* opCtx,
                                     SizeCountDeltas& deltas) const override;
 

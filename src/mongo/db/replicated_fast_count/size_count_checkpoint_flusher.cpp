@@ -92,9 +92,9 @@ void SizeCountCheckpointFlusher::runOneFlushCycle_ForTest(OperationContext* opCt
 void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
                                                    SizeCountCheckpointBuffer& buffer) {
     const Date_t flushStart = Date_t::now();
-    size_t flushedBatchSize = 0;
+    size_t entryWriteCount = 0;
     try {
-        flushedBatchSize = _doFlush(opCtx, buffer);
+        entryWriteCount = _doFlush(opCtx, buffer);
     } catch (const DBException& ex) {
         // _doFlush() guarantees that the checkpoint snapshot is only released from the buffer once
         // success if acknowledged. Thus, swallowing DBExceptions shouldn't impact correctness with
@@ -121,7 +121,7 @@ void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
         });
     }
 
-    _metrics.recordFlush(flushStart, flushedBatchSize);
+    recordFlush(flushStart, entryWriteCount);
 }
 
 size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
@@ -140,7 +140,7 @@ size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
         return 0;
     }
 
-    const Date_t flushStart = Date_t::now();
+    size_t entryWriteCount = 0;
     writeConflictRetry(opCtx, "flush", NamespaceString::kDefaultOplogCollectionNamespace, [&] {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
 
@@ -163,14 +163,13 @@ size_t SizeCountCheckpointFlusher::_doFlush(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
-        persistCheckpointSnapshot(opCtx, checkpoint, *_sizeCountStore, *_timestampStore);
+        entryWriteCount =
+            persistCheckpointSnapshot(opCtx, checkpoint, *_sizeCountStore, *_timestampStore);
         wuow.commit();
     });
     buffer.acknowledgeFlushSuccess();
-    auto flushedBatchSize = batch->deltas.size();
 
-    _metrics.addWriteTimeMsTotal((Date_t::now() - flushStart).count());
-    return flushedBatchSize;
+    return entryWriteCount;
 }
 
 }  // namespace mongo::replicated_fast_count

@@ -35,6 +35,7 @@
 
 namespace mongo::replicated_fast_count {
 namespace {
+
 SizeCountCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
                                                   const SizeCountStore& sizeCountStore,
                                                   Timestamp seekAfterTimestamp) {
@@ -59,8 +60,8 @@ SizeCountCheckpointSnapshot computeNextCheckpoint(OperationContext* opCtx,
     return materializeCheckpointSnapshot(
         opCtx, sizeCountStore, std::move(scanResult), std::move(seekAfterTimestamp));
 }
-
 }  // namespace
+
 SizeCountCheckpointSnapshot materializeCheckpointSnapshot(OperationContext* opCtx,
                                                           const SizeCountStore& sizeCountStore,
                                                           OplogScanResult scanResult,
@@ -70,10 +71,11 @@ SizeCountCheckpointSnapshot materializeCheckpointSnapshot(OperationContext* opCt
             .validAsOf = scanResult.lastTimestamp.value_or(scanStartAfterTS)};
 }
 
-void persistCheckpointSnapshot(OperationContext* opCtx,
-                               const SizeCountCheckpointSnapshot& checkpoint,
-                               SizeCountStore& sizeCountStore,
-                               SizeCountTimestampStore& timestampStore) {
+size_t persistCheckpointSnapshot(OperationContext* opCtx,
+                                 const SizeCountCheckpointSnapshot& checkpoint,
+                                 SizeCountStore& sizeCountStore,
+                                 SizeCountTimestampStore& timestampStore) {
+    size_t entryWriteCount = 0;
     for (const auto& [uuid, entry] : checkpoint.updatedCollections) {
         switch (entry.state) {
             case DDLState::kCreated: {
@@ -82,10 +84,11 @@ void persistCheckpointSnapshot(OperationContext* opCtx,
                                       SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
                                                             .size = entry.sizeCount.size,
                                                             .count = entry.sizeCount.count});
+                entryWriteCount++;
                 break;
             }
             case DDLState::kDropped: {
-                sizeCountStore.remove(opCtx, uuid);
+                entryWriteCount += sizeCountStore.remove(opCtx, uuid);
                 break;
             }
             case DDLState::kDroppedAndRecreated:
@@ -95,6 +98,7 @@ void persistCheckpointSnapshot(OperationContext* opCtx,
                                      SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
                                                            .size = entry.sizeCount.size,
                                                            .count = entry.sizeCount.count});
+                entryWriteCount++;
                 break;
             }
             default:
@@ -105,12 +109,13 @@ void persistCheckpointSnapshot(OperationContext* opCtx,
     // timestamp. This moves the global valid-as-of forward so that future checkpoint passes this
     // point.
     timestampStore.write(opCtx, checkpoint.validAsOf);
+
+    return entryWriteCount;
 }
 
-
-void advanceCheckpoint(OperationContext* opCtx,
-                       SizeCountStore& sizeCountStore,
-                       SizeCountTimestampStore& timestampStore) {
+size_t advanceCheckpoint(OperationContext* opCtx,
+                         SizeCountStore& sizeCountStore,
+                         SizeCountTimestampStore& timestampStore) {
     // A global IS lock cannot be upgraded to an IX lock, so we take the IX lock up front to avoid
     // releasing locks during execution of this function.
     Lock::GlobalLock writeLock(opCtx, MODE_IX);
@@ -123,12 +128,15 @@ void advanceCheckpoint(OperationContext* opCtx,
                 "Logical size count checkpoint found size count deltas in oplog entries, but "
                 "global valid-as-of did not advance",
                 checkpoint.updatedCollections.empty());
-        return;
+        return 0;
     }
 
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
-    persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
+    const size_t entryWriteCount =
+        persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
     wuow.commit();
+
+    return entryWriteCount;
 }
 
 }  // namespace mongo::replicated_fast_count

@@ -93,7 +93,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InitialCheckpoint) {
         opCtx,
         test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const SizeCountStore::Entry expectedEntry{.timestamp = ts1, .size = 10, .count = 1};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
@@ -108,7 +108,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InitialCheckpoint) {
 // Test: `advanceCheckpoint` is a no-op for the `SizeCountStore` when both stores are empty and
 // there are no new oplog entries.
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NothingTrackedNothingAdvanced) {
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 0);
 
     EXPECT_FALSE(timestampStore.read(opCtx).has_value());
 
@@ -143,7 +143,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, AdvancesExistingSizeCountAndTim
         test_helpers::makeOplogEntry(
             Timestamp(1, 3), collA, repl::OpTypeEnum::kInsert, 50 /*sizeDelta=*/));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const SizeCountStore::Entry expectedEntry{
         .timestamp = Timestamp(1, 3), .size = 100 + 60, .count = 3 + 2};
@@ -175,7 +175,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NoReplicatedSizeCountInOplogFor
     // No size count information is included in the no-op oplog entry for `collA`.
     test_helpers::writeToOplog(
         opCtx, test_helpers::makeOplogEntry(Timestamp(50, 1), collA, repl::OpTypeEnum::kNoop));
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 1);
 
     // Without replicated size count information tracked by the oplog entries, the SizeCountStore
     // entry for `collA` remains unchanged.
@@ -218,7 +218,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TimestampUpdatedForSum0SizeCoun
         test_helpers::makeOplogEntry(
             Timestamp(1, 3), collA, repl::OpTypeEnum::kDelete, -10 /*sizeDelta=*/));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     // Net 0 change from the original size and count for `collA`.
     const SizeCountStore::Entry expectedEntry{
@@ -247,7 +247,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TrackTwoUserCollections) {
 
     // The larger of the timestamps between the oplog insert entries.
     const Timestamp largestValidAsOf = Timestamp(1, 3);
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 3);
 
     const SizeCountStore::Entry expectedSizeCountCollA{
         .timestamp = largestValidAsOf, .size = 50, .count = 1};
@@ -285,7 +285,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
         test_helpers::makeOplogEntry(
             Timestamp(1, 3), collB, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     // The `collA` entry should be unchanged - since there were no updates to its size count in the
     // last checkpoint.
@@ -320,7 +320,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
                                                             timestampStoreNsAndUUID,
                                                             repl::OpTypeEnum::kUpdate));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 0);
 
     EXPECT_FALSE(timestampStore.read(opCtx).has_value());
 }
@@ -336,7 +336,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
                                                             fastCountStoreNsAndUUID,
                                                             repl::OpTypeEnum::kUpdate));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 0);
 
     EXPECT_FALSE(timestampStore.read(opCtx).has_value());
 }
@@ -357,7 +357,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
                                                             timestampStoreNsAndUUID,
                                                             repl::OpTypeEnum::kUpdate));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto tsAfterFirstAdvance = timestampStore.read(opCtx);
     ASSERT_TRUE(tsAfterFirstAdvance.has_value());
@@ -371,7 +371,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     test_helpers::writeToOplog(
         opCtx, test_helpers::makeOplogEntry(userWriteTs, collA, repl::OpTypeEnum::kInsert, 10));
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto tsAfterFirstAdvance = timestampStore.read(opCtx);
     ASSERT_TRUE(tsAfterFirstAdvance.has_value());
@@ -401,7 +401,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     }};
     test_helpers::writeToOplog(opCtx, applyOpsEntry);
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 0);
 
     const auto tsAfterSecondAdvance = timestampStore.read(opCtx);
     ASSERT_TRUE(tsAfterSecondAdvance.has_value());
@@ -412,7 +412,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CollectionCreationAddsEntry) {
     const Timestamp ts1{1, 1};
     test_helpers::writeToOplog(opCtx, test_helpers::makeCreateOplogEntry(ts1, collA));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
@@ -428,7 +428,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndInsertSameCheckpoint) 
     test_helpers::writeToOplog(
         opCtx, test_helpers::makeOplogEntry(Timestamp(1, 3), collA, repl::OpTypeEnum::kInsert, 20));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
@@ -450,10 +450,24 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, DropCollectionRemovesEntry) {
     const Timestamp ts2{1, 2};
     test_helpers::writeToOplog(opCtx, test_helpers::makeDropOplogEntry(ts2, collA));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     EXPECT_FALSE(sizeCountStore.read(opCtx, collA.uuid).has_value());
     EXPECT_EQ(timestampStore.read(opCtx), ts2);
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, DropWithoutExistingEntryCountsOnlyOplog) {
+    // No pre-existing entry for collA in the size count store.
+    EXPECT_FALSE(sizeCountStore.read(opCtx, collA.uuid).has_value());
+
+    const Timestamp ts(1, 1);
+    test_helpers::writeToOplog(opCtx, test_helpers::makeDropOplogEntry(ts, collA));
+
+    // The remove is a no-op (returns 0), so only the oplog entry is counted.
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 1);
+
+    EXPECT_FALSE(sizeCountStore.read(opCtx, collA.uuid).has_value());
+    EXPECT_EQ(timestampStore.read(opCtx), ts);
 }
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndDropSameCheckpoint) {
@@ -461,7 +475,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndDropSameCheckpoint) {
     test_helpers::writeToOplog(opCtx, test_helpers::makeCreateOplogEntry(Timestamp(1, 1), collA));
     test_helpers::writeToOplog(opCtx, test_helpers::makeDropOplogEntry(ts2, collA));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 1);
 
     // Create and drop cancel each other out, so there is no entry in collA, but we should still
     // have advanced the timestamp store.
@@ -504,7 +518,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
         test_helpers::makeOplogEntry(
             Timestamp(1, 4), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/200));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
@@ -528,7 +542,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateInApplyOpsUsesApplyOpsTim
     }};
     test_helpers::writeToOplog(opCtx, applyOpsEntry);
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
@@ -561,7 +575,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndInsertsInApplyOps) {
     }};
     test_helpers::writeToOplog(opCtx, applyOpsEntry);
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
@@ -590,7 +604,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDel
         test_helpers::makeTruncateRangeOplogEntry(
             Timestamp(1, 2), collA, /*bytesDeleted=*/120, /*docsDeleted=*/3));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const SizeCountStore::Entry expectedEntry{
         .timestamp = Timestamp(1, 2), .size = 200 - 120, .count = 5 - 3};
@@ -617,7 +631,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InsertThenTruncateRangeAccumula
                                test_helpers::makeTruncateRangeOplogEntry(
                                    Timestamp(1, 3), collA, /*bytesDeleted=*/30, /*docsDeleted=*/1));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     // Net: size = 50+50-30 = 70, count = 1+1-1 = 1.
     const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 3), .size = 70, .count = 1};
@@ -642,7 +656,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeOnlyAffectsTargetC
                                test_helpers::makeTruncateRangeOplogEntry(
                                    Timestamp(1, 2), collB, /*bytesDeleted=*/80, /*docsDeleted=*/2));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     // collA's entry is unchanged.
     const SizeCountStore::Entry expectedCollAEntry{
@@ -690,7 +704,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, MixedOpsWithTruncateRangeAccumu
                                test_helpers::makeTruncateRangeOplogEntry(
                                    Timestamp(1, 6), collA, /*bytesDeleted=*/60, /*docsDeleted=*/2));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     // Net: size = 40+60+50-10-40-60 = 40, count = 1+1+1+0-1-2 = 0
     const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 6), .size = 40, .count = 0};
@@ -723,7 +737,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideApplyOps) {
             .wallClockTime = Date_t::now(),
         }}});
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const SizeCountStore::Entry expectedEntry{
         .timestamp = ts1, .size = -bytesDeleted, .count = -docsDeleted};
@@ -732,7 +746,6 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideApplyOps) {
     EXPECT_EQ(expectedEntry, *entry);
 }
 
-// Test: A truncateRange nested inside a nested applyOps applies the correct negative delta.
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideNestedApplyOps) {
     const Timestamp ts1{1, 2};
     const int64_t bytesDeleted = 60;
@@ -760,7 +773,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideNestedApplyO
             .wallClockTime = Date_t::now(),
         }}});
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const SizeCountStore::Entry expectedEntry{
         .timestamp = ts1, .size = -bytesDeleted, .count = -docsDeleted};
@@ -781,7 +794,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogFastCountEntryPersistedOnC
 
     test_helpers::writeToOplog(opCtx, entry1);
     test_helpers::writeToOplog(opCtx, entry2);
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto oplogEntry = sizeCountStore.read(opCtx, getOplogUuid(opCtx));
     ASSERT_TRUE(oplogEntry.has_value());
@@ -797,7 +810,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogFastCountEntryMultipleChec
         test_helpers::makeOplogEntry(Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, 10);
     const int64_t size1 = static_cast<int64_t>(entry1.getEntry().toBSON().objsize());
     test_helpers::writeToOplog(opCtx, entry1);
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto oplogEntryAfterFirstChkpt = sizeCountStore.read(opCtx, getOplogUuid(opCtx));
     ASSERT_TRUE(oplogEntryAfterFirstChkpt.has_value());
@@ -809,7 +822,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogFastCountEntryMultipleChec
         test_helpers::makeOplogEntry(Timestamp(1, 2), collA, repl::OpTypeEnum::kInsert, 20);
     const int64_t size2 = static_cast<int64_t>(entry2.getEntry().toBSON().objsize());
     test_helpers::writeToOplog(opCtx, entry2);
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto oplogEntryAfterSecondChkpt = sizeCountStore.read(opCtx, getOplogUuid(opCtx));
     ASSERT_TRUE(oplogEntryAfterSecondChkpt.has_value());
@@ -829,7 +842,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogAndUserCollectionTrackedIn
 
     test_helpers::writeToOplog(opCtx, entry1);
     test_helpers::writeToOplog(opCtx, entry2);
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     // The user fast count entry should store the size and count of user documents.
     const auto userEntry = sizeCountStore.read(opCtx, collA.uuid);
@@ -852,7 +865,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogAndUserCollectionTrackedIn
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NoOplogEntriesDoesNotCreateOplogEntry) {
     EXPECT_FALSE(sizeCountStore.read(opCtx, getOplogUuid(opCtx)).has_value());
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 0);
 
     EXPECT_FALSE(sizeCountStore.read(opCtx, getOplogUuid(opCtx)).has_value());
 }
@@ -869,7 +882,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
                                test_helpers::makeOplogEntry(
                                    Timestamp(1, 1), fastCountNsAndUUID, repl::OpTypeEnum::kUpdate));
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 0);
 
     EXPECT_FALSE(sizeCountStore.read(opCtx, getOplogUuid(opCtx)).has_value());
 }
@@ -901,7 +914,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogTruncationUpdatesOplogFast
         static_cast<int64_t>(truncateEntry.getEntry().toBSON().objsize());
 
     test_helpers::writeToOplog(opCtx, truncateEntry);
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 1);
 
     const auto entry = sizeCountStore.read(opCtx, oplogUuid);
     ASSERT_TRUE(entry.has_value());
@@ -945,7 +958,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
         static_cast<int64_t>(truncateEntry.getEntry().toBSON().objsize());
     test_helpers::writeToOplog(opCtx, truncateEntry);
 
-    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+    EXPECT_EQ(advanceCheckpoint(opCtx, sizeCountStore, timestampStore), 2);
 
     const auto entry = sizeCountStore.read(opCtx, oplogUuid);
     ASSERT_TRUE(entry.has_value());

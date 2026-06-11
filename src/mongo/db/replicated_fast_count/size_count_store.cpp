@@ -164,7 +164,7 @@ void CollectionSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const 
         opCtx, coll, InsertStatement(newDoc), /*opDebug=*/nullptr));
 }
 
-void CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
+size_t CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
     const RecordId rid =
         record_id_helpers::keyForDoc(BSON("_id" << uuid),
@@ -179,7 +179,7 @@ void CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
                       "Attempted to delete an entry for uuid {uuid} from the fast count store, but "
                       "no such entry exists.",
                       "uuid"_attr = uuid.toString());
-        return;
+        return 0;
     }
 
     collection_internal::deleteDocument(opCtx,
@@ -188,6 +188,7 @@ void CollectionSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
                                         kUninitializedStmtId,
                                         rid,
                                         /*opDebug=*/nullptr);
+    return 1;
 }
 
 void CollectionSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,
@@ -266,7 +267,7 @@ void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const E
         container_write::insert(opCtx, ru, container, uuidToContainerKey(uuid), bsonToSpan(val)));
 }
 
-void ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
+size_t ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto status = container_write::remove(opCtx, ru, container, uuidToContainerKey(uuid));
@@ -276,7 +277,9 @@ void ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {
                       "container, but the operation failed.",
                       "uuid"_attr = uuid.toString(),
                       "error"_attr = status);
+        return 0;
     }
+    return 1;
 }
 
 void ContainerSizeCountStore::readAndIncrementSizeCounts(OperationContext* opCtx,

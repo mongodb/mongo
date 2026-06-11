@@ -544,13 +544,24 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
             uasserted(12311500, "Injected failure in _doFlush for testing");
         }
         hangBeforePersistingNewFastCountEntries.pauseWhileSet();
+
         if (_useLegacyFlush) {
             _flushDirtyMetadata(opCtx, dirtyMetadata);
         } else {
-            advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
-        }
-        _metrics.addWriteTimeMsTotal((Date_t::now() - startTime).count());
+            const size_t entryWriteCount =
+                advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
 
+            // Failpoint used in testing for:
+            // 1. indicating a flush has completed
+            // 2. (optionally) elongating the duration of a flush.
+            sleepAfterFlush.execute([](const BSONObj& data) {
+                if (auto elem = data["sleepMs"]; elem) {
+                    sleepmillis(elem.numberInt());
+                }
+            });
+
+            recordFlush(startTime, entryWriteCount);
+        }
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
             ex.code() == ErrorCodes::NotWritablePrimary) {
@@ -637,20 +648,8 @@ void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
             dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
         }
 
-        const Date_t flushStartTime = Date_t::now();
         auto opCtx = cc().makeOperationContext();
         _doFlush(opCtx.get(), dirtyMetadata);
-
-        // Failpoint used in testing for:
-        // 1. indicating a flush has completed
-        // 2. (optionally) elongating the duration of a flush.
-        sleepAfterFlush.execute([](const BSONObj& data) {
-            if (auto elem = data["sleepMs"]; elem) {
-                sleepmillis(elem.numberInt());
-            }
-        });
-
-        _metrics.recordFlush(flushStartTime, dirtyMetadata.size());
     }
 }
 

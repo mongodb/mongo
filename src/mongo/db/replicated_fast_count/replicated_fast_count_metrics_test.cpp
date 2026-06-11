@@ -72,7 +72,6 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
              MetricNames::kReplicatedFastCountFlushedDocsTotal,
              MetricNames::kReplicatedFastCountInsertCount,
              MetricNames::kReplicatedFastCountUpdateCount,
-             MetricNames::kReplicatedFastCountWriteTimeMsTotal,
          }) {
         EXPECT_EQ(capturer.readInt64Counter(counterName), 0);
     }
@@ -92,11 +91,8 @@ TEST(ReplicatedFastCountMetricsTest, IsRunningGaugeClearedBySetIsRunning) {
 
 TEST(ReplicatedFastCountMetricsTest, FlushSuccessCounterIncrementsViaRecordFlush) {
     OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
-    metrics.recordFlush(Date_t::now() - Milliseconds(10),
-                        /*batchSize=*/1);
-    metrics.recordFlush(Date_t::now() - Milliseconds(10),
-                        /*batchSize=*/1);
+    recordFlush(Date_t::now(), /*batchSize=*/1);
+    recordFlush(Date_t::now(), /*batchSize=*/1);
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushSuccessCount), 2);
 }
@@ -125,26 +121,11 @@ TEST(ReplicatedFastCountMetricsTest, InsertAndUpdateCountersIncrement) {
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount), 2);
 }
 
-TEST(ReplicatedFastCountMetricsTest, WriteMsTimeTotalAdd) {
-    OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
-
-    metrics.addWriteTimeMsTotal(1);
-    metrics.addWriteTimeMsTotal(5);
-    metrics.addWriteTimeMsTotal(100);
-
-    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWriteTimeMsTotal), 106);
-}
-
 TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {
     OtelMetricsCapturer capturer;
-    ReplicatedFastCountMetrics metrics;
-    metrics.recordFlush(Date_t::now() - Milliseconds(1),
-                        /*batchSize=*/3);
-    metrics.recordFlush(Date_t::now() - Milliseconds(1),
-                        /*batchSize=*/7);
-    metrics.recordFlush(Date_t::now() - Milliseconds(1),
-                        /*batchSize=*/1);
+    recordFlush(Date_t::now(), /*batchSize=*/3);
+    recordFlush(Date_t::now(), /*batchSize=*/7);
+    recordFlush(Date_t::now(), /*batchSize=*/1);
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 11);
 }
@@ -251,19 +232,6 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDurin
 //         1);
 // }
 //
-
-TEST_F(ReplicatedFastCountManagerMetricsTest, WriteTimeMsTotalIncrementsAfterFlush) {
-    const UUID uuid = UUID::gen();
-    boost::container::flat_map<UUID, CollectionSizeCount> changes;
-    changes[uuid] = {/*count=*/1, /*size=*/100};
-    _fastCountManager->commit(operationContext(), changes, /*commitTime=*/boost::none);
-    _fastCountManager->flushSync_ForTest(operationContext());
-
-    // writeTimeMsTotal is the time spent inside the WriteUnitOfWork; it may be 0ms on a fast
-    // machine. We can only assert that addWriteTimeMsTotal() was called (i.e., the OTel counter
-    // has a data point at a non-negative value).
-    EXPECT_GE(_capturer.readInt64Counter(MetricNames::kReplicatedFastCountWriteTimeMsTotal), 0);
-}
 
 TEST(ReplicatedFastCountMetricsTest, CheckpointOplogEntriesProcessedCounterIncrements) {
     OtelMetricsCapturer capturer;

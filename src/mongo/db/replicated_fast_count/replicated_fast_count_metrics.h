@@ -45,20 +45,18 @@ class ReplicatedFastCountMetrics {
 public:
     void setIsRunning(bool running);
 
-    /**
-     * Records metrics for a successful flush. Updates flush timing and flushed-document
-     * counters and gauges.
-     */
-    void recordFlush(Date_t startTime, size_t batchSize);
-
     void incrementFlushFailureCount();
 
     void incrementInsertCount();
 
     void incrementUpdateCount();
-
-    void addWriteTimeMsTotal(int64_t ms);
 };
+
+/**
+ * Records metrics for a successful flush. Updates flush timing, success count, and
+ * flushed-document counters.
+ */
+void recordFlush(Date_t startTime, size_t batchSize);
 
 /**
  * Free functions for recording checkpoint oplog scan metrics. These functions are safe to call from
