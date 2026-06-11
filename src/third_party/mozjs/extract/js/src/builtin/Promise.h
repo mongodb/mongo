@@ -257,7 +257,7 @@ struct PromiseReactionRecordBuilder {
 
 // This implements "Let promiseCapability be ! NewPromiseCapability(%Promise%)".
 [[nodiscard]] PromiseObject* CreatePromiseObjectWithoutResolutionFunctions(
-    JSContext* cx);
+    JSContext* cx, int32_t extraFlags = 0);
 
 [[nodiscard]] bool ResolvePromiseInternal(JSContext* cx,
                                           JS::Handle<JSObject*> promise,

@@ -1973,7 +1973,9 @@ static void RejectExecutionWithPendingException(JSContext* cx,
     std::ignore = cx->getPendingException(&exception);
   }
   cx->clearPendingException();
-  AsyncModuleExecutionRejected(cx, module, exception);
+  if (!AsyncModuleExecutionRejected(cx, module, exception)) {
+    MOZ_ASSERT(cx->isThrowingOverRecursed());
+  }
 }
 
 // https://tc39.es/ecma262/#sec-async-module-execution-fulfilled
@@ -2112,25 +2114,30 @@ void js::AsyncModuleExecutionFulfilled(JSContext* cx,
 
 // https://tc39.es/ecma262/#sec-async-module-execution-rejected
 // ES2023 16.2.1.5.2.5 AsyncModuleExecutionRejected
-void js::AsyncModuleExecutionRejected(JSContext* cx,
+bool js::AsyncModuleExecutionRejected(JSContext* cx,
                                       Handle<ModuleObject*> module,
                                       HandleValue error) {
+  AutoCheckRecursionLimit recursion(cx);
+  if (!recursion.check(cx)) {
+    return false;
+  }
+
   // Step 1. If module.[[Status]] is evaluated, then:
   if (module->status() == ModuleStatus::Evaluated) {
     // Step 1.a. Assert: module.[[EvaluationError]] is not empty
     MOZ_ASSERT(module->hadEvaluationError());
 
     // Step 1.b. Return unused.
-    return;
+    return true;
   }
 
   // Step 2. Assert: module.[[Status]] is evaluating-async.
   MOZ_ASSERT(module->status() == ModuleStatus::EvaluatingAsync);
 
-  // Step 3. Assert: module.[[AsyncEvaluation]] is true.
+  // Step 3. Assert: module.[[AsyncEvaluationOrder]] is an integer.
   MOZ_ASSERT(module->isAsyncEvaluating());
 
-  // Step 4. 4. Assert: module.[[EvaluationError]] is empty.
+  // Step 4. Assert: module.[[EvaluationError]] is empty.
   MOZ_ASSERT(!module->hadEvaluationError());
 
   ModuleObject::onTopLevelEvaluationFinished(module);
@@ -2141,25 +2148,15 @@ void js::AsyncModuleExecutionRejected(JSContext* cx,
   // Step 6. Set module.[[Status]] to evaluated.
   MOZ_ASSERT(module->status() == ModuleStatus::Evaluated);
 
+  // Step 7. Set module.[[AsyncEvaluationOrder]] to done.
   module->clearAsyncEvaluatingPostOrder();
 
-  // Step 7. For each Cyclic Module Record m of module.[[AsyncParentModules]],
-  //         do:
-  Rooted<ListObject*> parents(cx, module->asyncParentModules());
-  Rooted<ModuleObject*> parent(cx);
-  for (uint32_t i = 0; i < parents->length(); i++) {
-    parent = &parents->get(i).toObject().as<ModuleObject>();
-
-    // Step 7.a. Perform AsyncModuleExecutionRejected(m, error).
-    AsyncModuleExecutionRejected(cx, parent, error);
-  }
-
-  // Step 8. If module.[[TopLevelCapability]] is not empty, then:
+  // Step 9. If module.[[TopLevelCapability]] is not empty, then:
   if (module->hasTopLevelCapability()) {
-    // Step 8.a. Assert: module.[[CycleRoot]] is module.
+    // Step 9.a. Assert: module.[[CycleRoot]] is module.
     MOZ_ASSERT(module->getCycleRoot() == module);
 
-    // Step 8.b. Perform ! Call(module.[[TopLevelCapability]].[[Reject]],
+    // Step 9.b. Perform ! Call(module.[[TopLevelCapability]].[[Reject]],
     //           undefined, error).
     if (!ModuleObject::topLevelCapabilityReject(cx, module, error)) {
       // If Reject fails, there's nothing more we can do here.
@@ -2167,5 +2164,19 @@ void js::AsyncModuleExecutionRejected(JSContext* cx,
     }
   }
 
-  // Step 9. Return unused.
+  // Step 10. For each Cyclic Module Record m of module.[[AsyncParentModules]],
+  //         do:
+  Rooted<ListObject*> parents(cx, module->asyncParentModules());
+  Rooted<ModuleObject*> parent(cx);
+  for (uint32_t i = 0; i < parents->length(); i++) {
+    parent = &parents->get(i).toObject().as<ModuleObject>();
+
+    // Step 10.a. Perform AsyncModuleExecutionRejected(m, error).
+    if (!AsyncModuleExecutionRejected(cx, parent, error)) {
+      return false;
+    }
+  }
+
+  // Step 11. Return unused.
+  return true;
 }

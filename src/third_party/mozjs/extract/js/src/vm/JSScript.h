@@ -447,6 +447,13 @@ class ScriptSource {
     }
   };
 
+  class GenericReader : public PinnedUnitsBase {
+   public:
+    explicit GenericReader(ScriptSource* source);
+
+    ~GenericReader();
+  };
+
  private:
   // Missing source text that isn't retrievable using the source hook.  (All
   // ScriptSources initially begin in this state.  Users that are compiling

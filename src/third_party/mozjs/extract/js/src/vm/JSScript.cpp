@@ -1090,6 +1090,21 @@ void ScriptSource::performDelayedConvertToCompressedSource(
   g->pendingCompressed.destroy();
 }
 
+ScriptSource::GenericReader::GenericReader(ScriptSource* source)
+    : PinnedUnitsBase(source) {
+  MOZ_ASSERT(source->hasSourceText());
+
+  addReader();
+}
+
+ScriptSource::GenericReader::~GenericReader() {
+  if (source_->hasSourceType<Utf8Unit>()) {
+    removeReader<Utf8Unit>();
+  } else {
+    removeReader<char16_t>();
+  }
+}
+
 void ScriptSource::PinnedUnitsBase::addReader() {
   auto guard = source_->readers_.lock();
   guard->count++;

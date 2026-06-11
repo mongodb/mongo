@@ -536,21 +536,14 @@ bool GetUTF8AtomizationData(JSContext* cx, const JS::UTF8Chars& utf8,
 
 template <typename CharT>
 bool UTF8EqualsChars(const JS::UTF8Chars& utfChars, const CharT* chars) {
+  static_assert(std::is_same_v<CharT, JS::Latin1Char> ||
+                std::is_same_v<CharT, char16_t>);
+
   size_t ind = 0;
   bool isEqual = true;
 
   auto checkEqual = [&isEqual, &ind, chars](char16_t c) -> LoopDisposition {
-#ifdef DEBUG
-    JS::SmallestEncoding encoding = JS::SmallestEncoding::ASCII;
-    UpdateSmallestEncodingForChar(c, &encoding);
-    if (std::is_same_v<CharT, JS::Latin1Char>) {
-      MOZ_ASSERT(encoding <= JS::SmallestEncoding::Latin1);
-    } else if (!std::is_same_v<CharT, char16_t>) {
-      MOZ_CRASH("Invalid character type in UTF8EqualsChars");
-    }
-#endif
-
-    if (CharT(c) != chars[ind]) {
+    if (c != char16_t(chars[ind])) {
       isEqual = false;
       return LoopDisposition::Break;
     }
@@ -559,7 +552,7 @@ bool UTF8EqualsChars(const JS::UTF8Chars& utfChars, const CharT* chars) {
     return LoopDisposition::Continue;
   };
 
-  // To get here, you must have checked your work.
+  // The caller must have already validated UTF-8 well-formedness.
   InflateUTF8ToUTF16<OnUTF8Error::Crash>(/* cx = */ nullptr, utfChars,
                                          checkEqual);
 

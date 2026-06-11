@@ -668,7 +668,7 @@
   result_type: Object
   guard: true
   congruent_to: if_operands_equal
-  alias_set: none
+  alias_set: custom
   generate_lir: true
 
 #ifdef JS_PUNBOX64
@@ -825,7 +825,7 @@
     wideningOp: wasm::FieldWideningOp
   type_policy: none
   result_type: Int32
-  congruent_to: if_operands_equal
+  congruent_to: custom
   alias_set: none
   generate_lir: true
 
@@ -2161,7 +2161,7 @@
   guard: true
   movable: true
   congruent_to: if_operands_equal
-  alias_set: none
+  alias_set: custom
 
 - name: GuardGlobalGeneration
   arguments:
@@ -2180,7 +2180,7 @@
   guard: true
   movable: true
   congruent_to: if_operands_equal
-  alias_set: none
+  alias_set: custom
 
 - name: GuardIsNotDOMProxy
   operands:
@@ -2189,7 +2189,7 @@
   guard: true
   movable: true
   congruent_to: if_operands_equal
-  alias_set: none
+  alias_set: custom
 
 - name: GuardIsNotProxy
   operands:
@@ -2199,7 +2199,7 @@
   movable: true
   congruent_to: if_operands_equal
   folds_to: custom
-  alias_set: none
+  alias_set: custom
 
 - name: ProxyGet
   operands:
@@ -2401,7 +2401,7 @@
   guard: true
   movable: true
   congruent_to: if_operands_equal
-  alias_set: none
+  alias_set: custom
 
 # Loads a specific JSObject* that was originally nursery-allocated.
 # See also WarpObjectField.
@@ -2965,7 +2965,7 @@
   result_type: Boolean
   movable: true
   congruent_to: if_operands_equal
-  alias_set: none
+  alias_set: custom
   generate_lir: true
 
 - name: IsCrossRealmArrayConstructor

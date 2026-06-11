@@ -1114,6 +1114,14 @@ XDRResult StencilXDR::codeSourceData(XDRState<mode>* const xdr,
     Missing,
   };
 
+  // We need to freeze the ScriptSource state while encoding it.
+  // The actual logic reads either the compressed or uncompressed raw data.
+  // Neither of compression nor uncompression should be performed.
+  mozilla::Maybe<ScriptSource::GenericReader> reader;
+  if (mode == XDR_ENCODE && ss->hasSourceText()) {
+    reader.emplace(ss);
+  }
+
   DataType tag;
   {
     // This is terrible, but we can't do better.  When |mode == XDR_DECODE| we

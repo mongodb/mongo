@@ -15,6 +15,7 @@
 #include "builtin/FinalizationRegistryObject.h"
 #include "builtin/WeakRefObject.h"
 #include "gc/GCRuntime.h"
+#include "gc/PublicIterators.h"
 #include "gc/Zone.h"
 #include "vm/JSContext.h"
 
@@ -516,4 +517,35 @@ void FinalizationRegistryGlobalData::removeRecord(
 
 void FinalizationRegistryGlobalData::trace(JSTracer* trc) {
   recordSet.trace(trc);
+}
+
+JS_PUBLIC_API void JS::MaybeClearWeakRefTargets(
+    JSRuntime* runtime, JS::ShouldClearWeakRefTargetCallback callback,
+    void* data) {
+  MOZ_ASSERT(CurrentThreadCanAccessRuntime(runtime));
+  AssertHeapIsIdle();
+  runtime->gc.maybeClearWeakRefTargets(callback, data);
+}
+
+void GCRuntime::maybeClearWeakRefTargets(
+    JS::ShouldClearWeakRefTargetCallback callback, void* data) {
+  for (AllZonesIter zone(this); !zone.done(); zone.next()) {
+    FinalizationObservers* observers = zone->finalizationObservers();
+    if (observers) {
+      observers->maybeClearWeakRefTargets(callback, data);
+    }
+  }
+}
+
+void FinalizationObservers::maybeClearWeakRefTargets(
+    JS::ShouldClearWeakRefTargetCallback callback, void* data) {
+  for (auto iter = weakRefMap.modIter(); !iter.done(); iter.next()) {
+    JSObject* target = iter.get().key();
+    if (callback(JS::GCCellPtr(target), data)) {
+      for (JSObject* obj : iter.get().value()) {
+        updateForRemovedWeakRef(obj, UnwrapWeakRef(obj));
+      }
+      iter.remove();
+    }
+  }
 }

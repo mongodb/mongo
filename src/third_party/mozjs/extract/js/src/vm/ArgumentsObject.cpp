@@ -864,6 +864,12 @@ bool MappedArgumentsObject::obj_defineProperty(JSContext* cx, HandleObject obj,
     }
   }
 
+  // Ensure the arguments object has RareArgumentsData so that step 8 is
+  // infallible.
+  if (isMapped && !argsobj->getOrCreateRareData(cx)) {
+    return false;
+  }
+
   // Step 6. NativeDefineProperty will lookup [[Value]] for us.
   if (defineMapped) {
     if (!DefineMappedIndex(cx, argsobj, id, &newArgDesc, result)) {
@@ -884,17 +890,15 @@ bool MappedArgumentsObject::obj_defineProperty(JSContext* cx, HandleObject obj,
   if (isMapped) {
     unsigned arg = unsigned(id.toInt());
     if (desc.isAccessorDescriptor()) {
-      if (!argsobj->markElementDeleted(cx, arg)) {
-        return false;
-      }
+      bool ok = argsobj->markElementDeleted(cx, arg);
+      MOZ_RELEASE_ASSERT(ok, "shouldn't fail after getOrCreateRareData");
     } else {
       if (desc.hasValue()) {
         argsobj->setElement(arg, desc.value());
       }
       if (desc.hasWritable() && !desc.writable()) {
-        if (!argsobj->markElementDeleted(cx, arg)) {
-          return false;
-        }
+        bool ok = argsobj->markElementDeleted(cx, arg);
+        MOZ_RELEASE_ASSERT(ok, "shouldn't fail after getOrCreateRareData");
       }
     }
   }
@@ -940,7 +944,7 @@ bool js::UnmappedArgSetter(JSContext* cx, HandleObject obj, HandleId id,
 
   if (id.isInt()) {
     unsigned arg = unsigned(id.toInt());
-    if (arg < argsobj->initialLength()) {
+    if (argsobj->isElement(arg)) {
       argsobj->setElement(arg, v);
       return result.succeed();
     }

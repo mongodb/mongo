@@ -16,18 +16,30 @@ cd _build
 
 rm config.cache || true
 
+CONFIGURE_FLAGS=(
+    --disable-jemalloc
+    --disable-jit
+    --with-system-zlib
+    --without-intl-api
+    --enable-optimize
+    --disable-js-shell
+    --disable-wasm-moz-intgemm
+)
+
+# --disable-bootstrap is needed on ppc64le/s390x: configure tries to include
+# build/moz.configure/default-flags.configure (deleted from fork) on non-tier-1 platforms.
+# --disable-tests is required on all platforms: ICU 77 marks double_conversion symbols as
+# hidden; test executables that link against ICU fail on both lld and bfd linkers.
+CONFIGURE_FLAGS+=(--disable-tests)
+ARCH=$(uname -m)
+if [[ "$ARCH" == "s390x" || "$ARCH" == "ppc64le" ]]; then
+    CONFIGURE_FLAGS+=(--disable-bootstrap)
+fi
+
 # The 'ppc64le/linux' platform requires the additional 'CXXFLAGS' and 'CFLAGS' flags to compile
 CXXFLAGS="$CXXFLAGS -D__STDC_FORMAT_MACROS" \
 CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS" \
-../configure \
-    --disable-jemalloc \
-    --disable-jit \
-    --with-system-zlib \
-    --without-intl-api \
-    --enable-optimize \
-    --disable-js-shell \
-    --disable-tests \
-    --disable-wasm-moz-intgemm
+../configure "${CONFIGURE_FLAGS[@]}"
 
 # we have to run make to generate a byte code version of the self hosted js and
 # a switch table
@@ -131,7 +143,7 @@ done
 
 # this is all of the EXPORTS.js.friend files from the moz.build
 mkdir -p include/js/friend
-for i in 'DOMProxy.h' 'DumpFunctions.h' 'ErrorMessages.h' 'ErrorNumbers.msg' 'JSMEnvironment.h' 'PerformanceHint.h' 'StackLimits.h' 'UsageStatistics.h' 'WindowProxy.h' 'XrayJitInfo.h' ; do
+for i in 'CycleCollector.h' 'DOMProxy.h' 'DumpFunctions.h' 'ErrorMessages.h' 'ErrorNumbers.msg' 'JSMEnvironment.h' 'PerformanceHint.h' 'StackLimits.h' 'UsageStatistics.h' 'WindowProxy.h' 'XrayJitInfo.h' ; do
     cp extract/js/public/friend/$i include/js/friend/
 done
 
