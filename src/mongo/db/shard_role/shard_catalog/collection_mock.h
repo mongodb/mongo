@@ -234,9 +234,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool areTimeseriesBucketsFixed() const override {
-        MONGO_UNREACHABLE;
-    }
 
     bool isClustered() const override {
         return false;

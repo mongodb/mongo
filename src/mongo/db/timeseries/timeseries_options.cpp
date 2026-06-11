@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -136,8 +137,9 @@ Status checkBucketingParameters(TimeseriesOptions& timeseriesOptions,
 
 }  // namespace
 
-bool areTimeseriesBucketsFixed(const TimeseriesOptions& options, const bool parametersChanged) {
-    return !parametersChanged &&
+bool canUseFixedBucketOptimizations(const TimeseriesOptions& options) {
+    return feature_flags::gFixedBucketingOptimizations.isEnabled() &&
+        options.getFixedBucketing().value_or(false) &&
         options.getBucketMaxSpanSeconds() == options.getBucketRoundingSeconds();
 }
 

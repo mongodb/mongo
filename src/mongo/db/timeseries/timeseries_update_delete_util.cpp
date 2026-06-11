@@ -46,6 +46,7 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 
 #include <string>
 #include <type_traits>
@@ -353,8 +354,8 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
 TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
-    const BSONObj& writeQuery,
-    bool fixedBuckets) {
+    const BSONObj& writeQuery) {
+    const bool fixedBuckets = canUseFixedBucketOptimizations(tsOptions);
     auto [metaOnlyExpr, bucketMetricExpr, residualExpr] =
         BucketSpec::getPushdownPredicates(expCtx,
                                           tsOptions,

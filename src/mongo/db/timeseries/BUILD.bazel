@@ -30,6 +30,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/util:processinfo",

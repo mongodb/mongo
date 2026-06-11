@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -245,7 +246,12 @@ TEST(TimeseriesOptionsTest, ExtendedRoundMilliTimestampBySeconds) {
     }
 }
 
-TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
+TEST(TimeseriesOptionsTest, CanUseFixedBucketOptimizations) {
+    auto withFixedBucketing = [](TimeseriesOptions options) {
+        options.setFixedBucketing(true);
+        return options;
+    };
+
     const auto optionsEqualAndNone =
         createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(boost::none, boost::none);
     const auto optionsEqualNotNone =
@@ -257,80 +263,66 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
     const auto optionsValuesNotEqual =
         createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(1633, 77);
 
-    {
-        const auto parametersChanged = false;
-        EXPECT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
-            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
-            << "BucketingParametersChanged=false implies buckets should be fixed.";
+    // Flag off (default): always returns false regardless of options.
+    for (const auto& opts : {withFixedBucketing(optionsEqualAndNone),
+                             withFixedBucketing(optionsEqualNotNone),
+                             withFixedBucketing(optionsMaxSpanAndNone),
+                             withFixedBucketing(optionsNoneAndRounding),
+                             withFixedBucketing(optionsValuesNotEqual),
+                             optionsEqualAndNone,
+                             optionsEqualNotNone,
+                             optionsMaxSpanAndNone,
+                             optionsNoneAndRounding,
+                             optionsValuesNotEqual}) {
+        EXPECT_FALSE(timeseries::canUseFixedBucketOptimizations(opts));
     }
 
-    {
-        const auto parametersChanged = false;
-        EXPECT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
-            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
-            << "BucketingParametersChanged=false implies buckets should be fixed.";
-    }
+    RAIIServerParameterControllerForTest flagController("featureFlagFixedBucketingOptimizations",
+                                                        true);
 
-    {
-        const auto parametersChanged = false;
-        EXPECT_FALSE(
-            timeseries::areTimeseriesBucketsFixed(optionsMaxSpanAndNone, parametersChanged))
-            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
-            << "BucketingParametersChanged=false implies buckets should not be fixed.";
-    }
+    // Flag on: result depends on fixedBucketing field and maxSpan == rounding.
+    EXPECT_TRUE(timeseries::canUseFixedBucketOptimizations(withFixedBucketing(optionsEqualAndNone)))
+        << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
+        << "fixedBucketing=true implies buckets should be fixed.";
 
-    {
-        const auto parametersChanged = false;
-        EXPECT_FALSE(
-            timeseries::areTimeseriesBucketsFixed(optionsNoneAndRounding, parametersChanged))
-            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
-            << "BucketingParametersChanged=false implies buckets should not be fixed.";
-    }
+    EXPECT_TRUE(timeseries::canUseFixedBucketOptimizations(withFixedBucketing(optionsEqualNotNone)))
+        << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
+        << "fixedBucketing=true implies buckets should be fixed.";
 
-    {
-        const auto parametersChanged = false;
-        EXPECT_FALSE(
-            timeseries::areTimeseriesBucketsFixed(optionsValuesNotEqual, parametersChanged))
-            << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
-            << "BucketingParametersChanged=false implies buckets should not be fixed.";
-    }
-    {
-        const auto parametersChanged = true;
-        EXPECT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
-            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
-            << "BucketingParametersChanged=true implies buckets should not be fixed.";
-    }
+    EXPECT_FALSE(
+        timeseries::canUseFixedBucketOptimizations(withFixedBucketing(optionsMaxSpanAndNone)))
+        << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
+        << "fixedBucketing=true implies buckets should not be fixed.";
 
-    {
-        const auto parametersChanged = true;
-        EXPECT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
-            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
-            << "BucketingParametersChanged=true implies buckets should not be fixed.";
-    }
+    EXPECT_FALSE(
+        timeseries::canUseFixedBucketOptimizations(withFixedBucketing(optionsNoneAndRounding)))
+        << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
+        << "fixedBucketing=true implies buckets should not be fixed.";
 
-    {
-        const auto parametersChanged = true;
-        EXPECT_FALSE(
-            timeseries::areTimeseriesBucketsFixed(optionsMaxSpanAndNone, parametersChanged))
-            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
-            << "BucketingParametersChanged=true implies buckets should not be fixed.";
-    }
+    EXPECT_FALSE(
+        timeseries::canUseFixedBucketOptimizations(withFixedBucketing(optionsValuesNotEqual)))
+        << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
+        << "fixedBucketing=true implies buckets should not be fixed.";
 
-    {
-        const auto parametersChanged = true;
-        EXPECT_FALSE(
-            timeseries::areTimeseriesBucketsFixed(optionsNoneAndRounding, parametersChanged))
-            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
-            << "BucketingParametersChanged=true implies buckets should not be fixed.";
-    }
+    EXPECT_FALSE(timeseries::canUseFixedBucketOptimizations(optionsEqualAndNone))
+        << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
+        << "fixedBucketing unset implies buckets should not be fixed.";
 
-    {
-        const auto parametersChanged = true;
-        EXPECT_FALSE(
-            timeseries::areTimeseriesBucketsFixed(optionsValuesNotEqual, parametersChanged))
-            << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
-            << "BucketingParametersChanged=true implies buckets should not be fixed.";
-    }
+    EXPECT_FALSE(timeseries::canUseFixedBucketOptimizations(optionsEqualNotNone))
+        << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
+        << "fixedBucketing unset implies buckets should not be fixed.";
+
+    EXPECT_FALSE(timeseries::canUseFixedBucketOptimizations(optionsMaxSpanAndNone))
+        << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
+        << "fixedBucketing unset implies buckets should not be fixed.";
+
+    EXPECT_FALSE(timeseries::canUseFixedBucketOptimizations(optionsNoneAndRounding))
+        << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
+        << "fixedBucketing unset implies buckets should not be fixed.";
+
+    EXPECT_FALSE(timeseries::canUseFixedBucketOptimizations(optionsValuesNotEqual))
+        << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
+        << "fixedBucketing unset implies buckets should not be fixed.";
 }
 
 TEST(TimeseriesOptionsTest, OptionsAreEqualFixedBucketing) {

@@ -70,7 +70,6 @@ void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
  * TODO SERVER-122862: Use in validation command
  */
 void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
-                            bool fixedBucketingEnabled,
                             const BSONObj& controlMin,
                             const BSONObj& controlMax,
                             bool criticalValidationOnly);

@@ -86,8 +86,7 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
 TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
-    const BSONObj& writeQuery,
-    bool fixedBuckets);
+    const BSONObj& writeQuery);
 
 /**
  * Returns a basic match expression checking against closed buckets for meta-only updates/deletes

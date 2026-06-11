@@ -95,11 +95,8 @@ std::unique_ptr<TimeseriesWritesQueryExprs> maybeTranslateTimeseriesDelete(
     // If we're deleting documents from a time-series collection, splits the match expression
     // into a bucket-level match expression and a residual expression so that we can push down
     // the bucket-level match expression to the system bucket collection SCAN or FETCH/IXSCAN.
-    *timeseriesDeleteQueryExprs =
-        timeseries::getMatchExprsForWrites(expCtx,
-                                           *collection->getTimeseriesOptions(),
-                                           request.getQuery(),
-                                           collection->areTimeseriesBucketsFixed());
+    *timeseriesDeleteQueryExprs = timeseries::getMatchExprsForWrites(
+        expCtx, *collection->getTimeseriesOptions(), request.getQuery());
 
     if (request.getMulti() && !timeseriesDeleteQueryExprs->_residualExpr) {
         timeseriesCounters.incrementMetaDelete();

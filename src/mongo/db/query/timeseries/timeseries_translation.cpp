@@ -172,14 +172,11 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
     tassert(10601101,
             "Timeseries collections must have timeseries options",
             timeseriesFields.has_value());
-    bool parametersChanged =
-        timeseriesFields->getTimeseriesBucketingParametersHaveChanged().value_or(true);
 
     return TimeseriesTranslationParams{
         timeseriesFields->getTimeseriesOptions(),
         !timeseriesFields->getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true),
-        timeseries::areTimeseriesBucketsFixed(timeseriesFields->getTimeseriesOptions(),
-                                              parametersChanged)};
+        canUseFixedBucketOptimizations(timeseriesFields->getTimeseriesOptions())};
 }
 
 boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfRequired(
@@ -202,7 +199,7 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
     return TimeseriesTranslationParams{
         collPtr->getTimeseriesOptions().get(),
         !collPtr->getTimeseriesMixedSchemaBucketsState().mustConsiderMixedSchemaBucketsInReads(),
-        collPtr->areTimeseriesBucketsFixed()};
+        canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions())};
 }
 
 template <class T>
@@ -278,7 +275,8 @@ void populateUnpackBucketStagesFromCollection(Pipeline& pipeline, const Collecti
             }
 
             if (!unpack->fixedBuckets()) {
-                unpack->setFixedBuckets(collPtr->areTimeseriesBucketsFixed());
+                unpack->setFixedBuckets(
+                    canUseFixedBucketOptimizations(*collPtr->getTimeseriesOptions()));
             }
 
             if (!unpack->usesExtendedRange()) {

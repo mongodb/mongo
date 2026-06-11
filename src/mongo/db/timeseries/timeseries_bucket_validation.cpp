@@ -519,11 +519,7 @@ void validateBucketConsistency(const Collection* collection, const BSONObj& buck
         // Perform the actual validation
         validateBucketIdTimestamp(timeseriesOptions, bucketId, min, criticalValidationOnly);
 
-        validateBucketTimeSpan(timeseriesOptions,
-                               collection->areTimeseriesBucketsFixed(),
-                               min,
-                               max,
-                               criticalValidationOnly);
+        validateBucketTimeSpan(timeseriesOptions, min, max, criticalValidationOnly);
 
         validateBucketData(timeseriesOptions,
                            collection->getDefaultCollator(),
@@ -567,10 +563,10 @@ void validateBucketIdTimestamp(const TimeseriesOptions& timeseriesOptions,
 }
 
 void validateBucketTimeSpan(const TimeseriesOptions& timeseriesOptions,
-                            bool fixedBucketingEnabled,
                             const BSONObj& controlMin,
                             const BSONObj& controlMax,
                             bool criticalValidationOnly) {
+    const bool fixedBucketingEnabled = canUseFixedBucketOptimizations(timeseriesOptions);
     auto minTimestamp = controlMin[timeseriesOptions.getTimeField()].Date();
     auto maxTimestamp = controlMax[timeseriesOptions.getTimeField()].Date();
     auto bucketMaxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();

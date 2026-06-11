@@ -329,13 +329,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool areTimeseriesBucketsFixed() const override {
-        const auto tsOptions = getTimeseriesOptions();
-        // Assume parameters have changed unless otherwise specified.
-        const auto parametersChanged = timeseriesBucketingParametersHaveChanged().value_or(true);
-        return tsOptions && timeseries::areTimeseriesBucketsFixed(*tsOptions, parametersChanged);
-    }
-
     StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
         const BSONObj& bucketsDoc) const override {
         return _coll->doesTimeseriesBucketsDocContainMixedSchemaData(bucketsDoc);

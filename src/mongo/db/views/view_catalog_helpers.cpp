@@ -226,7 +226,8 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                             .mustConsiderMixedSchemaBucketsInReads();
             tsOptions = tsCollection->getTimeseriesOptions();
             hasExtendedRange = tsCollection->getRequiresTimeseriesExtendedRangeSupport();
-            fixedBuckets = tsCollection->areTimeseriesBucketsFixed();
+            // Fixed-bucket optimizations require viewless timeseries; leave false for viewful.
+            fixedBuckets = false;
             isNewTimeseriesWithoutView = tsCollection->isNewTimeseriesWithoutView();
         }
 

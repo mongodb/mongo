@@ -43,12 +43,12 @@ MONGO_MOD_PUBLIC;
 namespace mongo::timeseries {
 
 /**
- * Evaluates whether the timeseries bucket's options are fixed (unchanged).
+ * Evaluates whether fixed-bucket query optimizations can be used.
  *
- * Returns true if `options.bucketRoundingSeconds` and `options.bucketMaxSpanSeconds` are equal and
- * the `parametersChanged` argument is `false`.
+ * Returns true if fixed-bucket query optimizations are enabled (via
+ * featureFlagFixedBucketingOptimizations) and applicable to the specified timeseries options.
  */
-bool areTimeseriesBucketsFixed(const TimeseriesOptions& options, bool parametersChanged);
+bool canUseFixedBucketOptimizations(const TimeseriesOptions& options);
 
 /**
  * Evaluates whether the transition of timeseries granularities is valid (returning Status::OK if
