@@ -29,6 +29,7 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
+      oplogSize: 256
       set_parameters:
         enableTestCommands: 1
     num_nodes: 3
