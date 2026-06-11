@@ -1,13 +1,17 @@
 // Test count and distinct on views use with different values of the allowDiskUseByDefault
 // parameter.
 
-import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
 const viewsDB = conn.getDB(jsTestName());
 viewsDB.largeColl.drop();
+
+// The explicit plan cache clear below is only needed when SBE is fully enabled; under the classic
+// engine the test keeps its original behavior so it still exercises the classic plan cache.
+const sbeFullyEnabled = checkSbeFullyEnabled(viewsDB);
 
 const memoryLimitMb = 1;
 const largeStr = "A".repeat(1024 * 1024); // 1MB string
@@ -23,6 +27,13 @@ function testDiskUse(cmd) {
     assert.commandFailedWithCode(viewsDB.runCommand(cmd), ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
     assert.commandWorked(viewsDB.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
+    // TODO SERVER-67035: Remove this explicit plan cache clear once 'featureFlagSbeFull' is removed.
+    // Under SBE full, changing 'allowDiskUseByDefault' no longer implicitly clears the SBE plan
+    // cache, so clear it explicitly; otherwise the cached plan from the no-disk run above is reused
+    // and still fails. Gated on SBE full so we don't mask classic plan cache behavior.
+    if (sbeFullyEnabled) {
+        viewsDB.largeColl.getPlanCache().clear();
+    }
     assert.commandWorked(viewsDB.runCommand(cmd));
 }
 

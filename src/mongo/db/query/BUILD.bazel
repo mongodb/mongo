@@ -276,7 +276,6 @@ idl_generator(
 mongo_cc_library(
     name = "on_parameter_change_updaters",
     srcs = [
-        "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
     ],
     deps = [

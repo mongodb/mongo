@@ -30,7 +30,6 @@ global:
     mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
         - "mongo/platform/atomic_word.h"
         - "mongo/db/query/stage_memory_limit_knobs/knobs_protector.h"
 
@@ -187,7 +186,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gte: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalOrStageMaxMemoryBytes:

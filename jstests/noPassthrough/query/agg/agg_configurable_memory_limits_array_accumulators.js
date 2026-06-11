@@ -3,10 +3,16 @@
  * @tags: [requires_fcv_81]
  */
 
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
 const coll = db.agg_configurable_memory_limit;
+
+// The explicit plan cache clear below is only needed when SBE is fully enabled; under the classic
+// engine the test keeps its original behavior so it still exercises the classic plan cache.
+const sbeFullyEnabled = checkSbeFullyEnabled(db);
 
 // The approximate size of the strings below is 22-25 bytes.
 const stringSize = 22;
@@ -36,6 +42,13 @@ assert.commandWorked(bulk.execute());
 function setParam(param, val) {
     const res = db.adminCommand({setParameter: 1, [param]: val});
     assert.commandWorked(res);
+    // TODO SERVER-67035: Remove this explicit plan cache clear once 'featureFlagSbeFull' is removed.
+    // Under SBE full, changing a query knob no longer implicitly clears the SBE plan cache, so clear
+    // it explicitly so the new limit is applied rather than reusing a cached plan built with the old
+    // limit. Gated on SBE full so we don't mask classic plan cache behavior.
+    if (sbeFullyEnabled) {
+        coll.getPlanCache().clear();
+    }
     return res.was;
 }
 

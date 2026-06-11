@@ -160,4 +160,8 @@ size_t capMemorySize(size_t requestedSizeBytes,
     }
     return requestedSizeBytes;
 }
+
+Status validatePlanCacheSize(const std::string& str, const boost::optional<TenantId>&) {
+    return MemorySize::parse(str).getStatus();
+}
 }  // namespace mongo::memory_util

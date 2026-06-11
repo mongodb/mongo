@@ -2292,10 +2292,5 @@ TEST_F(SbePlanCacheTest, SBEPlanCacheKeyMakeAndCompare) {
     ASSERT_NE(sbeKey1.planCacheKeyHash(), sbeKey2.planCacheKeyHash());
 }
 
-TEST_F(SbePlanCacheTest, SBEPlanCacheUpdateSize) {
-    ASSERT_OK(plan_cache_util::onPlanCacheSizeUpdate("10%"));
-    ASSERT_OK(plan_cache_util::onPlanCacheSizeUpdate("5MB"));
-    ASSERT_NOT_OK(plan_cache_util::onPlanCacheSizeUpdate("10&"));
-}
 }  // namespace
 }  // namespace mongo

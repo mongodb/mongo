@@ -22,6 +22,7 @@ import {
     setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 function getServerParameter(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
@@ -35,6 +36,11 @@ const sortMemoryLimitKnob = "internalQueryMaxBlockingSortMemoryUsageBytes";
 
 db.dropDatabase();
 const coll = db[jsTestName()];
+
+// The SBE plan cache only needs to be cleared explicitly when SBE is fully enabled (see the clear
+// below); under the classic engine the test must keep its original behavior so it still exercises
+// the classic plan cache.
+const sbeFullyEnabled = checkSbeFullyEnabled(db);
 
 function getSortSpillCounter() {
     return accumulateServerStatusMetric(db, (metrics) => metrics.query.sort.spillToDisk);
@@ -116,6 +122,14 @@ for (let pipeline of pipelines) {
     {
         const originalKnobValue = getServerParameter(sortMemoryLimitKnob);
         setServerParameter(sortMemoryLimitKnob, 5 * 1024 * 1024);
+        // TODO SERVER-67035: Remove this explicit plan cache clear once 'featureFlagSbeFull' is removed.
+        // Under SBE full, changing the sort memory limit no longer implicitly clears the SBE plan
+        // cache, so clear it explicitly to force a replan with the new limit (otherwise a cached plan
+        // built with the previous limit would be reused and would not spill). Gated on SBE full so we
+        // don't mask classic plan cache behavior.
+        if (sbeFullyEnabled) {
+            coll.getPlanCache().clear();
+        }
 
         const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
         const cursorId = cursor.getId();

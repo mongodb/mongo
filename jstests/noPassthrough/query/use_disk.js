@@ -14,11 +14,16 @@ import {
 } from "jstests/libs/profiler.js";
 import {getAggPlanStages, getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagExtendedAutoSpilling: true}});
 const testDB = conn.getDB("profile_agg");
 const collName = jsTestName();
 const coll = testDB.getCollection(collName);
+
+// The explicit plan cache clear below is only needed when SBE is fully enabled; under the classic
+// engine the test keeps its original behavior so it still exercises the classic plan cache.
+const sbeFullyEnabled = checkSbeFullyEnabled(testDB);
 
 testDB.setProfilingLevel(2);
 
@@ -51,6 +56,13 @@ assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
 assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 10}));
+// TODO SERVER-67035: Remove this explicit plan cache clear once 'featureFlagSbeFull' is removed.
+// Under SBE full, changing the sort memory limit no longer implicitly clears the SBE plan cache, so
+// clear it explicitly; otherwise the cached plan built with the previous limit is reused and won't
+// spill. Gated on SBE full so we don't mask classic plan cache behavior.
+if (sbeFullyEnabled) {
+    coll.getPlanCache().clear();
+}
 assert.eq(8, coll.aggregate([{$match: {a: {$gte: 2}}}, {$sort: {a: 1}}], {allowDiskUse: true}).itcount());
 profileObj = getLatestProfilerEntry(testDB);
 

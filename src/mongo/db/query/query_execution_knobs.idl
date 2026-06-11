@@ -32,7 +32,6 @@ imports:
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
         - "mongo/db/query/query_knob_expressions.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/platform/atomic_word.h"
@@ -222,7 +221,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryMaxRangeBytes:
@@ -260,7 +258,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryMaxConcatArraysBytes:
@@ -274,7 +271,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryMaxSetUnionBytes:
@@ -288,7 +284,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryMaxPercentileAccumulatorBytes:
@@ -300,7 +295,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryJavaScriptHeapSizeLimitMB:
@@ -345,7 +339,6 @@ server_parameters:
         test_only: true
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals:
@@ -358,7 +351,6 @@ server_parameters:
         default: 1000
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryMaxDocValidationErrorConsideredValues:
@@ -455,7 +447,6 @@ server_parameters:
         cpp_varname: "internalQuerySlotBasedExecutionDisableLookupPushdown"
         cpp_vartype: AtomicWord<bool>
         default: false
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
         annotations:
             query_knob:
@@ -467,7 +458,6 @@ server_parameters:
         cpp_varname: "internalQuerySlotBasedExecutionDisableLookupUnwindPushdown"
         cpp_vartype: AtomicWord<bool>
         default: false
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQuerySlotBasedExecutionDisableGroupPushdown:
@@ -476,7 +466,6 @@ server_parameters:
         cpp_varname: "internalQuerySlotBasedExecutionDisableGroupPushdown"
         cpp_vartype: AtomicWord<bool>
         default: false
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
         annotations:
             query_knob:
@@ -503,7 +492,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryRegexHeapLimitKB:
@@ -582,7 +570,6 @@ server_parameters:
             expr: 10 * 1000
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryCollectionMaxDataSizeBytesToChooseHashJoin:
@@ -596,7 +583,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin:
@@ -610,7 +596,6 @@ server_parameters:
             expr: 100 * 1024 * 1024
         validator:
             gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryDisableLookupExecutionUsingHashJoin:
@@ -621,7 +606,6 @@ server_parameters:
         cpp_varname: "internalQueryDisableLookupExecutionUsingHashJoin"
         cpp_vartype: AtomicWord<bool>
         default: false
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalMeasureQueryExecutionTimeInNanoseconds:
@@ -845,7 +829,6 @@ server_parameters:
         cpp_varname: "internalQuerySlotBasedExecutionDisableTimeSeriesPushdown"
         cpp_vartype: AtomicWord<bool>
         default: false
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
         annotations:
             query_knob:

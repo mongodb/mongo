@@ -31,7 +31,6 @@
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -51,34 +50,8 @@ const auto sbePlanCacheDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<sbe::PlanCache>>();
 
 
-class PlanCacheOnParamChangeUpdaterImpl final : public plan_cache_util::OnParamChangeUpdater {
-public:
-    void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
-        auto newSizeBytes = memory_util::getRequestedMemSizeInBytes(memSize);
-        auto cappedCacheSize = memory_util::capMemorySize(newSizeBytes /*requestedSizeBytes*/,
-                                                          500 /*maximumSizeGB*/,
-                                                          25 /*percentTotalSystemMemory*/);
-        if (cappedCacheSize < newSizeBytes) {
-            LOGV2_DEBUG(6007001,
-                        1,
-                        "The plan cache size has been capped",
-                        "cappedSize"_attr = cappedCacheSize);
-        }
-        auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-        globalPlanCache->reset(cappedCacheSize);
-    }
-
-    void clearCache(ServiceContext* serviceCtx) final {
-        auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-        globalPlanCache->clear();
-    }
-};
-
 ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
     "PlanCacheRegisterer", [](ServiceContext* serviceCtx) {
-        plan_cache_util::sbePlanCacheOnParamChangeUpdater(serviceCtx) =
-            std::make_unique<PlanCacheOnParamChangeUpdaterImpl>();
-
         auto status = memory_util::MemorySize::parse(planCacheSize.get());
         uassertStatusOK(status);
         auto size = memory_util::getRequestedMemSizeInBytes(status.getValue());

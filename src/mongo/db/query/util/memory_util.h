@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::memory_util {
 
@@ -76,6 +80,11 @@ size_t capMemorySize(size_t requestedSizeBytes,
                      size_t maximumSizeGB,
                      double percentTotalSystemMemory);
 size_t getRequestedMemSizeInBytes(const MemorySize& memSize);
+
+/**
+ * Callback called on validation of the 'planCacheSize' parameter.
+ */
+Status validatePlanCacheSize(const std::string& str, const boost::optional<TenantId>&);
 
 
 }  // namespace mongo::memory_util

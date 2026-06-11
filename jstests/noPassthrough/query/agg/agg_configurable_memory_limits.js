@@ -1,13 +1,26 @@
 // Tests that certain aggregation operators have configurable memory limits.
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
 const coll = db.agg_configurable_memory_limit;
 
+// The explicit plan cache clears below are only needed when SBE is fully enabled; under the classic
+// engine the test keeps its original behavior so it still exercises the classic plan cache.
+const sbeFullyEnabled = checkSbeFullyEnabled(db);
+
 // Function to change the parameter value and return the previous value.
 function setParam(param, val) {
     const res = db.adminCommand({setParameter: 1, [param]: val});
     assert.commandWorked(res);
+    // TODO SERVER-67035: Remove this explicit plan cache clear once 'featureFlagSbeFull' is removed.
+    // Under SBE full, changing a query knob no longer implicitly clears the SBE plan cache, so clear
+    // it explicitly so the new limit is applied rather than reusing a cached plan built with the old
+    // limit. Gated on SBE full so we don't mask classic plan cache behavior.
+    if (sbeFullyEnabled) {
+        coll.getPlanCache().clear();
+    }
     return res.was;
 }
 
@@ -110,6 +123,13 @@ assert.commandWorked(bulk.execute());
 
         // Then, verify that the memory limit throws when lowered.
         db.adminCommand({setParameter: 1, internalQueryTopNAccumulatorBytes: 100});
+        // TODO SERVER-67035: Remove this explicit plan cache clear once 'featureFlagSbeFull' is removed.
+        // Under SBE full, changing the knob no longer implicitly clears the SBE plan cache; clear it
+        // so the lowered limit is applied rather than reusing the cached plan from the run above.
+        // Gated on SBE full so we don't mask classic plan cache behavior.
+        if (sbeFullyEnabled) {
+            coll.getPlanCache().clear();
+        }
         assert.throwsWithCode(
             () => coll.aggregate([{$group: {_id: null, strings: {[op]: spec}}}]),
             ErrorCodes.ExceededMemoryLimit,
