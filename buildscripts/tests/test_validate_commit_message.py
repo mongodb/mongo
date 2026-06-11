@@ -238,6 +238,8 @@ class ValidateCommitMessageTest(unittest.TestCase):
 
     @patch("requests.post")
     def test_dependabot_pr_skips_validation(self, mock_request):
+        """GitHub GraphQL returns 'dependabot[bot]' for the native Dependabot app."""
+
         class FakeResponse:
             def json(self):
                 return {
@@ -255,6 +257,30 @@ class ValidateCommitMessageTest(unittest.TestCase):
         mock_request.return_value = FakeResponse()
         commits = get_non_merge_queue_squashed_commits(
             github_org="fun_org", github_repo="fun_repo", pr_number=55153, github_token="fun_token"
+        )
+        self.assertEqual(len(commits), 0)
+
+    @patch("requests.post")
+    def test_dependabot_pr_skips_validation_bare_login(self, mock_request):
+        """GitHub GraphQL sometimes returns 'dependabot' without the '[bot]' suffix."""
+
+        class FakeResponse:
+            def json(self):
+                return {
+                    "data": {
+                        "repository": {
+                            "pullRequest": {
+                                "author": {"login": "dependabot"},
+                                "viewerMergeHeadlineText": "Bump twisted from 24.11.0 to 26.4.0 (#16848)",
+                                "viewerMergeBodyText": "Bumps twisted from 24.11.0 to 26.4.0.",
+                            }
+                        }
+                    }
+                }
+
+        mock_request.return_value = FakeResponse()
+        commits = get_non_merge_queue_squashed_commits(
+            github_org="fun_org", github_repo="fun_repo", pr_number=16848, github_token="fun_token"
         )
         self.assertEqual(len(commits), 0)
 

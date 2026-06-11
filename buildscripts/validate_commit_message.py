@@ -189,7 +189,7 @@ def get_non_merge_queue_squashed_commits(
     pr_info = resp["data"]["repository"]["pullRequest"]
 
     author_login = (pr_info.get("author") or {}).get("login")
-    if author_login == "dependabot[bot]":
+    if author_login in ("dependabot[bot]", "dependabot"):
         LOGGER.info(
             "Skipping commit message validation for Dependabot PR", author_login=author_login
         )
