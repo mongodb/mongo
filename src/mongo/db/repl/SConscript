@@ -1364,6 +1364,7 @@ env.Library(
         'hello_auth',
         'hello_command',
         'primary_only_service',
+        'repl_server_parameters',
         'replication_auth',
         'split_horizon',
     ],
