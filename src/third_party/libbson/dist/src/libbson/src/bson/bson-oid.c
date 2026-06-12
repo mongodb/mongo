@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-#include <bson/bson-compat.h>
+#include <bson/bson-oid.h>
+
+#include <bson/bson-context-private.h>
+
+#include <bson/bson-endian.h>
+#include <bson/bson-string.h>
+#include <bson/compat.h>
 
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-
-#include <bson/bson-context-private.h>
-#include <bson/bson-oid.h>
-#include <bson/bson-string.h>
 
 
 /*
@@ -76,106 +78,89 @@ BSON_MAYBE_UNUSED static const uint16_t gHexCharPairs[] = {
 #endif
 };
 
-static BSON_INLINE void
-_oid_init (bson_oid_t *oid, bson_context_t *context, bool add_random)
+void
+bson_oid_init(bson_oid_t *oid,         /* OUT */
+              bson_context_t *context) /* IN */
 {
-   BSON_ASSERT (oid);
+   BSON_ASSERT(oid);
    if (!context) {
-      context = bson_context_get_default ();
+      context = bson_context_get_default();
    }
 
-   const time_t now = time (NULL);
+   const time_t now = time(NULL);
    // Big-endian encode the low 32 bits of the time as the leading 32 bits of the new OID
-   oid->bytes[0] = (uint8_t) (now >> 24);
-   oid->bytes[1] = (uint8_t) (now >> 16);
-   oid->bytes[2] = (uint8_t) (now >> 8);
-   oid->bytes[3] = (uint8_t) (now >> 0);
-   // Maybe add randomness if the caller wants it
-   if (add_random) {
-      _bson_context_set_oid_rand (context, oid);
-      _bson_context_set_oid_seq32 (context, oid);
-   } else {
-      _bson_context_set_oid_seq64 (context, oid);
-   }
-}
-
-void
-bson_oid_init_sequence (bson_oid_t *oid,         /* OUT */
-                        bson_context_t *context) /* IN */
-{
-   _oid_init (oid, context, false /* no randomness */);
-}
-
-void
-bson_oid_init (bson_oid_t *oid,         /* OUT */
-               bson_context_t *context) /* IN */
-{
-   _oid_init (oid, context, true /* add randomness */);
+   oid->bytes[0] = (uint8_t)(now >> 24);
+   oid->bytes[1] = (uint8_t)(now >> 16);
+   oid->bytes[2] = (uint8_t)(now >> 8);
+   oid->bytes[3] = (uint8_t)(now >> 0);
+   // Add randomness
+   _bson_context_set_oid_rand(context, oid);
+   _bson_context_set_oid_seq32(context, oid);
 }
 
 
 void
-bson_oid_init_from_data (bson_oid_t *oid,     /* OUT */
-                         const uint8_t *data) /* IN */
+bson_oid_init_from_data(bson_oid_t *oid,     /* OUT */
+                        const uint8_t *data) /* IN */
 {
-   BSON_ASSERT (oid);
-   BSON_ASSERT (data);
+   BSON_ASSERT(oid);
+   BSON_ASSERT(data);
 
-   memcpy (oid, data, 12);
+   memcpy(oid, data, 12);
 }
 
 
 void
-bson_oid_init_from_string (bson_oid_t *oid, /* OUT */
-                           const char *str) /* IN */
+bson_oid_init_from_string(bson_oid_t *oid, /* OUT */
+                          const char *str) /* IN */
 {
-   BSON_ASSERT (oid);
-   BSON_ASSERT (str);
+   BSON_ASSERT(oid);
+   BSON_ASSERT(str);
 
-   bson_oid_init_from_string_unsafe (oid, str);
+   bson_oid_init_from_string_unsafe(oid, str);
 }
 
 
 time_t
-bson_oid_get_time_t (const bson_oid_t *oid) /* IN */
+bson_oid_get_time_t(const bson_oid_t *oid) /* IN */
 {
-   BSON_ASSERT (oid);
+   BSON_ASSERT(oid);
 
-   return bson_oid_get_time_t_unsafe (oid);
+   return bson_oid_get_time_t_unsafe(oid);
 }
 
 
 void
-bson_oid_to_string (const bson_oid_t *oid,                       /* IN */
-                    char str[BSON_ENSURE_ARRAY_PARAM_SIZE (25)]) /* OUT */
+bson_oid_to_string(const bson_oid_t *oid,                      /* IN */
+                   char str[BSON_ENSURE_ARRAY_PARAM_SIZE(25)]) /* OUT */
 {
 #if !defined(__i386__) && !defined(__x86_64__) && !defined(_M_IX86) && !defined(_M_X64)
-   BSON_ASSERT (oid);
-   BSON_ASSERT (str);
+   BSON_ASSERT(oid);
+   BSON_ASSERT(str);
 
-   bson_snprintf (str,
-                  25,
-                  "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                  oid->bytes[0],
-                  oid->bytes[1],
-                  oid->bytes[2],
-                  oid->bytes[3],
-                  oid->bytes[4],
-                  oid->bytes[5],
-                  oid->bytes[6],
-                  oid->bytes[7],
-                  oid->bytes[8],
-                  oid->bytes[9],
-                  oid->bytes[10],
-                  oid->bytes[11]);
+   bson_snprintf(str,
+                 25,
+                 "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+                 oid->bytes[0],
+                 oid->bytes[1],
+                 oid->bytes[2],
+                 oid->bytes[3],
+                 oid->bytes[4],
+                 oid->bytes[5],
+                 oid->bytes[6],
+                 oid->bytes[7],
+                 oid->bytes[8],
+                 oid->bytes[9],
+                 oid->bytes[10],
+                 oid->bytes[11]);
 #else
    uint16_t *dst;
-   uint8_t *id = (uint8_t *) oid;
+   uint8_t *id = (uint8_t *)oid;
 
-   BSON_ASSERT (oid);
-   BSON_ASSERT (str);
+   BSON_ASSERT(oid);
+   BSON_ASSERT(str);
 
-   dst = (uint16_t *) (void *) str;
+   dst = (uint16_t *)(void *)str;
    dst[0] = gHexCharPairs[id[0]];
    dst[1] = gHexCharPairs[id[1]];
    dst[2] = gHexCharPairs[id[2]];
@@ -194,54 +179,54 @@ bson_oid_to_string (const bson_oid_t *oid,                       /* IN */
 
 
 uint32_t
-bson_oid_hash (const bson_oid_t *oid) /* IN */
+bson_oid_hash(const bson_oid_t *oid) /* IN */
 {
-   BSON_ASSERT (oid);
+   BSON_ASSERT(oid);
 
-   return bson_oid_hash_unsafe (oid);
+   return bson_oid_hash_unsafe(oid);
 }
 
 
 int
-bson_oid_compare (const bson_oid_t *oid1, /* IN */
-                  const bson_oid_t *oid2) /* IN */
+bson_oid_compare(const bson_oid_t *oid1, /* IN */
+                 const bson_oid_t *oid2) /* IN */
 {
-   BSON_ASSERT (oid1);
-   BSON_ASSERT (oid2);
+   BSON_ASSERT(oid1);
+   BSON_ASSERT(oid2);
 
-   return bson_oid_compare_unsafe (oid1, oid2);
+   return bson_oid_compare_unsafe(oid1, oid2);
 }
 
 
 bool
-bson_oid_equal (const bson_oid_t *oid1, /* IN */
-                const bson_oid_t *oid2) /* IN */
+bson_oid_equal(const bson_oid_t *oid1, /* IN */
+               const bson_oid_t *oid2) /* IN */
 {
-   BSON_ASSERT (oid1);
-   BSON_ASSERT (oid2);
+   BSON_ASSERT(oid1);
+   BSON_ASSERT(oid2);
 
-   return bson_oid_equal_unsafe (oid1, oid2);
+   return bson_oid_equal_unsafe(oid1, oid2);
 }
 
 
 void
-bson_oid_copy (const bson_oid_t *src, /* IN */
-               bson_oid_t *dst)       /* OUT */
+bson_oid_copy(const bson_oid_t *src, /* IN */
+              bson_oid_t *dst)       /* OUT */
 {
-   BSON_ASSERT (src);
-   BSON_ASSERT (dst);
+   BSON_ASSERT(src);
+   BSON_ASSERT(dst);
 
-   bson_oid_copy_unsafe (src, dst);
+   bson_oid_copy_unsafe(src, dst);
 }
 
 
 bool
-bson_oid_is_valid (const char *str, /* IN */
-                   size_t length)   /* IN */
+bson_oid_is_valid(const char *str, /* IN */
+                  size_t length)   /* IN */
 {
    size_t i;
 
-   BSON_ASSERT (str);
+   BSON_ASSERT(str);
 
    if ((length == 25) && (str[24] == '\0')) {
       length = 24;

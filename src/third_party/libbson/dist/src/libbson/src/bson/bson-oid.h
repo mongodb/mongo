@@ -21,39 +21,37 @@
 #define BSON_OID_H
 
 
-#include <time.h>
-
 #include <bson/bson-context.h>
-#include <bson/bson-macros.h>
-#include <bson/bson-types.h>
 #include <bson/bson-endian.h>
+#include <bson/bson-types.h>
+#include <bson/macros.h>
+
+#include <time.h>
 
 
 BSON_BEGIN_DECLS
 
 
-BSON_EXPORT (int)
-bson_oid_compare (const bson_oid_t *oid1, const bson_oid_t *oid2);
-BSON_EXPORT (void)
-bson_oid_copy (const bson_oid_t *src, bson_oid_t *dst);
-BSON_EXPORT (bool)
-bson_oid_equal (const bson_oid_t *oid1, const bson_oid_t *oid2);
-BSON_EXPORT (bool)
-bson_oid_is_valid (const char *str, size_t length);
-BSON_EXPORT (time_t)
-bson_oid_get_time_t (const bson_oid_t *oid);
-BSON_EXPORT (uint32_t)
-bson_oid_hash (const bson_oid_t *oid);
-BSON_EXPORT (void)
-bson_oid_init (bson_oid_t *oid, bson_context_t *context);
-BSON_EXPORT (void)
-bson_oid_init_from_data (bson_oid_t *oid, const uint8_t *data);
-BSON_EXPORT (void)
-bson_oid_init_from_string (bson_oid_t *oid, const char *str);
-BSON_EXPORT (void)
-bson_oid_init_sequence (bson_oid_t *oid, bson_context_t *context) BSON_GNUC_DEPRECATED_FOR (bson_oid_init);
-BSON_EXPORT (void)
-bson_oid_to_string (const bson_oid_t *oid, char str[25]);
+BSON_EXPORT(int)
+bson_oid_compare(const bson_oid_t *oid1, const bson_oid_t *oid2);
+BSON_EXPORT(void)
+bson_oid_copy(const bson_oid_t *src, bson_oid_t *dst);
+BSON_EXPORT(bool)
+bson_oid_equal(const bson_oid_t *oid1, const bson_oid_t *oid2);
+BSON_EXPORT(bool)
+bson_oid_is_valid(const char *str, size_t length);
+BSON_EXPORT(time_t)
+bson_oid_get_time_t(const bson_oid_t *oid);
+BSON_EXPORT(uint32_t)
+bson_oid_hash(const bson_oid_t *oid);
+BSON_EXPORT(void)
+bson_oid_init(bson_oid_t *oid, bson_context_t *context);
+BSON_EXPORT(void)
+bson_oid_init_from_data(bson_oid_t *oid, const uint8_t *data);
+BSON_EXPORT(void)
+bson_oid_init_from_string(bson_oid_t *oid, const char *str);
+BSON_EXPORT(void)
+bson_oid_to_string(const bson_oid_t *oid, char str[25]);
 
 
 /**
@@ -70,9 +68,9 @@ bson_oid_to_string (const bson_oid_t *oid, char str[25]);
  *          An integer > 0 if @oid1 is greater than @oid2.
  */
 static BSON_INLINE int
-bson_oid_compare_unsafe (const bson_oid_t *oid1, const bson_oid_t *oid2)
+bson_oid_compare_unsafe(const bson_oid_t *oid1, const bson_oid_t *oid2)
 {
-   return memcmp (oid1, oid2, sizeof *oid1);
+   return memcmp(oid1, oid2, sizeof *oid1);
 }
 
 
@@ -89,9 +87,9 @@ bson_oid_compare_unsafe (const bson_oid_t *oid1, const bson_oid_t *oid2)
  * Returns: true if @oid1 and @oid2 are equal; otherwise false.
  */
 static BSON_INLINE bool
-bson_oid_equal_unsafe (const bson_oid_t *oid1, const bson_oid_t *oid2)
+bson_oid_equal_unsafe(const bson_oid_t *oid1, const bson_oid_t *oid2)
 {
-   return !memcmp (oid1, oid2, sizeof *oid1);
+   return !memcmp(oid1, oid2, sizeof *oid1);
 }
 
 /**
@@ -108,13 +106,15 @@ bson_oid_equal_unsafe (const bson_oid_t *oid1, const bson_oid_t *oid2)
  * Returns: A uint32_t containing a hash code.
  */
 static BSON_INLINE uint32_t
-bson_oid_hash_unsafe (const bson_oid_t *oid)
+bson_oid_hash_unsafe(const bson_oid_t *oid)
 {
    uint32_t hash = 5381;
    uint32_t i;
 
    for (i = 0; i < sizeof oid->bytes; i++) {
+      BSON_DISABLE_UNSAFE_BUFFER_USAGE_WARNING_BEGIN
       hash = ((hash << 5) + hash) + oid->bytes[i];
+      BSON_DISABLE_UNSAFE_BUFFER_USAGE_WARNING_END
    }
 
    return hash;
@@ -132,9 +132,9 @@ bson_oid_hash_unsafe (const bson_oid_t *oid)
  * function.
  */
 static BSON_INLINE void
-bson_oid_copy_unsafe (const bson_oid_t *src, bson_oid_t *dst)
+bson_oid_copy_unsafe(const bson_oid_t *src, bson_oid_t *dst)
 {
-   memcpy (dst, src, sizeof *src);
+   memcpy(dst, src, sizeof *src);
 }
 
 
@@ -149,7 +149,7 @@ bson_oid_copy_unsafe (const bson_oid_t *src, bson_oid_t *dst)
  * Returns: An integer between 0 and 15.
  */
 static BSON_INLINE uint8_t
-bson_oid_parse_hex_char (char hex)
+bson_oid_parse_hex_char(char hex)
 {
    switch (hex) {
    case '0':
@@ -208,13 +208,14 @@ bson_oid_parse_hex_char (char hex)
  * valid input to the function.
  */
 static BSON_INLINE void
-bson_oid_init_from_string_unsafe (bson_oid_t *oid, const char *str)
+bson_oid_init_from_string_unsafe(bson_oid_t *oid, const char *str)
 {
    int i;
 
    for (i = 0; i < 12; i++) {
-      oid->bytes[i] =
-         (uint8_t) ((bson_oid_parse_hex_char (str[2 * i]) << 4) | (bson_oid_parse_hex_char (str[2 * i + 1])));
+      BSON_DISABLE_UNSAFE_BUFFER_USAGE_WARNING_BEGIN
+      oid->bytes[i] = (uint8_t)((bson_oid_parse_hex_char(str[2 * i]) << 4) | (bson_oid_parse_hex_char(str[2 * i + 1])));
+      BSON_DISABLE_UNSAFE_BUFFER_USAGE_WARNING_END
    }
 }
 
@@ -228,12 +229,12 @@ bson_oid_init_from_string_unsafe (bson_oid_t *oid, const char *str)
  * Returns: A time_t containing the UNIX timestamp of generation.
  */
 static BSON_INLINE time_t
-bson_oid_get_time_t_unsafe (const bson_oid_t *oid)
+bson_oid_get_time_t_unsafe(const bson_oid_t *oid)
 {
    uint32_t t;
 
-   memcpy (&t, oid, sizeof (t));
-   return BSON_UINT32_FROM_BE (t);
+   memcpy(&t, oid, sizeof(t));
+   return BSON_UINT32_FROM_BE(t);
 }
 
 

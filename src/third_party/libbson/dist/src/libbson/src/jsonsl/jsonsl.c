@@ -3,82 +3,11 @@
  * See included LICENSE file for license details.
  */
 
-#include "jsonsl.h"
-#include "bson/bson-memory.h"
+#include <jsonsl/jsonsl.h>
+#include <bson/memory.h>
 
 #include <limits.h>
 #include <ctype.h>
-
-#ifdef JSONSL_USE_METRICS
-#define XMETRICS \
-    X(STRINGY_INSIGNIFICANT) \
-    X(STRINGY_SLOWPATH) \
-    X(ALLOWED_WHITESPACE) \
-    X(QUOTE_FASTPATH) \
-    X(SPECIAL_FASTPATH) \
-    X(SPECIAL_WSPOP) \
-    X(SPECIAL_SLOWPATH) \
-    X(GENERIC) \
-    X(STRUCTURAL_TOKEN) \
-    X(SPECIAL_SWITCHFIRST) \
-    X(STRINGY_CATCH) \
-    X(NUMBER_FASTPATH) \
-    X(ESCAPES) \
-    X(TOTAL) \
-
-struct jsonsl_metrics_st {
-#define X(m) \
-    unsigned long metric_##m;
-    XMETRICS
-#undef X
-};
-
-static struct jsonsl_metrics_st GlobalMetrics = { 0 };
-static unsigned long GenericCounter[0x100] = { 0 };
-static unsigned long StringyCatchCounter[0x100] = { 0 };
-
-#define INCR_METRIC(m) \
-    GlobalMetrics.metric_##m++;
-
-#define INCR_GENERIC(c) \
-        INCR_METRIC(GENERIC); \
-        GenericCounter[c]++; \
-
-#define INCR_STRINGY_CATCH(c) \
-    INCR_METRIC(STRINGY_CATCH); \
-    StringyCatchCounter[c]++;
-
-JSONSL_API
-void jsonsl_dump_global_metrics(void)
-{
-    int ii;
-    printf("JSONSL Metrics:\n");
-#define X(m) \
-    printf("\t%-30s %20lu (%0.2f%%)\n", #m, GlobalMetrics.metric_##m, \
-           (float)((float)(GlobalMetrics.metric_##m/(float)GlobalMetrics.metric_TOTAL)) * 100);
-    XMETRICS
-#undef X
-    printf("Generic Characters:\n");
-    for (ii = 0; ii < 0xff; ii++) {
-        if (GenericCounter[ii]) {
-            printf("\t[ %c ] %lu\n", ii, GenericCounter[ii]);
-        }
-    }
-    printf("Weird string loop\n");
-    for (ii = 0; ii < 0xff; ii++) {
-        if (StringyCatchCounter[ii]) {
-            printf("\t[ %c ] %lu\n", ii, StringyCatchCounter[ii]);
-        }
-    }
-}
-
-#else
-#define INCR_METRIC(m)
-#define INCR_GENERIC(c)
-#define INCR_STRINGY_CATCH(c)
-JSONSL_API
-void jsonsl_dump_global_metrics(void) { }
-#endif /* JSONSL_USE_METRICS */
 
 #define CASE_DIGITS \
 case '1': \
@@ -99,7 +28,6 @@ static int is_allowed_escape(unsigned);
 static int is_simple_char(unsigned);
 static char get_escape_equiv(unsigned);
 
-JSONSL_API
 jsonsl_t jsonsl_new(int nlevels)
 {
     unsigned int ii;
@@ -111,7 +39,7 @@ jsonsl_t jsonsl_new(int nlevels)
 
     jsn = (struct jsonsl_st *)
             bson_malloc0(sizeof (*jsn) +
-                    ( (nlevels-1) * sizeof (struct jsonsl_state_st) )
+                    ( (nlevels) * sizeof (struct jsonsl_state_st) )
             );
 
     jsn->levels_max = (unsigned int) nlevels;
@@ -123,7 +51,6 @@ jsonsl_t jsonsl_new(int nlevels)
     return jsn;
 }
 
-JSONSL_API
 void jsonsl_reset(jsonsl_t jsn)
 {
     jsn->tok_last = 0;
@@ -135,7 +62,6 @@ void jsonsl_reset(jsonsl_t jsn)
     jsn->expecting = 0;
 }
 
-JSONSL_API
 void jsonsl_destroy(jsonsl_t jsn)
 {
     if (jsn) {
@@ -170,8 +96,6 @@ jsonsl__str_fastparse(jsonsl_t jsn,
                 *bytes >= 0x100 ||
 #endif /* JSONSL_USE_WCHAR */
                 (is_simple_char(*bytes))) {
-            INCR_METRIC(TOTAL);
-            INCR_METRIC(STRINGY_INSIGNIFICANT);
         } else {
             /* Once we're done here, re-calculate the position variables */
             jsn->pos += (bytes - *bytes_p);
@@ -200,8 +124,6 @@ jsonsl__num_fastparse(jsonsl_t jsn,
     for (; nbytes; nbytes--, bytes++) {
         jsonsl_uchar_t c = *bytes;
         if (isdigit(c)) {
-            INCR_METRIC(TOTAL);
-            INCR_METRIC(NUMBER_FASTPATH);
             state->nelem = (state->nelem * 10) + (c - 0x30);
         } else {
             exhausted = 0;
@@ -217,49 +139,49 @@ jsonsl__num_fastparse(jsonsl_t jsn,
     return FASTPARSE_BREAK;
 }
 
-JSONSL_API
 void
 jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
 {
 
 #define INVOKE_ERROR(eb) \
-    if (jsn->error_callback(jsn, JSONSL_ERROR_##eb, state, (char*)c)) { \
-        goto GT_AGAIN; \
-    } \
-    return;
+    if (1) { \
+        if (jsn->error_callback(jsn, JSONSL_ERROR_##eb, state, (char*)c)) { \
+            goto GT_AGAIN; \
+        } \
+        return; \
+    } else ((void)0)
 
 #define STACK_PUSH \
-    if (jsn->level >= (levels_max-1)) { \
-        jsn->error_callback(jsn, JSONSL_ERROR_LEVELS_EXCEEDED, state, (char*)c); \
-        return; \
-    } \
-    state = jsn->stack + (++jsn->level); \
-    state->ignore_callback = jsn->stack[jsn->level-1].ignore_callback; \
-    state->pos_begin = jsn->pos;
-
-#define STACK_POP_NOPOS \
-    state->pos_cur = jsn->pos; \
-    state = jsn->stack + (--jsn->level);
-
-
-#define STACK_POP \
-    STACK_POP_NOPOS; \
-    state->pos_cur = jsn->pos;
+    if (1) { \
+        if (jsn->level >= (levels_max-1)) { \
+            jsn->error_callback(jsn, JSONSL_ERROR_LEVELS_EXCEEDED, state, (char*)c); \
+            return; \
+        } \
+        state = jsn->stack + (++jsn->level); \
+        state->ignore_callback = jsn->stack[jsn->level-1].ignore_callback; \
+        state->pos_begin = jsn->pos; \
+    } else ((void)0)
 
 #define CALLBACK_AND_POP_NOPOS(T) \
+    if (1) { \
         state->pos_cur = jsn->pos; \
         DO_CALLBACK(T, POP); \
         state->nescapes = 0; \
-        state = jsn->stack + (--jsn->level);
+        state = jsn->stack + (--jsn->level); \
+    } else ((void)0)
 
 #define CALLBACK_AND_POP(T) \
+    if (1) { \
         CALLBACK_AND_POP_NOPOS(T); \
-        state->pos_cur = jsn->pos;
+        state->pos_cur = jsn->pos; \
+    } else ((void)0)
 
 #define SPECIAL_POP \
-    CALLBACK_AND_POP(SPECIAL); \
-    jsn->expecting = 0; \
-    jsn->tok_last = 0; \
+    if (1) { \
+        CALLBACK_AND_POP(SPECIAL); \
+        jsn->expecting = 0; \
+        jsn->tok_last = 0; \
+    } else ((void)0)
 
 #define CUR_CHAR (*(jsonsl_uchar_t*)c)
 
@@ -274,7 +196,7 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
             jsn->action_callback(jsn, JSONSL_ACTION_##action, state, (jsonsl_char_t*)c); \
         } \
         if (jsn->stopfl) { return; } \
-    }
+    } else ((void)0)
 
     /**
      * Verifies that we are able to insert the (non-string) item into a hash.
@@ -282,19 +204,19 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
 #define ENSURE_HVAL \
     if (state->nelem % 2 == 0 && state->type == JSONSL_T_OBJECT) { \
         INVOKE_ERROR(HKEY_EXPECTED); \
-    }
+    } else ((void)0)
 
 #define VERIFY_SPECIAL(lit, lit_len) \
-        if ((jsn->pos - state->pos_begin) > lit_len \
-                || CUR_CHAR != (lit)[jsn->pos - state->pos_begin]) { \
-            INVOKE_ERROR(SPECIAL_EXPECTED); \
-        }
+    if ((jsn->pos - state->pos_begin) > lit_len \
+            || CUR_CHAR != (lit)[jsn->pos - state->pos_begin]) { \
+        INVOKE_ERROR(SPECIAL_EXPECTED); \
+    } else ((void)0)
 
 #define VERIFY_SPECIAL_CI(lit, lit_len) \
-        if ((jsn->pos - state->pos_begin) > lit_len \
-                || tolower(CUR_CHAR) != (lit)[jsn->pos - state->pos_begin]) { \
-            INVOKE_ERROR(SPECIAL_EXPECTED); \
-        }
+    if ((jsn->pos - state->pos_begin) > lit_len \
+            || tolower(CUR_CHAR) != (lit)[jsn->pos - state->pos_begin]) { \
+        INVOKE_ERROR(SPECIAL_EXPECTED); \
+    } else ((void)0)
 
 #define STATE_SPECIAL_LENGTH \
     (state)->nescapes
@@ -314,7 +236,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
 
     for (; nbytes; nbytes--, jsn->pos++, c++) {
         unsigned state_type;
-        INCR_METRIC(TOTAL);
 
         GT_AGAIN:
         state_type = state->type;
@@ -347,7 +268,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
                     INVOKE_ERROR(WEIRD_WHITESPACE);
                 }
             }
-            INCR_METRIC(STRINGY_SLOWPATH);
 
         } else if (state_type == JSONSL_T_SPECIAL) {
             /* Fast track for signed/unsigned */
@@ -476,7 +396,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
                    }
 #endif
                 }
-                INCR_METRIC(SPECIAL_FASTPATH);
                 CONTINUE_NEXT_CHAR();
             }
 
@@ -529,7 +448,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
              */
             goto GT_STRUCTURAL_TOKEN;
         } else if (is_allowed_whitespace(CUR_CHAR)) {
-            INCR_METRIC(ALLOWED_WHITESPACE);
             /* So we're not special. Harmless insignificant whitespace
              * passthrough
              */
@@ -538,8 +456,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
             /* not a string, whitespace, or structural token. must be special */
             goto GT_SPECIAL_BEGIN;
         }
-
-        INCR_GENERIC(CUR_CHAR);
 
         if (CUR_CHAR == '"') {
             GT_QUOTE:
@@ -601,7 +517,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
             } /* switch(state->type) */
         } else if (CUR_CHAR == '\\') {
             GT_ESCAPE:
-            INCR_METRIC(ESCAPES);
         /* Escape */
             if ( (state->type & JSONSL_Tf_STRINGY) == 0 ) {
                 INVOKE_ERROR(ESCAPE_OUTSIDE_STRING);
@@ -614,7 +529,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
         GT_STRUCTURAL_TOKEN:
         switch (CUR_CHAR) {
         case ':':
-            INCR_METRIC(STRUCTURAL_TOKEN);
             if (jsn->expecting != CUR_CHAR) {
                 INVOKE_ERROR(STRAY_TOKEN);
             }
@@ -624,7 +538,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
             CONTINUE_NEXT_CHAR();
 
         case ',':
-            INCR_METRIC(STRUCTURAL_TOKEN);
             /**
              * The comma is one of the more generic tokens.
              * In the context of an OBJECT, the can_insert flag
@@ -653,7 +566,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
             /* hashes are more common */
         case '{':
         case '[':
-            INCR_METRIC(STRUCTURAL_TOKEN);
             if (!jsn->can_insert) {
                 INVOKE_ERROR(CANT_INSERT);
             }
@@ -681,7 +593,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
             /* closing of list or object */
         case '}':
         case ']':
-            INCR_METRIC(STRUCTURAL_TOKEN);
             if (jsn->tok_last == ',' && jsn->options.allow_trailing_comma == 0) {
                 INVOKE_ERROR(TRAILING_COMMA);
             }
@@ -754,7 +665,6 @@ jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes)
     }
 }
 
-JSONSL_API
 const char* jsonsl_strerror(jsonsl_error_t err)
 {
     if (err == JSONSL_ERROR_SUCCESS) {
@@ -763,12 +673,11 @@ const char* jsonsl_strerror(jsonsl_error_t err)
 #define X(t) \
     if (err == JSONSL_ERROR_##t) \
         return #t;
-    JSONSL_XERR;
+    JSONSL_XERR
 #undef X
     return "<UNKNOWN_ERROR>";
 }
 
-JSONSL_API
 const char *jsonsl_strtype(jsonsl_type_t type)
 {
 #define X(o,c) \
@@ -786,7 +695,6 @@ const char *jsonsl_strtype(jsonsl_type_t type)
  *
  *
  */
-#ifndef JSONSL_NO_JPR
 static
 jsonsl_jpr_type_t
 populate_component(char *in,
@@ -879,7 +787,6 @@ populate_component(char *in,
     return ret;
 }
 
-JSONSL_API
 jsonsl_jpr_t
 jsonsl_jpr_new(const char *path, jsonsl_error_t *errp)
 {
@@ -890,7 +797,7 @@ jsonsl_jpr_new(const char *path, jsonsl_error_t *errp)
     size_t origlen;
     jsonsl_error_t errstacked;
 
-#define JPR_BAIL(err) *errp = err; goto GT_ERROR;
+#define JPR_BAIL(err) if (1) { *errp = err; goto GT_ERROR; } else ((void)0)
 
     if (errp == NULL) {
         errp = &errstacked;
@@ -1030,7 +937,6 @@ jsonsl__match_continue(jsonsl_jpr_t jpr,
     }
 }
 
-JSONSL_API
 jsonsl_jpr_match_t
 jsonsl_path_match(jsonsl_jpr_t jpr,
                   const struct jsonsl_state_st *parent,
@@ -1061,7 +967,6 @@ jsonsl_path_match(jsonsl_jpr_t jpr,
     return jsonsl__match_continue(jpr, comp, parent->level, child->type);
 }
 
-JSONSL_API
 jsonsl_jpr_match_t
 jsonsl_jpr_match(jsonsl_jpr_t jpr,
                    unsigned int parent_type,
@@ -1139,7 +1044,6 @@ jsonsl_jpr_match(jsonsl_jpr_t jpr,
     return JSONSL_MATCH_NOMATCH;
 }
 
-JSONSL_API
 void jsonsl_jpr_match_state_init(jsonsl_t jsn,
                                  jsonsl_jpr_t *jprs,
                                  size_t njprs)
@@ -1148,9 +1052,9 @@ void jsonsl_jpr_match_state_init(jsonsl_t jsn,
     if (njprs == 0) {
         return;
     }
-    jsn->jprs = (jsonsl_jpr_t *)malloc(sizeof(jsonsl_jpr_t) * njprs);
+    jsn->jprs = BSON_ARRAY_ALLOC(njprs, jsonsl_jpr_t);
     jsn->jpr_count = njprs;
-    jsn->jpr_root = (size_t*)calloc(1, sizeof(size_t) * njprs * jsn->levels_max);
+    jsn->jpr_root = BSON_ARRAY_ALLOC0(njprs * jsn->levels_max, size_t);
     memcpy(jsn->jprs, jprs, sizeof(jsonsl_jpr_t) * njprs);
     /* Set the initial jump table values */
 
@@ -1160,15 +1064,14 @@ void jsonsl_jpr_match_state_init(jsonsl_t jsn,
     }
 }
 
-JSONSL_API
 void jsonsl_jpr_match_state_cleanup(jsonsl_t jsn)
 {
     if (jsn->jpr_count == 0) {
         return;
     }
 
-    free(jsn->jpr_root);
-    free(jsn->jprs);
+    bson_free(jsn->jpr_root);
+    bson_free(jsn->jprs);
     jsn->jprs = NULL;
     jsn->jpr_root = NULL;
     jsn->jpr_count = 0;
@@ -1187,7 +1090,6 @@ void jsonsl_jpr_match_state_cleanup(jsonsl_t jsn)
  * main lexer itself.
  *
  */
-JSONSL_API
 jsonsl_jpr_t jsonsl_jpr_match_state(jsonsl_t jsn,
                                     struct jsonsl_state_st *state,
                                     const char *key,
@@ -1252,7 +1154,6 @@ jsonsl_jpr_t jsonsl_jpr_match_state(jsonsl_t jsn,
     return NULL;
 }
 
-JSONSL_API
 const char *jsonsl_strmatchtype(jsonsl_jpr_match_t match)
 {
 #define X(T,v) \
@@ -1263,12 +1164,10 @@ const char *jsonsl_strmatchtype(jsonsl_jpr_match_t match)
     return "<UNKNOWN>";
 }
 
-#endif /* JSONSL_WITH_JPR */
-
 static char *
 jsonsl__writeutf8(uint32_t pt, char *out)
 {
-    #define ADD_OUTPUT(c) *out = (char)(c); out++;
+    #define ADD_OUTPUT(c) if (1) { *out = (char)(c); out++; } else ((void)0)
 
     if (pt < 0x80) {
         ADD_OUTPUT(pt);
@@ -1315,9 +1214,11 @@ jsonsl__get_uescape_16(const char *s)
     int cur;
 
     #define GET_DIGIT(off) \
-        cur = jsonsl__digit2int(s[off]); \
-        if (cur == -1) { return -1; } \
-        ret |= (cur << (12 - (off * 4)));
+        if (1) { \
+            cur = jsonsl__digit2int(s[off]); \
+            if (cur == -1) { return -1; } \
+            ret |= (cur << (12 - (off * 4))); \
+        } else ((void)0)
 
     GET_DIGIT(0);
     GET_DIGIT(1);
@@ -1330,7 +1231,6 @@ jsonsl__get_uescape_16(const char *s)
 /**
  * Utility function to convert escape sequences
  */
-JSONSL_API
 size_t jsonsl_util_unescape_ex(const char *in,
                                char *out,
                                size_t len,
@@ -1350,11 +1250,13 @@ size_t jsonsl_util_unescape_ex(const char *in,
     *oflags = 0;
 
     #define UNESCAPE_BAIL(e,offset) \
-        *err = JSONSL_ERROR_##e; \
-        if (errat) { \
-            *errat = (const char*)(c+ (ptrdiff_t)(offset)); \
-        } \
-        return 0;
+        if (1) { \
+            *err = JSONSL_ERROR_##e; \
+            if (errat) { \
+                *errat = (const char*)(c+ (ptrdiff_t)(offset)); \
+            } \
+            return 0; \
+        } else ((void)0)
 
     for (; len; len--, c++, out++) {
         int uescval;
@@ -1367,7 +1269,7 @@ size_t jsonsl_util_unescape_ex(const char *in,
             UNESCAPE_BAIL(ESCAPE_INVALID, 0);
         }
         if (!is_allowed_escape(c[1])) {
-            UNESCAPE_BAIL(ESCAPE_INVALID, 1)
+            UNESCAPE_BAIL(ESCAPE_INVALID, 1);
         }
         if ((toEscape && toEscape[(unsigned char)c[1] & 0x7f] == 0 &&
                 c[1] != '\\' && c[1] != '"')) {
@@ -1658,14 +1560,9 @@ static int is_simple_char(unsigned c) {
 }
 
 /* Clean up all our macros! */
-#undef INCR_METRIC
-#undef INCR_GENERIC
-#undef INCR_STRINGY_CATCH
 #undef CASE_DIGITS
 #undef INVOKE_ERROR
 #undef STACK_PUSH
-#undef STACK_POP_NOPOS
-#undef STACK_POP
 #undef CALLBACK_AND_POP_NOPOS
 #undef CALLBACK_AND_POP
 #undef SPECIAL_POP

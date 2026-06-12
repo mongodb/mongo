@@ -9,10 +9,13 @@
  * See included LICENSE file for license details.
  */
 
-#include "../bson/bson-prelude.h"
-
 #ifndef JSONSL_H_
 #define JSONSL_H_
+
+#include <bson/config.h>
+#include <bson/compat.h>
+
+#include <mlib/config.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,19 +75,6 @@ typedef int ssize_t;
 #ifndef JSONSL_JPR_COMPONENT_USER_FIELDS
 #define JSONSL_JPR_COMPONENT_USER_FIELDS
 #endif
-
-#ifndef JSONSL_API
-/**
- * We require a /DJSONSL_DLL so that users already using this as a static
- * or embedded library don't get confused
- */
-#if defined(_WIN32) && defined(JSONSL_DLL)
-#define JSONSL_API __declspec(dllexport)
-#else
-#define JSONSL_API
-#endif /* _WIN32 */
-
-#endif /* !JSONSL_API */
 
 #ifndef JSONSL_INLINE
 #if defined(_MSC_VER)
@@ -554,21 +544,28 @@ struct jsonsl_st {
     int can_insert;
     unsigned int levels_max;
 
-#ifndef JSONSL_NO_JPR
     size_t jpr_count;
     jsonsl_jpr_t *jprs;
 
     /* Root pointer for JPR matching information */
     size_t *jpr_root;
-#endif /* JSONSL_NO_JPR */
     /*@}*/
+
+#if defined(_MSC_VER)
+#pragma warning (push)
+#pragma warning (disable : 4200)
+#endif // defined(_MSC_VER)
 
     /**
      * This is the stack. Its upper bound is levels_max, or the
      * nlevels argument passed to jsonsl_new. If you modify this structure,
      * make sure that this member is last.
      */
-    struct jsonsl_state_st stack[1];
+    struct jsonsl_state_st stack[];
+
+#if defined(_MSC_VER)
+#pragma warning (pop)
+#endif // defined(_MSC_VER)
 };
 
 
@@ -577,7 +574,6 @@ struct jsonsl_st {
  *
  * @param nlevels maximum recursion depth
  */
-JSONSL_API
 jsonsl_t jsonsl_new(int nlevels);
 
 /**
@@ -587,7 +583,6 @@ jsonsl_t jsonsl_new(int nlevels);
  * @param bytes new data to be fed
  * @param nbytes size of new data
  */
-JSONSL_API
 void jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes);
 
 /**
@@ -597,7 +592,6 @@ void jsonsl_feed(jsonsl_t jsn, const jsonsl_char_t *bytes, size_t nbytes);
  *
  * @param jsn the lexer
  */
-JSONSL_API
 void jsonsl_reset(jsonsl_t jsn);
 
 /**
@@ -605,7 +599,6 @@ void jsonsl_reset(jsonsl_t jsn);
  *
  * @param jsn the lexer
  */
-JSONSL_API
 void jsonsl_destroy(jsonsl_t jsn);
 
 /**
@@ -675,20 +668,8 @@ void jsonsl_enable_all_callbacks(jsonsl_t jsn)
  * of the error or type, respectively. They will never
  * return NULL
  */
-JSONSL_API
 const char* jsonsl_strerror(jsonsl_error_t err);
-JSONSL_API
 const char* jsonsl_strtype(jsonsl_type_t jt);
-
-/**
- * Dumps global metrics to the screen. This is a noop unless
- * jsonsl was compiled with JSONSL_USE_METRICS
- */
-JSONSL_API
-void jsonsl_dump_global_metrics(void);
-
-/* This macro just here for editors to do code folding */
-#ifndef JSONSL_NO_JPR
 
 /**
  * @name JSON Pointer API
@@ -803,13 +784,11 @@ struct jsonsl_jpr_st {
  *
  * @return a new jsonsl_jpr_t object, or NULL on error.
  */
-JSONSL_API
 jsonsl_jpr_t jsonsl_jpr_new(const char *path, jsonsl_error_t *errp);
 
 /**
  * Destroy a JPR object
  */
-JSONSL_API
 void jsonsl_jpr_destroy(jsonsl_jpr_t jpr);
 
 /**
@@ -830,7 +809,6 @@ void jsonsl_jpr_destroy(jsonsl_jpr_t jpr);
  * @return a status constant. This indicates whether a match was excluded, possible,
  * or successful.
  */
-JSONSL_API
 jsonsl_jpr_match_t jsonsl_jpr_match(jsonsl_jpr_t jpr,
                                     unsigned int parent_type,
                                     unsigned int parent_level,
@@ -861,7 +839,6 @@ jsonsl_jpr_match_t jsonsl_jpr_match(jsonsl_jpr_t jpr,
  * Since this function also checks the state of the child, it should only
  * be called on PUSH callbacks, and not POP callbacks
  */
-JSONSL_API
 jsonsl_jpr_match_t
 jsonsl_path_match(jsonsl_jpr_t jpr,
                   const struct jsonsl_state_st *parent,
@@ -885,7 +862,6 @@ jsonsl_path_match(jsonsl_jpr_t jpr,
  * @param jprs An array of jsonsl_jpr_t objects
  * @param njprs How many elements in the jprs array.
  */
-JSONSL_API
 void jsonsl_jpr_match_state_init(jsonsl_t jsn,
                                  jsonsl_jpr_t *jprs,
                                  size_t njprs);
@@ -910,7 +886,6 @@ void jsonsl_jpr_match_state_init(jsonsl_t jsn,
  * does not mean matching has failed, it can still be part of the match: check
  * the out parameter).
  */
-JSONSL_API
 jsonsl_jpr_t jsonsl_jpr_match_state(jsonsl_t jsn,
                                     struct jsonsl_state_st *state,
                                     const char *key,
@@ -923,13 +898,11 @@ jsonsl_jpr_t jsonsl_jpr_match_state(jsonsl_t jsn,
  * match_state_init() and match_state()
  * @param jsn The lexer
  */
-JSONSL_API
 void jsonsl_jpr_match_state_cleanup(jsonsl_t jsn);
 
 /**
  * Return a string representation of the match result returned by match()
  */
-JSONSL_API
 const char *jsonsl_strmatchtype(jsonsl_jpr_match_t match);
 
 /* @}*/
@@ -982,7 +955,6 @@ const char *jsonsl_strmatchtype(jsonsl_jpr_match_t match);
  * (i.e. \uXXXX) will occupy six bytes in the source, but at the most
  * two bytes when escaped.
  */
-JSONSL_API
 size_t jsonsl_util_unescape_ex(const char *in,
                                char *out,
                                size_t len,
@@ -996,8 +968,6 @@ size_t jsonsl_util_unescape_ex(const char *in,
  */
 #define jsonsl_util_unescape(in, out, len, toEscape, err) \
     jsonsl_util_unescape_ex(in, out, len, toEscape, NULL, err, NULL)
-
-#endif /* JSONSL_NO_JPR */
 
 #ifdef __cplusplus
 }

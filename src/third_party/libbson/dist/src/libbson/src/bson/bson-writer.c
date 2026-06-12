@@ -15,8 +15,9 @@
  */
 
 
-#include <bson/bson-private.h>
 #include <bson/bson-writer.h>
+
+#include <bson/bson_t-private.h>
 
 
 struct _bson_writer_t {
@@ -58,15 +59,15 @@ struct _bson_writer_t {
  */
 
 bson_writer_t *
-bson_writer_new (uint8_t **buf,                  /* IN */
-                 size_t *buflen,                 /* IN */
-                 size_t offset,                  /* IN */
-                 bson_realloc_func realloc_func, /* IN */
-                 void *realloc_func_ctx)         /* IN */
+bson_writer_new(uint8_t **buf,                  /* IN */
+                size_t *buflen,                 /* IN */
+                size_t offset,                  /* IN */
+                bson_realloc_func realloc_func, /* IN */
+                void *realloc_func_ctx)         /* IN */
 {
    bson_writer_t *writer;
 
-   writer = BSON_ALIGNED_ALLOC0 (bson_writer_t);
+   writer = BSON_ALIGNED_ALLOC0(bson_writer_t);
    writer->buf = buf;
    writer->buflen = buflen;
    writer->offset = offset;
@@ -97,9 +98,9 @@ bson_writer_new (uint8_t **buf,                  /* IN */
  */
 
 void
-bson_writer_destroy (bson_writer_t *writer) /* IN */
+bson_writer_destroy(bson_writer_t *writer) /* IN */
 {
-   bson_free (writer);
+   bson_free(writer);
 }
 
 
@@ -126,7 +127,7 @@ bson_writer_destroy (bson_writer_t *writer) /* IN */
  */
 
 size_t
-bson_writer_get_length (bson_writer_t *writer) /* IN */
+bson_writer_get_length(bson_writer_t *writer) /* IN */
 {
    return writer->offset + writer->b.len;
 }
@@ -156,35 +157,35 @@ bson_writer_get_length (bson_writer_t *writer) /* IN */
  */
 
 bool
-bson_writer_begin (bson_writer_t *writer, /* IN */
-                   bson_t **bson)         /* OUT */
+bson_writer_begin(bson_writer_t *writer, /* IN */
+                  bson_t **bson)         /* OUT */
 {
    bson_impl_alloc_t *b;
    bool grown = false;
 
-   BSON_ASSERT (writer);
-   BSON_ASSERT (writer->ready);
-   BSON_ASSERT (bson);
+   BSON_ASSERT(writer);
+   BSON_ASSERT(writer->ready);
+   BSON_ASSERT(bson);
 
    writer->ready = false;
 
-   memset (&writer->b, 0, sizeof (bson_t));
+   memset(&writer->b, 0, sizeof(bson_t));
 
-   b = (bson_impl_alloc_t *) &writer->b;
-   b->flags = BSON_FLAG_STATIC | BSON_FLAG_NO_FREE;
+   b = (bson_impl_alloc_t *)&writer->b;
+   b->flags = BSON_FLAG_NO_FREE_OBJECT | BSON_FLAG_NO_FREE_DATA;
    b->len = 5;
    b->parent = NULL;
-   b->buf = writer->buf;
-   b->buflen = writer->buflen;
+   b->indirect_buffer = writer->buf;
+   b->indirect_buflen = writer->buflen;
    b->offset = writer->offset;
-   b->alloc = NULL;
-   b->alloclen = 0;
+   b->own_buffer = NULL;
+   b->own_buflen = 0;
    b->realloc = writer->realloc_func;
    b->realloc_func_ctx = writer->realloc_func_ctx;
 
    while ((writer->offset + writer->b.len) > *writer->buflen) {
       if (!writer->realloc_func) {
-         memset (&writer->b, 0, sizeof (bson_t));
+         memset(&writer->b, 0, sizeof(bson_t));
          writer->ready = true;
          return false;
       }
@@ -198,10 +199,10 @@ bson_writer_begin (bson_writer_t *writer, /* IN */
    }
 
    if (grown) {
-      *writer->buf = writer->realloc_func (*writer->buf, *writer->buflen, writer->realloc_func_ctx);
+      *writer->buf = writer->realloc_func(*writer->buf, *writer->buflen, writer->realloc_func_ctx);
    }
 
-   memset ((*writer->buf) + writer->offset + 1, 0, 5);
+   memset((*writer->buf) + writer->offset + 1, 0, 5);
    (*writer->buf)[writer->offset] = 5;
 
    *bson = &writer->b;
@@ -227,13 +228,13 @@ bson_writer_begin (bson_writer_t *writer, /* IN */
  */
 
 void
-bson_writer_end (bson_writer_t *writer) /* IN */
+bson_writer_end(bson_writer_t *writer) /* IN */
 {
-   BSON_ASSERT (writer);
-   BSON_ASSERT (!writer->ready);
+   BSON_ASSERT(writer);
+   BSON_ASSERT(!writer->ready);
 
    writer->offset += writer->b.len;
-   memset (&writer->b, 0, sizeof (bson_t));
+   memset(&writer->b, 0, sizeof(bson_t));
    writer->ready = true;
 }
 
@@ -258,12 +259,12 @@ bson_writer_end (bson_writer_t *writer) /* IN */
  */
 
 void
-bson_writer_rollback (bson_writer_t *writer) /* IN */
+bson_writer_rollback(bson_writer_t *writer) /* IN */
 {
-   BSON_ASSERT (writer);
+   BSON_ASSERT(writer);
 
    if (writer->b.len) {
-      memset (&writer->b, 0, sizeof (bson_t));
+      memset(&writer->b, 0, sizeof(bson_t));
    }
 
    writer->ready = true;

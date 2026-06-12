@@ -15,70 +15,18 @@
  */
 
 
-#include <string.h>
-
-#include <bson/bson-memory.h>
-#include <bson/bson-string.h>
 #include <bson/bson-utf8.h>
 
+#include <common-json-private.h>
+#include <common-macros-private.h>
+#include <common-string-private.h>
+#include <common-utf8-private.h>
 
-/*
- *--------------------------------------------------------------------------
- *
- * _bson_utf8_get_sequence --
- *
- *       Determine the sequence length of the first UTF-8 character in
- *       @utf8. The sequence length is stored in @seq_length and the mask
- *       for the first character is stored in @first_mask.
- *
- * Returns:
- *       None.
- *
- * Side effects:
- *       @seq_length is set.
- *       @first_mask is set.
- *
- *--------------------------------------------------------------------------
- */
+#include <bson/memory.h>
 
-static BSON_INLINE void
-_bson_utf8_get_sequence (const char *utf8,    /* IN */
-                         uint8_t *seq_length, /* OUT */
-                         uint8_t *first_mask) /* OUT */
-{
-   unsigned char c = *(const unsigned char *) utf8;
-   uint8_t m;
-   uint8_t n;
+#include <mlib/cmp.h>
 
-   /*
-    * See the following[1] for a description of what the given multi-byte
-    * sequences will be based on the bits set of the first byte. We also need
-    * to mask the first byte based on that.  All subsequent bytes are masked
-    * against 0x3F.
-    *
-    * [1] http://www.joelonsoftware.com/articles/Unicode.html
-    */
-
-   if ((c & 0x80) == 0) {
-      n = 1;
-      m = 0x7F;
-   } else if ((c & 0xE0) == 0xC0) {
-      n = 2;
-      m = 0x1F;
-   } else if ((c & 0xF0) == 0xE0) {
-      n = 3;
-      m = 0x0F;
-   } else if ((c & 0xF8) == 0xF0) {
-      n = 4;
-      m = 0x07;
-   } else {
-      n = 0;
-      m = 0;
-   }
-
-   *seq_length = n;
-   *first_mask = m;
-}
+#include <string.h>
 
 
 /*
@@ -96,10 +44,14 @@ _bson_utf8_get_sequence (const char *utf8,    /* IN */
  *       However, some languages such as Python can send UTF-8 encoded
  *       strings with NUL's in them.
  *
+ *       Note that the two-byte sequence "C0 80" is also interpreted as an
+ *       internal NUL, for historical reasons. This sequence is considered
+ *       invalid according to RFC3629.
+ *
  * Parameters:
  *       @utf8: A UTF-8 encoded string.
  *       @utf8_len: The length of @utf8 in bytes.
- *       @allow_null: If \0 is allowed within @utf8, excluding trailing \0.
+ *       @allow_null: If the single "00" byte or two-byte sequence "C0 80" are allowed internally within @utf8.
  *
  * Returns:
  *       true if @utf8 is valid UTF-8. otherwise false.
@@ -111,9 +63,9 @@ _bson_utf8_get_sequence (const char *utf8,    /* IN */
  */
 
 bool
-bson_utf8_validate (const char *utf8, /* IN */
-                    size_t utf8_len,  /* IN */
-                    bool allow_null)  /* IN */
+bson_utf8_validate(const char *utf8, /* IN */
+                   size_t utf8_len,  /* IN */
+                   bool allow_null)  /* IN */
 {
    bson_unichar_t c;
    uint8_t first_mask;
@@ -121,10 +73,10 @@ bson_utf8_validate (const char *utf8, /* IN */
    size_t i;
    size_t j;
 
-   BSON_ASSERT (utf8);
+   BSON_ASSERT(utf8);
 
    for (i = 0; i < utf8_len; i += seq_length) {
-      _bson_utf8_get_sequence (&utf8[i], &seq_length, &first_mask);
+      mcommon_utf8_get_sequence(&utf8[i], &seq_length, &first_mask);
 
       /*
        * Ensure we have a valid multi-byte sequence length.
@@ -244,6 +196,10 @@ bson_utf8_validate (const char *utf8, /* IN */
  *       byte is found before @utf8_len bytes, it will be converted to the
  *       two byte UTF-8 sequence.
  *
+ *       The two-byte sequence "C0 80" is also interpreted as an internal NUL,
+ *       for historical reasons. This sequence is considered invalid according
+ *       to RFC3629.
+ *
  * Parameters:
  *       @utf8: A UTF-8 encoded string.
  *       @utf8_len: The length of @utf8 in bytes or -1 if NUL terminated.
@@ -258,89 +214,46 @@ bson_utf8_validate (const char *utf8, /* IN */
  */
 
 char *
-bson_utf8_escape_for_json (const char *utf8, /* IN */
-                           ssize_t utf8_len) /* IN */
+bson_utf8_escape_for_json(const char *utf8, /* IN */
+                          ssize_t utf8_len) /* IN */
 {
-   bson_unichar_t c;
-   bson_string_t *str;
-   bool length_provided = true;
-   const char *end;
-
-   BSON_ASSERT (utf8);
-
-   str = bson_string_new (NULL);
+   uint32_t len32;
+   bool allow_nul;
 
    if (utf8_len < 0) {
-      length_provided = false;
-      utf8_len = strlen (utf8);
-   }
-
-   end = utf8 + utf8_len;
-
-   while (utf8 < end) {
-      uint8_t mask;
-      uint8_t length_of_char;
-
-      // Check if expected char length goes past end
-      _bson_utf8_get_sequence (utf8, &length_of_char, &mask);
-      if (utf8 > end - length_of_char) {
-         goto invalid_utf8;
-      }
-
-      c = bson_utf8_get_char (utf8);
-
-      switch (c) {
-      case '\\':
-      case '"':
-         bson_string_append_c (str, '\\');
-         bson_string_append_unichar (str, c);
-         break;
-      case '\b':
-         bson_string_append (str, "\\b");
-         break;
-      case '\f':
-         bson_string_append (str, "\\f");
-         break;
-      case '\n':
-         bson_string_append (str, "\\n");
-         break;
-      case '\r':
-         bson_string_append (str, "\\r");
-         break;
-      case '\t':
-         bson_string_append (str, "\\t");
-         break;
-      default:
-         if (c < ' ') {
-            bson_string_append_printf (str, "\\u%04x", (unsigned) c);
-         } else {
-            bson_string_append_unichar (str, c);
-         }
-         break;
-      }
-
-      if (c) {
-         utf8 = bson_utf8_next_char (utf8);
+      size_t sizet_len = strlen(utf8);
+      if (sizet_len < UINT32_MAX) {
+         len32 = (uint32_t)sizet_len;
+         allow_nul = false;
       } else {
-         if (length_provided) {
-            // Check if current character is null character,
-            // if so skip past it as we've already added '\\u0000' above
-            if (*utf8 == '\0' || (*utf8 == '\xc0' && *(utf8 + 1) == '\x80')) {
-               utf8 += (*utf8 == '\0') ? 1 : 2;
-            } else {
-               goto invalid_utf8;
-            }
-         } else {
-            goto invalid_utf8;
-         }
+         return NULL;
+      }
+   } else {
+      if (mlib_in_range(uint32_t, utf8_len) && (uint32_t)utf8_len < UINT32_MAX) {
+         len32 = utf8_len;
+         allow_nul = true;
+      } else {
+         return NULL;
       }
    }
 
-   return bson_string_free (str, false);
+   /* The new private implementation of mcommon_json_append_escaped() avoids
+    * parsing UTF-8 sequences at all in most cases. It preserves the validity
+    * of valid sequences, but it will not catch most UTF-8 errors. For compatibility
+    * at the expense of performance, we emulate the old behavior in this wrapper.
+    */
+   if (!bson_utf8_validate(utf8, (size_t)len32, allow_nul)) {
+      return NULL;
+   }
 
-invalid_utf8:
-   bson_string_free (str, true);
-   return NULL;
+   mcommon_string_append_t append;
+   mcommon_string_new_with_capacity_as_append(&append, len32);
+   if (mcommon_json_append_escaped(&append, utf8, len32, allow_nul)) {
+      return mcommon_string_from_append_destroy_with_steal(&append);
+   } else {
+      mcommon_string_from_append_destroy(&append);
+      return NULL;
+   }
 }
 
 
@@ -364,16 +277,16 @@ invalid_utf8:
  */
 
 bson_unichar_t
-bson_utf8_get_char (const char *utf8) /* IN */
+bson_utf8_get_char(const char *utf8) /* IN */
 {
    bson_unichar_t c;
    uint8_t mask;
    uint8_t num;
    int i;
 
-   BSON_ASSERT (utf8);
+   BSON_ASSERT(utf8);
 
-   _bson_utf8_get_sequence (utf8, &num, &mask);
+   mcommon_utf8_get_sequence(utf8, &num, &mask);
    c = (*utf8) & mask;
 
    for (i = 1; i < num; i++) {
@@ -405,14 +318,14 @@ bson_utf8_get_char (const char *utf8) /* IN */
  */
 
 const char *
-bson_utf8_next_char (const char *utf8) /* IN */
+bson_utf8_next_char(const char *utf8) /* IN */
 {
    uint8_t mask;
    uint8_t num;
 
-   BSON_ASSERT (utf8);
+   BSON_ASSERT(utf8);
 
-   _bson_utf8_get_sequence (utf8, &num, &mask);
+   mcommon_utf8_get_sequence(utf8, &num, &mask);
 
    return utf8 + num;
 }
@@ -442,32 +355,10 @@ bson_utf8_next_char (const char *utf8) /* IN */
  */
 
 void
-bson_utf8_from_unichar (bson_unichar_t unichar,                      /* IN */
-                        char utf8[BSON_ENSURE_ARRAY_PARAM_SIZE (6)], /* OUT */
-                        uint32_t *len)                               /* OUT */
+bson_utf8_from_unichar(bson_unichar_t unichar,                     /* IN */
+                       char utf8[BSON_ENSURE_ARRAY_PARAM_SIZE(6)], /* OUT */
+                       uint32_t *len)                              /* OUT */
 {
-   BSON_ASSERT (utf8);
-   BSON_ASSERT (len);
-
-   if (unichar <= 0x7F) {
-      utf8[0] = unichar;
-      *len = 1;
-   } else if (unichar <= 0x7FF) {
-      *len = 2;
-      utf8[0] = 0xC0 | ((unichar >> 6) & 0x3F);
-      utf8[1] = 0x80 | ((unichar) & 0x3F);
-   } else if (unichar <= 0xFFFF) {
-      *len = 3;
-      utf8[0] = 0xE0 | ((unichar >> 12) & 0xF);
-      utf8[1] = 0x80 | ((unichar >> 6) & 0x3F);
-      utf8[2] = 0x80 | ((unichar) & 0x3F);
-   } else if (unichar <= 0x1FFFFF) {
-      *len = 4;
-      utf8[0] = 0xF0 | ((unichar >> 18) & 0x7);
-      utf8[1] = 0x80 | ((unichar >> 12) & 0x3F);
-      utf8[2] = 0x80 | ((unichar >> 6) & 0x3F);
-      utf8[3] = 0x80 | ((unichar) & 0x3F);
-   } else {
-      *len = 0;
-   }
+   // Inlined implementation from common-utf8-private
+   mcommon_utf8_from_unichar(unichar, utf8, len);
 }

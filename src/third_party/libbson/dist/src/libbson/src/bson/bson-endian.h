@@ -20,9 +20,9 @@
 #ifndef BSON_ENDIAN_H
 #define BSON_ENDIAN_H
 
-#include <bson/bson-config.h>
-#include <bson/bson-macros.h>
-#include <bson/bson-compat.h>
+#include <bson/compat.h>
+#include <bson/config.h>
+#include <bson/macros.h>
 
 
 BSON_BEGIN_DECLS
@@ -34,70 +34,74 @@ BSON_BEGIN_DECLS
 #if defined(__clang__) && defined(__clang_major__) && defined(__clang_minor__) && (__clang_major__ >= 3) && \
    (__clang_minor__ >= 1)
 #if __has_builtin(__builtin_bswap16)
-#define BSON_UINT16_SWAP_LE_BE(v) __builtin_bswap16 (v)
+#define BSON_UINT16_SWAP_LE_BE(v) __builtin_bswap16(v)
 #endif
 #if __has_builtin(__builtin_bswap32)
-#define BSON_UINT32_SWAP_LE_BE(v) __builtin_bswap32 (v)
+#define BSON_UINT32_SWAP_LE_BE(v) __builtin_bswap32(v)
 #endif
 #if __has_builtin(__builtin_bswap64)
-#define BSON_UINT64_SWAP_LE_BE(v) __builtin_bswap64 (v)
+#define BSON_UINT64_SWAP_LE_BE(v) __builtin_bswap64(v)
 #endif
 #elif defined(__GNUC__) && (__GNUC__ >= 4)
 #if __GNUC__ > 4 || (defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 3)
-#define BSON_UINT32_SWAP_LE_BE(v) __builtin_bswap32 ((uint32_t) v)
-#define BSON_UINT64_SWAP_LE_BE(v) __builtin_bswap64 ((uint64_t) v)
+#define BSON_UINT32_SWAP_LE_BE(v) __builtin_bswap32((uint32_t)v)
+#define BSON_UINT64_SWAP_LE_BE(v) __builtin_bswap64((uint64_t)v)
 #endif
 #if __GNUC__ > 4 || (defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 8)
-#define BSON_UINT16_SWAP_LE_BE(v) __builtin_bswap16 ((uint32_t) v)
+#define BSON_UINT16_SWAP_LE_BE(v) __builtin_bswap16((uint32_t)v)
 #endif
 #endif
 
 
 #ifndef BSON_UINT16_SWAP_LE_BE
-#define BSON_UINT16_SWAP_LE_BE(v) __bson_uint16_swap_slow ((uint16_t) v)
+#define BSON_UINT16_SWAP_LE_BE(v) __bson_uint16_swap_slow((uint16_t)v)
 #endif
 
 
 #ifndef BSON_UINT32_SWAP_LE_BE
-#define BSON_UINT32_SWAP_LE_BE(v) __bson_uint32_swap_slow ((uint32_t) v)
+#define BSON_UINT32_SWAP_LE_BE(v) __bson_uint32_swap_slow((uint32_t)v)
 #endif
 
 
 #ifndef BSON_UINT64_SWAP_LE_BE
-#define BSON_UINT64_SWAP_LE_BE(v) __bson_uint64_swap_slow ((uint64_t) v)
+#define BSON_UINT64_SWAP_LE_BE(v) __bson_uint64_swap_slow((uint64_t)v)
 #endif
 
 
 #if BSON_BYTE_ORDER == BSON_LITTLE_ENDIAN
-#define BSON_UINT16_FROM_LE(v) ((uint16_t) v)
-#define BSON_UINT16_TO_LE(v) ((uint16_t) v)
-#define BSON_UINT16_FROM_BE(v) BSON_UINT16_SWAP_LE_BE (v)
-#define BSON_UINT16_TO_BE(v) BSON_UINT16_SWAP_LE_BE (v)
-#define BSON_UINT32_FROM_LE(v) ((uint32_t) v)
-#define BSON_UINT32_TO_LE(v) ((uint32_t) v)
-#define BSON_UINT32_FROM_BE(v) BSON_UINT32_SWAP_LE_BE (v)
-#define BSON_UINT32_TO_BE(v) BSON_UINT32_SWAP_LE_BE (v)
-#define BSON_UINT64_FROM_LE(v) ((uint64_t) v)
-#define BSON_UINT64_TO_LE(v) ((uint64_t) v)
-#define BSON_UINT64_FROM_BE(v) BSON_UINT64_SWAP_LE_BE (v)
-#define BSON_UINT64_TO_BE(v) BSON_UINT64_SWAP_LE_BE (v)
-#define BSON_DOUBLE_FROM_LE(v) ((double) v)
-#define BSON_DOUBLE_TO_LE(v) ((double) v)
+#define BSON_UINT16_FROM_LE(v) ((uint16_t)v)
+#define BSON_UINT16_TO_LE(v) ((uint16_t)v)
+#define BSON_UINT16_FROM_BE(v) BSON_UINT16_SWAP_LE_BE(v)
+#define BSON_UINT16_TO_BE(v) BSON_UINT16_SWAP_LE_BE(v)
+#define BSON_UINT32_FROM_LE(v) ((uint32_t)v)
+#define BSON_UINT32_TO_LE(v) ((uint32_t)v)
+#define BSON_UINT32_FROM_BE(v) BSON_UINT32_SWAP_LE_BE(v)
+#define BSON_UINT32_TO_BE(v) BSON_UINT32_SWAP_LE_BE(v)
+#define BSON_UINT64_FROM_LE(v) ((uint64_t)v)
+#define BSON_UINT64_TO_LE(v) ((uint64_t)v)
+#define BSON_UINT64_FROM_BE(v) BSON_UINT64_SWAP_LE_BE(v)
+#define BSON_UINT64_TO_BE(v) BSON_UINT64_SWAP_LE_BE(v)
+#define BSON_DOUBLE_FROM_LE(v) ((double)v)
+#define BSON_DOUBLE_TO_LE(v) ((double)v)
+#define BSON_FLOAT_FROM_LE(v) ((float)v)
+#define BSON_FLOAT_TO_LE(v) ((float)v)
 #elif BSON_BYTE_ORDER == BSON_BIG_ENDIAN
-#define BSON_UINT16_FROM_LE(v) BSON_UINT16_SWAP_LE_BE (v)
-#define BSON_UINT16_TO_LE(v) BSON_UINT16_SWAP_LE_BE (v)
-#define BSON_UINT16_FROM_BE(v) ((uint16_t) v)
-#define BSON_UINT16_TO_BE(v) ((uint16_t) v)
-#define BSON_UINT32_FROM_LE(v) BSON_UINT32_SWAP_LE_BE (v)
-#define BSON_UINT32_TO_LE(v) BSON_UINT32_SWAP_LE_BE (v)
-#define BSON_UINT32_FROM_BE(v) ((uint32_t) v)
-#define BSON_UINT32_TO_BE(v) ((uint32_t) v)
-#define BSON_UINT64_FROM_LE(v) BSON_UINT64_SWAP_LE_BE (v)
-#define BSON_UINT64_TO_LE(v) BSON_UINT64_SWAP_LE_BE (v)
-#define BSON_UINT64_FROM_BE(v) ((uint64_t) v)
-#define BSON_UINT64_TO_BE(v) ((uint64_t) v)
-#define BSON_DOUBLE_FROM_LE(v) (__bson_double_swap_slow (v))
-#define BSON_DOUBLE_TO_LE(v) (__bson_double_swap_slow (v))
+#define BSON_UINT16_FROM_LE(v) BSON_UINT16_SWAP_LE_BE(v)
+#define BSON_UINT16_TO_LE(v) BSON_UINT16_SWAP_LE_BE(v)
+#define BSON_UINT16_FROM_BE(v) ((uint16_t)v)
+#define BSON_UINT16_TO_BE(v) ((uint16_t)v)
+#define BSON_UINT32_FROM_LE(v) BSON_UINT32_SWAP_LE_BE(v)
+#define BSON_UINT32_TO_LE(v) BSON_UINT32_SWAP_LE_BE(v)
+#define BSON_UINT32_FROM_BE(v) ((uint32_t)v)
+#define BSON_UINT32_TO_BE(v) ((uint32_t)v)
+#define BSON_UINT64_FROM_LE(v) BSON_UINT64_SWAP_LE_BE(v)
+#define BSON_UINT64_TO_LE(v) BSON_UINT64_SWAP_LE_BE(v)
+#define BSON_UINT64_FROM_BE(v) ((uint64_t)v)
+#define BSON_UINT64_TO_BE(v) ((uint64_t)v)
+#define BSON_DOUBLE_FROM_LE(v) (__bson_double_swap_slow(v))
+#define BSON_DOUBLE_TO_LE(v) (__bson_double_swap_slow(v))
+#define BSON_FLOAT_FROM_LE(v) (__bson_float_swap_slow(v))
+#define BSON_FLOAT_TO_LE(v) (__bson_float_swap_slow(v))
 #else
 #error "The endianness of target architecture is unknown."
 #endif
@@ -120,9 +124,9 @@ BSON_BEGIN_DECLS
  */
 
 static BSON_INLINE uint16_t
-__bson_uint16_swap_slow (uint16_t v) /* IN */
+__bson_uint16_swap_slow(uint16_t v) /* IN */
 {
-   return (uint16_t) ((v & 0x00FF) << 8) | (uint16_t) ((v & 0xFF00) >> 8);
+   return (uint16_t)((v & 0x00FF) << 8) | (uint16_t)((v & 0xFF00) >> 8);
 }
 
 
@@ -143,7 +147,7 @@ __bson_uint16_swap_slow (uint16_t v) /* IN */
  */
 
 static BSON_INLINE uint32_t
-__bson_uint32_swap_slow (uint32_t v) /* IN */
+__bson_uint32_swap_slow(uint32_t v) /* IN */
 {
    return ((v & 0x000000FFU) << 24) | ((v & 0x0000FF00U) << 8) | ((v & 0x00FF0000U) >> 8) | ((v & 0xFF000000U) >> 24);
 }
@@ -166,7 +170,7 @@ __bson_uint32_swap_slow (uint32_t v) /* IN */
  */
 
 static BSON_INLINE uint64_t
-__bson_uint64_swap_slow (uint64_t v) /* IN */
+__bson_uint64_swap_slow(uint64_t v) /* IN */
 {
    return ((v & 0x00000000000000FFULL) << 56) | ((v & 0x000000000000FF00ULL) << 40) |
           ((v & 0x0000000000FF0000ULL) << 24) | ((v & 0x00000000FF000000ULL) << 8) |
@@ -191,16 +195,47 @@ __bson_uint64_swap_slow (uint64_t v) /* IN */
  *--------------------------------------------------------------------------
  */
 
-BSON_STATIC_ASSERT2 (sizeof_uint64_t, sizeof (double) == sizeof (uint64_t));
+BSON_STATIC_ASSERT2(sizeof_uint64_t, sizeof(double) == sizeof(uint64_t));
 
 static BSON_INLINE double
-__bson_double_swap_slow (double v) /* IN */
+__bson_double_swap_slow(double v) /* IN */
 {
    uint64_t uv;
 
-   memcpy (&uv, &v, sizeof (v));
-   uv = BSON_UINT64_SWAP_LE_BE (uv);
-   memcpy (&v, &uv, sizeof (v));
+   memcpy(&uv, &v, sizeof(v));
+   uv = BSON_UINT64_SWAP_LE_BE(uv);
+   memcpy(&v, &uv, sizeof(v));
+
+   return v;
+}
+
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * __bson_float_swap_slow --
+ *
+ *       Fallback endianness conversion for single floating point.
+ *
+ * Returns:
+ *       The endian swapped version.
+ *
+ * Side effects:
+ *       None.
+ *
+ *--------------------------------------------------------------------------
+ */
+
+BSON_STATIC_ASSERT2(sizeof_uint32_t, sizeof(float) == sizeof(uint32_t));
+
+static BSON_INLINE float
+__bson_float_swap_slow(float v) /* IN */
+{
+   uint32_t uv;
+
+   memcpy(&uv, &v, sizeof(v));
+   uv = BSON_UINT32_SWAP_LE_BE(uv);
+   memcpy(&v, &uv, sizeof(v));
 
    return v;
 }

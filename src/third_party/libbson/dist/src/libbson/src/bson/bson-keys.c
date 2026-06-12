@@ -15,11 +15,13 @@
  */
 
 
-#include <stdio.h>
-
 #include <bson/bson-keys.h>
-#include <bson/bson-string.h>
-#include <bson/bson-cmp.h>
+
+#include <common-string-private.h>
+
+#include <mlib/cmp.h>
+
+#include <stdio.h>
 
 
 static const char *gUint32Strs[] = {
@@ -123,10 +125,10 @@ static const char *gUint32Strs[] = {
  */
 
 size_t
-bson_uint32_to_string (uint32_t value,      /* IN */
-                       const char **strptr, /* OUT */
-                       char *str,           /* OUT */
-                       size_t size)         /* IN */
+bson_uint32_to_string(uint32_t value,      /* IN */
+                      const char **strptr, /* OUT */
+                      char *str,           /* OUT */
+                      size_t size)         /* IN */
 {
    if (value < 1000) {
       *strptr = gUint32Strs[value];
@@ -142,9 +144,9 @@ bson_uint32_to_string (uint32_t value,      /* IN */
 
    *strptr = str;
 
-   int ret = bson_snprintf (str, size, "%u", value);
+   int ret = bson_snprintf(str, size, "%u", value);
    // Truncation is OK.
-   BSON_ASSERT (ret > 0);
-   BSON_ASSERT (bson_in_range_size_t_signed (ret));
-   return (size_t) ret;
+   BSON_ASSERT(ret > 0);
+   BSON_ASSERT(mlib_in_range(size_t, ret));
+   return (size_t)ret;
 }

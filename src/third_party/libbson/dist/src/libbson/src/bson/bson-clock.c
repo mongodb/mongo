@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
-#include <bson/bson-config.h>
-#include <bson/bson-compat.h>
+#include <bson/compat.h>
+#include <bson/config.h>
+
+#include <mlib/duration.h>
+#include <mlib/time_point.h>
 
 
 #if defined(BSON_HAVE_CLOCK_GETTIME)
-#include <time.h>
 #include <sys/time.h>
+
+#include <time.h>
 #endif
 
 #include <bson/bson-clock.h>
@@ -42,7 +46,7 @@
  */
 
 int
-bson_gettimeofday (struct timeval *tv) /* OUT */
+bson_gettimeofday(struct timeval *tv) /* OUT */
 {
 #if defined(_WIN32)
 #if defined(_MSC_VER)
@@ -64,7 +68,7 @@ bson_gettimeofday (struct timeval *tv) /* OUT */
     */
 
    if (tv) {
-      GetSystemTimeAsFileTime (&ft);
+      GetSystemTimeAsFileTime(&ft);
 
       /* pull out of the filetime into a 64 bit uint */
       tmp |= ft.dwHighDateTime;
@@ -77,13 +81,13 @@ bson_gettimeofday (struct timeval *tv) /* OUT */
       /* adjust to unix epoch */
       tmp -= DELTA_EPOCH_IN_MICROSEC;
 
-      tv->tv_sec = (long) (tmp / 1000000UL);
-      tv->tv_usec = (long) (tmp % 1000000UL);
+      tv->tv_sec = (long)(tmp / 1000000UL);
+      tv->tv_usec = (long)(tmp % 1000000UL);
    }
 
    return 0;
 #else
-   return gettimeofday (tv, NULL);
+   return gettimeofday(tv, NULL);
 #endif
 }
 
@@ -107,26 +111,8 @@ bson_gettimeofday (struct timeval *tv) /* OUT */
  */
 
 int64_t
-bson_get_monotonic_time (void)
+bson_get_monotonic_time(void)
 {
-#if defined(BSON_HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-   struct timespec ts;
-   /* ts.tv_sec may be a four-byte integer on 32 bit machines, so cast to
-    * int64_t to avoid truncation. */
-   clock_gettime (CLOCK_MONOTONIC, &ts);
-   return (((int64_t) ts.tv_sec * 1000000) + (ts.tv_nsec / 1000));
-#elif defined(_WIN32)
-   /* Despite it's name, this is in milliseconds! */
-   int64_t ticks = GetTickCount64 ();
-   return (ticks * 1000);
-#elif defined(__hpux__)
-   int64_t nanosec = gethrtime ();
-   return (nanosec / 1000UL);
-#else
-#pragma message "Monotonic clock is not yet supported on your platform."
-   struct timeval tv;
-
-   bson_gettimeofday (&tv);
-   return ((int64_t) tv.tv_sec * 1000000) + tv.tv_usec;
-#endif
+   mlib_time_point now = mlib_now();
+   return mlib_microseconds_count(now.time_since_monotonic_start);
 }

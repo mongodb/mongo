@@ -21,11 +21,11 @@
 #define BSON_DECIMAL128_H
 
 
-#include <string.h>
-
-#include <bson/bson-macros.h>
-#include <bson/bson-config.h>
 #include <bson/bson-types.h>
+#include <bson/config.h>
+#include <bson/macros.h>
+
+#include <string.h>
 
 
 /**
@@ -45,16 +45,16 @@
 
 BSON_BEGIN_DECLS
 
-BSON_EXPORT (void)
-bson_decimal128_to_string (const bson_decimal128_t *dec, char *str);
+BSON_EXPORT(void)
+bson_decimal128_to_string(const bson_decimal128_t *dec, char *str);
 
 
 /* Note: @string must be ASCII characters only! */
-BSON_EXPORT (bool)
-bson_decimal128_from_string (const char *string, bson_decimal128_t *dec);
+BSON_EXPORT(bool)
+bson_decimal128_from_string(const char *string, bson_decimal128_t *dec);
 
-BSON_EXPORT (bool)
-bson_decimal128_from_string_w_len (const char *string, int len, bson_decimal128_t *dec);
+BSON_EXPORT(bool)
+bson_decimal128_from_string_w_len(const char *string, int len, bson_decimal128_t *dec);
 
 BSON_END_DECLS
 

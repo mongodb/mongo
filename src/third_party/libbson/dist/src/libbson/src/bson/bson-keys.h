@@ -21,15 +21,15 @@
 #define BSON_KEYS_H
 
 
-#include <bson/bson-macros.h>
 #include <bson/bson-types.h>
+#include <bson/macros.h>
 
 
 BSON_BEGIN_DECLS
 
 
-BSON_EXPORT (size_t)
-bson_uint32_to_string (uint32_t value, const char **strptr, char *str, size_t size);
+BSON_EXPORT(size_t)
+bson_uint32_to_string(uint32_t value, const char **strptr, char *str, size_t size);
 
 
 BSON_END_DECLS

@@ -21,18 +21,18 @@
 #define BSON_CLOCK_H
 
 
-#include <bson/bson-compat.h>
-#include <bson/bson-macros.h>
 #include <bson/bson-types.h>
+#include <bson/compat.h>
+#include <bson/macros.h>
 
 
 BSON_BEGIN_DECLS
 
 
-BSON_EXPORT (int64_t)
-bson_get_monotonic_time (void);
-BSON_EXPORT (int)
-bson_gettimeofday (struct timeval *tv);
+BSON_EXPORT(int64_t)
+bson_get_monotonic_time(void);
+BSON_EXPORT(int)
+bson_gettimeofday(struct timeval *tv);
 
 
 BSON_END_DECLS

@@ -19,6 +19,7 @@
 #ifndef BSON_JSON_PRIVATE_H
 #define BSON_JSON_PRIVATE_H
 
+#include <bson/bson-json.h> // IWYU pragma: export
 
 struct _bson_json_opts_t {
    bson_json_mode_t mode;

@@ -1,0 +1,470 @@
+/**
+ * @file vec.th
+ * @brief Declare a new vector container data type
+ * @date 2024-10-02
+ *
+ * To use this file:
+ *
+ * - #define a type `T` immediately before including this file.
+ * - Optional: Define an identifier `VecName` to the name of the vector. If unset, declares `<T>_vec`
+ * - Optional: Define a `VecDestroyElement(Ptr)` macro to specify how the vector
+ *   should destroy the element at `*Ptr`. If unset, destroying is a no-op.
+ * - Optional: Define `VecInitElement(Ptr, ...)` which initializes a new element.
+ *   The first macro argument is a pointer to the element and subsequent arguments
+ *   are unspecified and reserved for future use. Elements are zero-initialized
+ *   before being passed to this macro.
+ * - Optional: Define `VecCopyElement(DstPtr, SrcPtr)` to copy data from `*SrcPtr`
+ *   to `*DstPtr`. The vector's copying function is only defined if this macro
+ *   is defined. This macro MUST evaluate to a boolean to indicate if the copy
+ *   operation succeeded. If a copy fails, then the partially copied elements
+ *   will be destroyed and the overall copy will fail.
+ *
+ *   To add a trival copying function, define `VecCopyElement` to
+ *   `VecTrivialCopyElement`.
+ *
+ * - NOTE: All of the above macros will be automatically undef'd after this file
+ *   is included.
+ *
+ * Types stored in the vector must be trivially relocatable.
+ *
+ * @copyright Copyright 2009-present MongoDB, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#include <mlib/ckdint.h>
+#include <mlib/config.h>
+#include <mlib/intutil.h>
+
+#include <assert.h>  // assert
+#include <stdbool.h> // bool
+#include <stddef.h>  // size_t
+#include <stdlib.h>  // calloc, realloc, free
+#include <string.h>  // memcpy, memset
+
+// Check that the caller provided a `T` macro to be the element type
+#ifndef T
+#if defined(__clangd__) || defined(__INTELLISENSE__)
+#define T int                                // Define a type for IDE diagnostics
+#define VecCopyElement VecTrivialCopyElement // For IDE highlighting
+#else
+#error A type `T` should be defined before including this file
+#endif
+#endif
+
+#ifndef VecName
+#define VecName MLIB_PASTE(T, _vec)
+#endif
+
+#ifndef VecDestroyElement
+#define VecDestroyElement(Ptr) ((void)(Ptr))
+#endif
+
+#ifndef VecInitElement
+#define VecInitElement(Ptr) ((void)(Ptr))
+#endif
+
+#ifndef VecTrivialCopyElement
+#define VecTrivialCopyElement(DstPtr, SrcPtr) ((*(DstPtr) = *(SrcPtr)), true)
+#endif
+
+#pragma push_macro("vec_inline_spec")
+#if !defined(vec_inline_spec)
+#define vec_inline_spec static inline
+#endif
+
+// The "fn" macro just adds a qualified name to the front of a function identifier
+#pragma push_macro("fn")
+#undef fn
+#define fn(M) MLIB_PASTE_3(VecName, _, M)
+
+typedef struct VecName {
+   /**
+    * @private
+    * @brief Pointer to the first vector element, or NULL if the vector is
+    * empty.
+    *
+    * @note DO NOT DIRECTLY MODIFY THIS VALUE
+    */
+   T *data;
+   /**
+    * @brief The number of elements in the vector.
+    *
+    * @note DO NOT DIRECTLY MODIFY THIS VALUE
+    */
+   size_t size;
+   /**
+    * @brief The number of allocated storage elements.
+    *
+    * @note DO NOT DIRECTLY MODIFY THIS VALUE
+    */
+   size_t capacity;
+
+#if mlib_is_cxx()
+   T *
+   begin() noexcept
+   {
+      return data;
+   }
+   T *
+   end() noexcept
+   {
+      return data ? data + size : data;
+   }
+#endif
+} VecName;
+
+mlib_extern_c_begin();
+
+/**
+ * @brief Obtain a pointer-to-mutable to the first element in the given vector
+ */
+vec_inline_spec T *
+fn(begin(VecName *v)) mlib_noexcept
+{
+   return v->data;
+}
+
+/**
+ * @brief Obtain a pointer-to-mutable past the last element in the given vector
+ */
+vec_inline_spec T *
+fn(end(VecName *v)) mlib_noexcept
+{
+   return v->data ? v->data + v->size : v->data;
+}
+
+/**
+ * @brief Obtain a pointer-to-const to the first element in the given vector
+ */
+vec_inline_spec T const *
+fn(cbegin(VecName const *v)) mlib_noexcept
+{
+   return v->data;
+}
+
+/**
+ * @brief Obtain a pointer-to-const past the last element in the given vector
+ */
+vec_inline_spec T const *
+fn(cend(VecName const *v)) mlib_noexcept
+{
+   return v->data ? v->data + v->size : v->data;
+}
+
+/**
+ * @brief Get the maximum number of elements that can be held in the vector of
+ * a certain type.
+ */
+vec_inline_spec size_t
+fn(max_size(void)) mlib_noexcept
+{
+   // We compare against (signed) PTRDIFF_MAX because want to support the difference
+   // between two pointers. If we use the unsigned size, then we could have vectors
+   // with size that is too large to represent the difference between two sizes.
+   return PTRDIFF_MAX / sizeof(T);
+}
+
+/**
+ * @brief Set the capacity of the given vector.
+ *
+ * @param self The vector object to be modified
+ * @param count The new capacity. If this is less than the current size, then
+ * the capacity will be capped at the size instead
+ *
+ * @retval true If-and-only-if the reallocation was successful
+ * @retval false If there was an error in allocating the buffer
+ */
+vec_inline_spec bool
+fn(reserve(VecName *const self, size_t count)) mlib_noexcept
+{
+   // Check if this value is beyond the possible capacity of the vector
+   if (count > fn(max_size())) {
+      // Too many elements. We cannot allocate a region this large.
+      return false;
+   }
+   // Check if we are already at the requested capacity.
+   if (count == self->capacity) {
+      // No reallocation needed.
+      return true;
+   }
+   // Check if the caller is requesting a lower capacity than our current size
+   if (count < self->size) {
+      // We cannot shrink the capacity below the current size, so just shrink-to-fit
+      count = self->size;
+   }
+   // Impossible: We will never shrink below `self.size`, and if
+   // `self.size == 0` and `count == 0`, then we early-return'd above.
+   assert(count != 0);
+   // The number of bytes we need to allocate. Note that this cannot overflow
+   // because we guard against it by checking against `max_size()`
+   const size_t new_buffer_size = count * sizeof(T);
+   // Attempt to reallocate the region
+   T *const new_buffer = (T *)realloc(self->data, new_buffer_size);
+   if (!new_buffer) {
+      // Failed to reallocate a new storage region
+      return false;
+   }
+   // Successfully reallocated the buffer. Update our storage pointer.
+   self->data = new_buffer;
+   // Note the new capacity.
+   self->capacity = count;
+   return true;
+}
+
+/**
+ * @brief Destroy elements in the vector at the specified range positions
+ *
+ * @param self The vector to be updated
+ * @param first Pointer to the first element to be destroyed
+ * @param last Pointer to the first element to NOT be destroyed
+ *
+ * Elements are destroyed and removed starting at the end. If `first == last`,
+ * this is a no-op. The given pointers must refer to vector elements, and `last`
+ * must be reachable by advancing `first` zero or more times.
+ */
+vec_inline_spec void
+fn(erase(VecName *const self, T *const first, T *const last))
+{
+   // Number of elements following the removed region
+   const size_t n_tail_elements = (size_t)(fn(end(self)) - last);
+   // Destroy elements in reverse order:
+   for (T *r_iter = last; r_iter != first; --r_iter) {
+      VecDestroyElement((r_iter - 1));
+      --self->size;
+   }
+   // This mult cannot overflow because we can never contain enough elements to overflow PTRDIFF_MAX
+   const size_t n_bytes_to_shift = n_tail_elements * sizeof(T);
+   // If there are any elements to be shifted, shift them down over the removed region
+   if (n_bytes_to_shift) {
+      // Shift all tail elements down into their new position
+      memmove(first, last, n_bytes_to_shift);
+   }
+}
+
+/**
+ * @brief Destroy a single element at the given zero-based index position
+ */
+vec_inline_spec void
+fn(erase_at(VecName *const self, size_t pos))
+{
+   fn(erase(self, fn(begin(self)) + pos, fn(end(self))));
+}
+
+/**
+ * @brief Resize the vector to hold the given number of elements
+ *
+ * Newly added elements are zero-initialized, or initailized using VecInitElement
+ *
+ * @retval true If-and-only-if the resize was successful
+ * @retval false If the function failed to allocate the new storage region
+ *
+ * @note Don't forget to check the return value for success!
+ */
+// mlib_nodiscard ("Check the returned bool to detect allocation failure")
+vec_inline_spec bool
+fn(resize(VecName *const self, size_t const count)) mlib_noexcept
+{
+   // Check if we aren't actually growing the vector.
+   if (count <= self->size) {
+      // We need to destroy elements at the tail. If `count == size`, this is a no-op.
+      if (self->data) {
+         fn(erase(self, fn(begin(self)) + count, fn(end(self))));
+      }
+      return true;
+   }
+
+   // We need to increase the capacity of the vector to hold the new elements
+   // Try to auto-grow capacity. Increase capacity by ×1.5
+   const size_t half_current_capacity = self->capacity / 2;
+   size_t new_capacity = 0;
+   if (mlib_unlikely(mlib_add(&new_capacity, self->size, half_current_capacity))) {
+      // The auto growth amount would overflow, so just cap to the max size.
+      new_capacity = fn(max_size());
+   }
+   // Check if our automatic growth is big enough to hold the requested number of elements
+   if (new_capacity < count) {
+      // The automatic growth factor is actually smaller than the number of new elements
+      // the caller wants, so we need to increase capacity to that level instead.
+      new_capacity = count;
+   }
+   // Try to reserve more storage
+   if (!fn(reserve(self, new_capacity))) {
+      // We failed to reserve the new storage region. The requested capacity may be too large,
+      // or we may have just run out of memory.
+      return false;
+   }
+
+   // Pointer to where the new end will be
+   T *const new_end = fn(begin(self)) + count;
+   // Create a zero-initialized object to copy over the top of each new element.
+   T zero;
+   memset(&zero, 0, sizeof zero);
+   // Call init() on ever new element up until the new size
+   for (T *iter = fn(end(self)); iter != new_end; ++iter) {
+      *iter = zero;
+      (void)(VecInitElement((iter)));
+   }
+
+   // Update the stored size
+   self->size = count;
+   return true;
+}
+
+/**
+ * @brief Append another element, returning a pointer to that element.
+ *
+ * @return T* A pointer to the newly added element, or NULL in case of allocation failure.
+ */
+// mlib_nodiscard ("Check the returned pointer for failure")
+vec_inline_spec T *
+fn(push(VecName *self)) mlib_noexcept
+{
+   size_t count = self->size;
+   if (mlib_unlikely(mlib_add(&count, 1))) {
+      // Adding another element would overflow size_t. This is extremely unlikely,
+      // but precautionary.
+      return NULL;
+   }
+   if (!fn(resize(self, count))) {
+      // Failed to push another item
+      return NULL;
+   }
+   return fn(begin(self)) + count - 1;
+}
+
+/**
+ * @brief Create a new empty vector
+ */
+vec_inline_spec VecName fn(new(void)) mlib_noexcept
+{
+   VecName ret = {NULL, 0, 0};
+   return ret;
+}
+
+/**
+ * @brief Destroy the pointed-to vector, freeing the associated data buffer.
+ *
+ * The pointed-to vector becomes valid storage for a new vector object.
+ */
+vec_inline_spec void
+fn(destroy(VecName *self)) mlib_noexcept
+{
+   // Resizing to zero will destroy all elements
+   (void)fn(resize(self, 0));
+   // Resizing won't necessarily free the data buffer. Do that now.
+   free(self->data);
+   self->capacity = 0;
+   self->data = NULL;
+}
+
+/**
+ * @brief Create a new vector with `n` initialized elements
+ */
+vec_inline_spec VecName
+fn(new_n(size_t n, bool *okay)) mlib_noexcept
+{
+   VecName ret = fn(new());
+   *okay = fn(resize)(&ret, n);
+   return ret;
+}
+
+#ifdef VecCopyElement
+/**
+ * @brief Copy the data from the vector `src` into storage for a new vector `dst`
+ *
+ * @param dst_vec Pointer-to-storage for a new vector object to be initialized.
+ * @param src_vec Pointer to a vector whose elements will be copied into a new vector
+ * @retval true If-and-only-if the copy was successful.
+ * @retval false Otherwise
+ */
+vec_inline_spec bool
+fn(init_copy(VecName *dst_vec, VecName const *src_vec)) mlib_noexcept
+{
+   VecName tmp = fn(new());
+   // Try to reseve capacity for all new elements. Don't resize(), because we want
+   // uninitialized storage for the new data.
+   if (!fn(reserve(&tmp, src_vec->size))) {
+      // We failed to reserve capacity in the new vector
+      fn(destroy(&tmp));
+      // Always leave `dst_vec` in an initialized state.
+      *dst_vec = (VecName){NULL, 0, 0};
+      return false;
+   }
+   // Copy everything into the destination element-by-element
+   {
+      // Input iterator
+      T const *in_iter = fn(cbegin(src_vec));
+      // Input stop position
+      T const *const in_stop = fn(cend(src_vec));
+      // Output iterator
+      T *out_iter = tmp.data;
+      // Copy from the first to the last
+      for (; in_iter != in_stop; ++in_iter, ++out_iter) {
+         // Try to copy into the new element
+         if (!VecCopyElement((out_iter), (in_iter))) {
+            // Failed copying here. Undo everything by destroying the temporary
+            fn(destroy(&tmp));
+            // Always leave `dst_vec` in an initialized state.
+            *dst_vec = (VecName){NULL, 0, 0};
+            return false;
+         }
+         // Update the size of the temporary vec to record that it is holding the new
+         // element. This allows us to call `destroy()` to undo our work.
+         tmp.size++;
+      }
+   }
+   // Everything went okay. Give the temporary to the caller as the final result
+   *dst_vec = tmp;
+   return true;
+}
+#endif // VecCopyElement
+
+#ifndef mlib_vec_foreach
+#define mlib_vec_foreach(Type, VarName, Vector) \
+   for (Type *VarName = (Vector).data; VarName && (VarName != (Vector).data + (Vector).size); ++VarName)
+#endif
+
+#ifndef mlib_vec_at
+/**
+ * @brief Obtain a vector element at some zero-based index offset, with negative index
+ * wrapping (-1 refers to the last element in the vector)
+ *
+ * @note The `Vec` argument will be evaluated at least twice!
+ */
+#define mlib_vec_at(Vec, Pos) ((Vec).data[_mlib_vec_index_adjust((Vec).size, mlib_upsize_integer(Pos))])
+static inline size_t
+_mlib_vec_index_adjust(size_t size, mlib_upsized_integer pos)
+{
+   if (pos.is_signed && pos.bits.as_signed < 0) {
+      return mlib_assert_add(size_t, size, pos.bits.as_signed);
+   }
+   mlib_check(pos.bits.as_unsigned, lte, size, because, "the vector index must be in-bounds for mlib_vec_at()");
+   return pos.bits.as_unsigned;
+}
+#endif
+
+mlib_extern_c_end();
+
+#undef T
+#undef VecName
+#undef VecDestroyElement
+#undef VecInitElement
+#undef VecTrivialCopyElement
+#ifdef VecCopyElement
+#undef VecCopyElement
+#endif
+// These ones we want to pop, not undefine:
+#pragma pop_macro("fn")
+#pragma pop_macro("vec_inline_spec")
+
+// vi: ft=c

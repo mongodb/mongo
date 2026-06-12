@@ -21,17 +21,17 @@
 #define BSON_VALUE_H
 
 
-#include <bson/bson-macros.h>
 #include <bson/bson-types.h>
+#include <bson/macros.h>
 
 
 BSON_BEGIN_DECLS
 
 
-BSON_EXPORT (void)
-bson_value_copy (const bson_value_t *src, bson_value_t *dst);
-BSON_EXPORT (void)
-bson_value_destroy (bson_value_t *value);
+BSON_EXPORT(void)
+bson_value_copy(const bson_value_t *src, bson_value_t *dst);
+BSON_EXPORT(void)
+bson_value_destroy(bson_value_t *value);
 
 
 BSON_END_DECLS

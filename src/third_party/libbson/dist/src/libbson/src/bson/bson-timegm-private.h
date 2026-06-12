@@ -21,8 +21,8 @@
 #define BSON_TIMEGM_PRIVATE_H
 
 
-#include <bson/bson-compat.h>
-#include <bson/bson-macros.h>
+#include <bson/compat.h>
+#include <bson/macros.h>
 
 
 BSON_BEGIN_DECLS
@@ -43,7 +43,7 @@ struct bson_tm {
 };
 
 int64_t
-_bson_timegm (struct bson_tm *const tmp);
+_bson_timegm(struct bson_tm *const tmp);
 
 BSON_END_DECLS
 

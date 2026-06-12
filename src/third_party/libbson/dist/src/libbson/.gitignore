@@ -7,7 +7,6 @@ ChangeLog
 CMakeFiles
 CMakeCache.txt
 compile
-config.*
 !config.yml
 configure
 depcomp
