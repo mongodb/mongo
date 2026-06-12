@@ -54,7 +54,9 @@ using opentelemetry::trace::propagation::HttpTraceContext;
 
 class TelemetryContextSerializationTest : public traces::OtelTestFixture {
 protected:
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagTracing", true};
+    RAIIServerParameterControllerForTest _featureFlagTracingController{"featureFlagTracing", true};
+    RAIIServerParameterControllerForTest _featureFlagSamplingController{
+        "featureFlagOtelTraceSampling", true};
 };
 
 BSONObj serializeTraceContextOnly(const std::shared_ptr<TelemetryContext>& context) {

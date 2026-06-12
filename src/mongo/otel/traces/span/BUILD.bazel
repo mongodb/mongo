@@ -44,9 +44,11 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/otel:otel_base",
+        "//src/mongo/otel/traces/sampler",
     ] + select({
         "@//bazel/config:build_otel_enabled": [
             "//src/mongo/otel/traces:tracer_provider_service",
+            "//src/mongo/otel/traces:tracing_feature_flags",
             "//src/third_party/opentelemetry-cpp/api",
         ],
         "//conditions:default": [],
@@ -64,7 +66,9 @@ mongo_cc_unit_test(
     deps = [
         ":span",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/otel/traces:tracing_test_util",
+        "//src/mongo/otel/traces/sampler",
     ],
 )
 

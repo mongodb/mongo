@@ -29,8 +29,10 @@
 
 #include "mongo/otel/traces/span/span.h"
 
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/otel_test_fixture.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span_names.h"
 
 namespace mongo {
@@ -80,6 +82,10 @@ struct SpanNameHelper<StringApi> {
 template <typename T>
 class SpanTest : public OtelTestFixture {
 protected:
+    // Enable OTel sampling for all span tests; individual tests may override.
+    RAIIServerParameterControllerForTest _samplingFlagController{"featureFlagOtelTraceSampling",
+                                                                 true};
+
     auto name1() {
         return SpanNameHelper<T>::name1();
     }
@@ -352,6 +358,79 @@ TYPED_TEST(SpanTest, StartIfExistingTraceParentIfTraceParent) {
         ASSERT_TRUE(this->isEmpty());
     }
     ASSERT_FALSE(this->isEmpty());
+}
+
+TYPED_TEST(SpanTest, SamplingFlagDisabledDropsRootSpan) {
+    auto guard = setTraceSamplingFnForTest([](StringData) { return true; });
+    RAIIServerParameterControllerForTest flagController("featureFlagOtelTraceSampling", false);
+
+    auto opCtx = this->makeOperationContext();
+    {
+        auto span = Span::start(opCtx.get(), this->name1());
+    }
+    EXPECT_TRUE(this->isEmpty());
+}
+
+TYPED_TEST(SpanTest, TracingFlagDisabledDropsRootSpan) {
+    auto guard = setTraceSamplingFnForTest([](StringData) { return true; });
+    RAIIServerParameterControllerForTest flagController("featureFlagTracing", false);
+
+    auto opCtx = this->makeOperationContext();
+    {
+        auto span = Span::start(opCtx.get(), this->name1());
+    }
+    EXPECT_TRUE(this->isEmpty());
+}
+
+TYPED_TEST(SpanTest, SamplingFlagEnabledSamplerReturnsTrueExportsSpan) {
+    auto guard = setTraceSamplingFnForTest([](StringData) { return true; });
+
+    auto opCtx = this->makeOperationContext();
+    {
+        auto span = Span::start(opCtx.get(), this->name1());
+    }
+    EXPECT_FALSE(this->isEmpty());
+}
+
+TYPED_TEST(SpanTest, SamplingFlagEnabledSamplerReturnsFalseDropsSpan) {
+    auto guard = setTraceSamplingFnForTest([](StringData) { return false; });
+
+    auto opCtx = this->makeOperationContext();
+    {
+        auto span = Span::start(opCtx.get(), this->name1());
+    }
+    EXPECT_TRUE(this->isEmpty());
+}
+
+TYPED_TEST(SpanTest, SamplingDroppedRootMeansChildHasNoParentAndIsAlsoDropped) {
+    auto guard = setTraceSamplingFnForTest([](StringData) { return false; });
+
+    auto opCtx = this->makeOperationContext();
+    {
+        // Root is dropped: Span{} is returned and no OTel context is set.
+        // The subsequent "child" therefore has no real OTel parent and is also dropped.
+        auto rootSpan = Span::start(opCtx.get(), this->name1());
+        auto childSpan = Span::start(opCtx.get(), this->name2());
+    }
+    EXPECT_TRUE(this->isEmpty());
+}
+
+TYPED_TEST(SpanTest, SamplingFlagEnabledChildOfRealParentAlwaysExported) {
+    auto opCtx = this->makeOperationContext();
+    {
+        // Sampler approves only name1; name2 is rejected. The child span must still
+        // be created because it has a real OTel parent context and bypasses the sampler.
+        auto guard = setTraceSamplingFnForTest(
+            [&](StringData name) { return name == this->toString(this->name1()); });
+        auto rootSpan = Span::start(opCtx.get(), this->name1());
+        auto childSpan = Span::start(opCtx.get(), this->name2());
+    }
+    // Both root and child should be exported.
+    ASSERT_FALSE(this->isEmpty());
+    auto rootRecord = this->getSpan(1, this->toString(this->name1()));
+    EXPECT_EQ(rootRecord->parentId, opentelemetry::trace::SpanId());
+    auto childRecord = this->getSpan(0, this->toString(this->name2()));
+    EXPECT_NE(childRecord->parentId, opentelemetry::trace::SpanId());
 }
 
 }  // namespace

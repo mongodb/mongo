@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/traces/tracing_feature_flags_gen.h"
+#pragma once
+
+#include "mongo/base/string_data.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
 
 namespace mongo::otel::traces {
 
-bool isTracingEnabled(OperationContext* opCtx) {
-#ifndef MONGO_CONFIG_OTEL
-    return false;
-#else
-    if (!opCtx) {
-        return false;
-    }
-    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (!fcv.isVersionInitialized()) {
-        return false;
-    }
-    const auto& context = VersionContext::getDecoration(opCtx);
-    return feature_flags::gFeatureFlagTracing.isEnabled(context, fcv) &&
-        feature_flags::gFeatureFlagOtelTraceSampling.isEnabled(context, fcv);
-#endif
-}
+/** Decides whether a span should initiate a trace. */
+class MONGO_MOD_PUBLIC TracingSampler {
+public:
+    /** Returns the global sampler instance. */
+    static TracingSampler& get();
+
+    virtual ~TracingSampler() = default;
+
+    /** Returns whether this span should start a trace. */
+    virtual bool shouldSample(StringData spanName) const = 0;
+};
+
+/** Interface for overriding the global sampler, for use in tests. */
+class MONGO_MOD_PUBLIC SamplerOverride {
+public:
+    virtual ~SamplerOverride() = default;
+};
+using ScopedSamplerOverride = std::unique_ptr<SamplerOverride>;
+
+/**
+ * Replaces the global sampler with one that calls fn for `shouldSample`, for testing purposes.
+ * Returns a guard that restores the previous sampler on destruction. This is not thread-safe.
+ */
+[[nodiscard]] MONGO_MOD_PUBLIC ScopedSamplerOverride
+setTraceSamplingFnForTest(unique_function<bool(StringData)> fn);
 
 }  // namespace mongo::otel::traces

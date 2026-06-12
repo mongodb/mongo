@@ -32,8 +32,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/otel/telemetry_context_holder.h"
+#include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/otel/traces/tracing_feature_flags_gen.h"
 #include "mongo/otel/traces/tracing_utils.h"
 #include "mongo/util/assert_util.h"
 
@@ -175,6 +177,17 @@ Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx,
     }
 
     ScopedSpan parentSpan = spanCtx->getSpan();
+    bool hasParent = parentSpan->GetContext().IsValid();
+
+    if (!hasParent) {
+        // Root span: drop if either feature flag is disabled or the sampler rejects it.
+        // (Ignore FCV check) — no VersionContext is available in this path.
+        if (!feature_flags::gFeatureFlagTracing.isEnabledAndIgnoreFCVUnsafe() ||
+            !feature_flags::gFeatureFlagOtelTraceSampling.isEnabledAndIgnoreFCVUnsafe() ||
+            !TracingSampler::get().shouldSample(name)) {
+            return Span{};
+        }
+    }
 
     opentelemetry::trace::StartSpanOptions opts;
     opts.parent = parentSpan->GetContext();

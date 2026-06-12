@@ -20,8 +20,8 @@ idl_generator(
 )
 
 idl_generator(
-    name = "tracing_feature_flag_gen",
-    src = "tracing_feature_flag.idl",
+    name = "tracing_feature_flags_gen",
+    src = "tracing_feature_flags.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -71,15 +71,25 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "tracing_feature_flags",
+    srcs = [
+        ":tracing_feature_flags_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
     name = "tracing_enablement",
     srcs = [
         "tracing_enablement.cpp",
-        ":tracing_feature_flag_gen",
     ],
     hdrs = [
         "tracing_enablement.h",
     ],
     deps = [
+        ":tracing_feature_flags",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
     ],

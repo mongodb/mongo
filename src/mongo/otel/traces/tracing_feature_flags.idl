@@ -40,3 +40,11 @@ feature_flags:
         default: true
         fcv_gated: true
         version: 8.3
+
+    featureFlagOtelTraceSampling:
+        mod_visibility: public
+        description: >-
+            Feature flag for enabling head-based sampling of tracing spans in the server code.
+        cpp_varname: gFeatureFlagOtelTraceSampling
+        default: false
+        fcv_gated: true
