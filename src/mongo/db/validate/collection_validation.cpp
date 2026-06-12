@@ -45,7 +45,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -61,6 +60,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_adaptor.h"
+#include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -1018,6 +1018,12 @@ Status validate(OperationContext* opCtx,
         // the collection. For clustered collections, the validator also verifies that the
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
+
+        // TODO (SERVER-76345): Remove feature flag branch
+        if (gFeatureFlagParallelCollectionValidation.isEnabled()) {
+            LOGV2_INFO(7634500, "Parallel record store traversal is not yet implemented");
+        }
+
         indexValidator.traverseRecordStore(opCtx, results, validateState.validationVersion());
 
         if (validateState.isCollHashValidation()) {
