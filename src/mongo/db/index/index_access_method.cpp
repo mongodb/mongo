@@ -902,7 +902,7 @@ public:
                   const OnSuppressedErrorFn& onSuppressedError = nullptr,
                   const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) final;
 
-    void done() final;
+    void done(bool forceSpill) final;
 
     Status commit(OperationContext* opCtx,
                   RecoveryUnit& ru,
@@ -1160,9 +1160,12 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
     return Status::OK();
 }
 
-void BulkBuilderImpl::done() {
+void BulkBuilderImpl::done(bool forceSpill) {
     invariant(_sorter);
     tassert(12723200, "BulkBuilder::done called more than once", !_sortedIterator);
+    if (forceSpill) {
+        _sorter->spill();
+    }
     _sortedIterator = _sorter->done();
 }
 

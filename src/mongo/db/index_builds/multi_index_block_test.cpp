@@ -2419,6 +2419,119 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
     resumedIndexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+// A build that spilled during its scan and then resumed from the scan phase must still be treated
+// as "spilled" even when the resumed scan portion is small enough that it does not spill again.
+TEST_F(MultiIndexBlockTest, ResumeFromScanWithSpilledRangesPersistsLoadPhaseWithoutRespilling) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    const auto buildUUID = UUID::gen();
+    auto configurePdib = [&](MultiIndexBlock& idx) {
+        idx.setBuildUUID(buildUUID);
+        idx.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+        idx.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+        idx.setIsResumable(true);
+    };
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    // Original build: 20 docs of 64 KB exceed the 1 MB limit and spill during the scan.
+    auto& indexer = *getIndexer();
+    configurePdib(indexer);
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        std::string val(64 * 1024, 'a');
+        for (auto i = 0; i < 20; ++i) {
+            ASSERT_OK(
+                Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
+        }
+        wuow.commit();
+    }
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo =
+        index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+    ASSERT_TRUE(resumeInfo);
+    // Precondition: the original build spilled, so its persisted state carries ranges.
+    ASSERT_TRUE(resumeInfo->getIndexes()[0].getRanges());
+    EXPECT_FALSE(resumeInfo->getIndexes()[0].getRanges()->empty());
+    // Simulate a step-down mid-scan: override the persisted phase to kCollectionScan.
+    resumeInfo->setPhase(IndexBuildPhaseEnum::kCollectionScan);
+    auto savedPosition = index_builds::minLastSpilledRecordId(resumeInfo->getIndexes());
+    EXPECT_TRUE(savedPosition);
+
+    indexer.markAsCleanedUp();
+
+    // Raise the memory budget so the resumed scan does not spill again, and install a fresh
+    // observer so it captures only the resumed build's container writes.
+    maxIndexBuildMemoryUsageMegabytes.store(1024);
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    MultiIndexBlock resumedIndexer;
+    configurePdib(resumedIndexer);
+    ASSERT_OK(resumedIndexer.init(operationContext(),
+                                  coll,
+                                  {indexBuildInfo},
+                                  MultiIndexBlock::kNoopOnInitFn,
+                                  MultiIndexBlock::InitMode::SteadyState,
+                                  resumeInfo));
+    ASSERT_OK(resumedIndexer.insertAllDocumentsInCollection(
+        operationContext(), getNSS(), *savedPosition));
+
+    // The resumed build saw the prior ranges and treated it as spilled so, even though the resumed
+    // scan did not spill, the load transition force-spilled the remainder and updated the persisted
+    // phase to the load phase.
+    auto isMetadataKey = [](const auto& op) {
+        return std::holds_alternative<int64_t>(op.key) && std::get<int64_t>(op.key) == 1;
+    };
+    bool wroteBulkLoadMetadata = false;
+    auto scanForBulkLoad = [&](const std::vector<ResumeStateContainerInsertObserver::Op>& ops) {
+        for (const auto& op : ops) {
+            if (op.ident != indexBuildIdent || !isMetadataKey(op)) {
+                continue;
+            }
+            auto metadata = IndexBuildMetadata::parse(BSONObj(op.value.data()),
+                                                      IDLParserContext("IndexBuildMetadata"));
+            if (metadata.getPhase() == IndexBuildPhaseEnum::kBulkLoad) {
+                wroteBulkLoadMetadata = true;
+            }
+        }
+    };
+    scanForBulkLoad(observer.inserts);
+    scanForBulkLoad(observer.updates);
+    EXPECT_TRUE(wroteBulkLoadMetadata);
+
+    resumedIndexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpilledRecordId) {
     RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
     RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
@@ -3156,6 +3269,10 @@ TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBui
         "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
     RAIIServerParameterControllerForTest resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
+    // Periodic load-phase resume-state writes only happen when the build spilled during the scan.
+    // Force spilling with a tiny memory budget and large index keys.
+    RAIIServerParameterControllerForTest memUsage{"maxIndexBuildMemoryUsageMegabytes", 2};
+    RAIIServerParameterControllerForTest iteratorsMemoryPct{"maxIteratorsMemoryUsagePercentage", 1};
 
     promoteMockReplCoordToPrimary(getServiceContext());
     auto& observer = installResumeStateContainerObserver(operationContext());
@@ -3174,7 +3291,132 @@ TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBui
     indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer.setIsResumable(true);
 
+    // 50 distinct ~64KB keys (~3.2MB total) exceed the 2MB budget above, forcing at least one spill
+    // during the scan phase.
     WriteUnitOfWork wuow(operationContext());
+    for (auto i = 0; i < 50; ++i) {
+        ASSERT_OK(Helpers::insert(
+            operationContext(),
+            coll.get(),
+            BSON("_id" << i << "a" << (std::to_string(i) + std::string(64 * 1024, 'a')))));
+    }
+    wuow.commit();
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    // Collect every per-index resume-state record (key=2) written across the build and parse each
+    // IndexStateInfo. Records written during the scan phase carry a `lastSpilledRecordId`, while
+    // the initial seed (written before any spill) and the periodic load phase writes do not.
+    auto isPerIndexKey = [](const auto& op) {
+        return std::holds_alternative<int64_t>(op.key) && std::get<int64_t>(op.key) == 2;
+    };
+    size_t scanSpillWrites = 0;    // onSpill writes during the scan (carry lastSpilledRecordId)
+    size_t seedAndLoadWrites = 0;  // seed + periodic load-phase writes (no lastSpilledRecordId)
+    auto classify = [&](const std::vector<ResumeStateContainerInsertObserver::Op>& ops) {
+        for (const auto& op : ops) {
+            if (op.ident != indexBuildIdent || !isPerIndexKey(op)) {
+                continue;
+            }
+            auto info =
+                IndexStateInfo::parse(BSONObj(op.value.data()), IDLParserContext("IndexStateInfo"));
+            if (info.getLastSpilledRecordId()) {
+                ++scanSpillWrites;
+            } else {
+                ++seedAndLoadWrites;
+            }
+        }
+    };
+    classify(observer.inserts);
+    classify(observer.updates);
+
+    // The build spilled during the scan, so at least one onSpill write carries a
+    // lastSpilledRecordId.
+    EXPECT_GE(scanSpillWrites, 1);
+    // 1 seed + 5 periodic load-phase writes (50 keys / interval 10), none of which carry a
+    // lastSpilledRecordId.
+    EXPECT_EQ(seedAndLoadWrites, 6);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, NonSpillingPrimaryDrivenBuildDoesNotPersistLoadPhase) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto indexer = getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    // Builds an index over a single small document, which is not large enough to spill.
+    auto handle =
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, acq, coll, getNSS());
+
+    // Because the build never spilled, the persisted resume state must still be at the
+    // scan phase (so a resume rescans the collection), not the load phase.
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), handle.indexBuildIdent);
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(resumeInfo->getPhase(), IndexBuildPhaseEnum::kCollectionScan);
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, NonSpillingPrimaryDrivenBuildSkipsPeriodicLoadResumeStateWrites) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+    // A tiny resume-state interval would trigger periodic load-phase writes if the build spilled.
+    RAIIServerParameterControllerForTest insertionBatchSize{
+        "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
+    RAIIServerParameterControllerForTest resumeStateInterval{
+        "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto& indexer = *getIndexer();
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    // Small documents under the default memory budget never spill the sorter.
+    WriteUnitOfWork wuow{operationContext()};
     for (auto i = 0; i < 50; ++i) {
         ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << i)));
     }
@@ -3198,40 +3440,9 @@ TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBui
     auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
     ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
 
-    // 50 keys with interval=10 deterministically produces 5 periodic OnNKeysLoadedFn callbacks
-    // (one per 10 committed keys, including the final batch). Each callback writes a single
-    // per-index record (key=2). The 5 load-phase updates plus the initial seed (1 transaction
-    // with insert key=1 + insert key=2 at phase=kCollectionScan) and the kBulkLoad transition
-    // (update key=1) give 5 + 2 + 1 = 8 ops for a single-index build.
-    auto opsObserved = observer.countInsertsForIdent(indexBuildIdent) +
-        observer.countUpdatesForIdent(indexBuildIdent);
-    EXPECT_EQ(opsObserved, 8U);
-
-    // Filter the per-index records (key=2) and confirm we see the seed (1 insert) plus 5
-    // load-phase updates from OnNKeysLoadedFn = 6 records. None of them carry a
-    // `lastSpilledRecordId`: the seed runs at phase=kCollectionScan but no spill has yet set
-    // `index.lastSpilledRecordId`, and the load-phase writes happen at phase=kBulkLoad where
-    // `_buildIndexStateInfo` doesn't populate that field.
-    auto isPerIndexKey = [](const auto& op) {
-        return std::holds_alternative<int64_t>(op.key) && std::get<int64_t>(op.key) == 2;
-    };
-    std::vector<IndexStateInfo> persistedStates;
-    for (const auto& op : observer.inserts) {
-        if (op.ident == indexBuildIdent && isPerIndexKey(op)) {
-            persistedStates.push_back(IndexStateInfo::parse(BSONObj(op.value.data()),
-                                                            IDLParserContext("IndexStateInfo")));
-        }
-    }
-    for (const auto& op : observer.updates) {
-        if (op.ident == indexBuildIdent && isPerIndexKey(op)) {
-            persistedStates.push_back(IndexStateInfo::parse(BSONObj(op.value.data()),
-                                                            IDLParserContext("IndexStateInfo")));
-        }
-    }
-    EXPECT_EQ(persistedStates.size(), 6U);
-    for (const auto& info : persistedStates) {
-        EXPECT_FALSE(info.getLastSpilledRecordId());
-    }
+    // The build never spilled, so the only container writes are the initial seed.
+    EXPECT_EQ(observer.countInsertsForIdent(indexBuildIdent), 2);
+    EXPECT_EQ(observer.countUpdatesForIdent(indexBuildIdent), 0);
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }

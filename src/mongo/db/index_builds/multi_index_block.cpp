@@ -555,6 +555,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
                 stateInfo = *stateInfoIt;
                 index.lastSpilledRecordId = stateInfo->getLastSpilledRecordId();
+                if (stateInfo->getRanges() && !stateInfo->getRanges()->empty()) {
+                    _anyIndexSpilled = true;
+                }
                 auto status = index.block->initForResume(opCtx,
                                                          collection.getWritableCollection(opCtx),
                                                          indexes[i],
@@ -589,6 +592,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                     .onSpill =
                         [this, opCtx, i, &lastSpilledRecordId = index.lastSpilledRecordId] {
                             hangAfterIndexBuildSpillBeforeStatePersisted.pauseWhileSet();
+                            _anyIndexSpilled = true;
                             lastSpilledRecordId = _lastRecordIdInserted;
                             if (_isResumable) {
                                 _writeIndexStateInfoToContainer(opCtx, i);
@@ -1159,14 +1163,16 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                   _phase == IndexBuildPhaseEnum::kBulkLoad,
               idl::serialize(_phase));
 
-    // Finalize all builders (which may perform a final spill) before transitioning to the load
-    // phase.
     for (auto&& index : _indexes) {
-        index.bulk->done();
+        // If the build has spilled, force all builders to spill their in-memory remainder so the
+        // persisted sorter is a complete copy and it's safe to resume from the load phase.
+        index.bulk->done(/*forceSpill=*/_anyIndexSpilled);
     }
 
-    // If the phase changed, write the new phase to the index build container.
-    if (std::exchange(_phase, IndexBuildPhaseEnum::kBulkLoad) != IndexBuildPhaseEnum::kBulkLoad) {
+    // If the phase changed and the build has spilled, write the new phase to the index build
+    // container.
+    if (std::exchange(_phase, IndexBuildPhaseEnum::kBulkLoad) != IndexBuildPhaseEnum::kBulkLoad &&
+        _anyIndexSpilled) {
         _writeIndexBuildMetadataToContainer(opCtx);
     }
 
@@ -1232,8 +1238,8 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                         opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished)};
         };
 
-        const bool periodicResumeStateWrites =
-            _isResumable && _containerWriteBehavior == ContainerWriteBehavior::kReplicate;
+        const bool periodicResumeStateWrites = _isResumable &&
+            _containerWriteBehavior == ContainerWriteBehavior::kReplicate && _anyIndexSpilled;
         Status status = _indexes[i].bulk->commit(
             opCtx,
             *shard_role_details::getRecoveryUnit(opCtx),

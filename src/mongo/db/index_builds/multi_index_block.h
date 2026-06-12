@@ -439,6 +439,9 @@ private:
     // True if init() was called with a resumeInfo.
     bool _wasResumed = false;
 
+    // Whether any of this builder's indexes have spilled.
+    bool _anyIndexSpilled = false;
+
     bool _ignoreUnique = false;
 
     // True if one or more indexes being built are on time-series measurements.

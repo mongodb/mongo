@@ -266,7 +266,7 @@ public:
          * Signals to the builder that inserting has been completed. Must be called exactly once,
          * before commit().
          */
-        virtual void done() = 0;
+        virtual void done(bool forceSpill = false) = 0;
 
         /**
          * Commit the data that was inserted. done() must have been called first.
