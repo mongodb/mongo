@@ -329,6 +329,51 @@ std::string getNameFromPeerInfo(Client* client) {
 #endif
 }
 
+AuthenticateReply _runSaslStartForX509(OperationContext* opCtx,
+                                       AuthenticationSession* session,
+                                       const AuthenticateCommand& cmd) {
+    auto client = opCtx->getClient();
+    auto dbname = cmd.getDbName();
+    auto user = cmd.getUser();
+    auto mechanism = cmd.getMechanism();
+
+    // Synthesize the SASLStartCommand.
+    auth::SaslStartCommand request;
+    auto payload = generateSaslPayload(user, dbname);
+
+    request.setPayload(std::move(payload));
+    request.setDbName(dbname);
+    request.setMechanism(mechanism);
+    request.setSerializationContext(cmd.getSerializationContext());
+
+    // Log Authenticate command.
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2_DEBUG(8209201,
+                    2,
+                    "Authenticate Command",
+                    "client"_attr = client->getRemote(),
+                    "mechanism"_attr = mechanism,
+                    "user"_attr = user,
+                    logAttrs(dbname));
+    }
+
+    // Run SASL Start.
+    // We do not need to check the response to runSaslStart because that function
+    // will throw and we will eventually get caught by the AuthenticationSession
+    // stepguard.
+    auto saslStartReply = runSaslStart(opCtx, session, request);
+    uassert(ErrorCodes::InternalError,
+            "saslStart unexpectedly did not complete for authenticate",
+            saslStartReply.getDone() == true);
+
+    // Translate SASLStartReply and return AuthenticateReply.
+    AuthenticateReply reply;
+    reply.setUser(session->getUserName());
+    reply.setDbname(session->getDatabase());
+
+    return reply;
+}
+
 /**
  * The steps of authCommand (sans feature flag) are below.
  *
@@ -393,39 +438,13 @@ AuthenticateReply authCommand(OperationContext* opCtx,
         return reply;
     }
 
-    // Synthesize the SASLStartCommand.
-    auth::SaslStartCommand request;
-    auto payload = generateSaslPayload(user, dbname);
-
-    request.setPayload(std::move(payload));
-    request.setDbName(dbname);
-    request.setMechanism(mechanism);
-    request.setSerializationContext(cmd.getSerializationContext());
-
-    // Log Authenticate command.
-    if (!serverGlobalParams.quiet.load()) {
-        LOGV2_DEBUG(8209201,
-                    2,
-                    "Authenticate Command",
-                    "client"_attr = client->getRemote(),
-                    "mechanism"_attr = mechanism,
-                    "user"_attr = user,
-                    logAttrs(dbname));
+    // Before converting this to SaslStart, ensure that the mechanism is X.509.
+#ifdef MONGO_CONFIG_SSL
+    if (mechanism == auth::kMechanismMongoX509) {
+        return _runSaslStartForX509(opCtx, session, cmd);
     }
-
-    // Run SASL Start.
-    // We do not need to check the response to runSaslStart because that function
-    // will throw and we will eventually get caught by the AuthenticationSession
-    // stepguard.
-    auto saslStartReply = runSaslStart(opCtx, session, request);
-    invariant(saslStartReply.getDone() == true);
-
-    // Translate SASLStartReply and return AuthenticateReply.
-    AuthenticateReply reply;
-    reply.setUser(session->getUserName());
-    reply.setDbname(session->getDatabase());
-
-    return reply;
+#endif
+    uasserted(ErrorCodes::BadValue, str::stream() << "Unsupported mechanism: " << mechanism);
 }
 
 class CmdAuthenticate final : public AuthenticateCmdVersion1Gen<CmdAuthenticate> {
